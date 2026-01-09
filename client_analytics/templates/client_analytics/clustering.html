@@ -1,0 +1,225 @@
+{% extends 'client_analytics/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Clustering - {{ dataset.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-5 mb-3">
+            <i class="bi bi-diagram-3 text-danger"></i> Clustering K-Means - {{ dataset.name }}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'client_analytics:home' %}">Accueil</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'client_analytics:dataset_overview' dataset.pk %}">{{ dataset.name }}</a></li>
+                <li class="breadcrumb-item active">Clustering</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- Form -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0"><i class="bi bi-gear"></i> Configuration du Clustering</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label"><strong>Variables pour le Clustering</strong></label>
+                            <select name="feature_columns" id="feature_columns" class="form-select" multiple size="10" required>
+                                {% for col in numeric_columns %}
+                                <option value="{{ col }}">{{ col }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Sélectionner plusieurs variables (Ctrl+clic). Uniquement variables numériques.</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="n_clusters" class="form-label"><strong>Nombre de Clusters (k)</strong></label>
+                                <input type="range" class="form-range" name="n_clusters" id="n_clusters" 
+                                       min="2" max="10" value="3" oninput="document.getElementById('k_value').textContent = this.value">
+                                <div class="text-center">
+                                    <span class="badge bg-danger fs-4" id="k_value">3</span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="standardize" id="standardize" checked>
+                                    <label class="form-check-label" for="standardize">
+                                        <strong>Standardiser les variables</strong>
+                                    </label>
+                                </div>
+                                <div class="form-text">Recommandé si les variables ont des échelles différentes</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-play-fill"></i> Lancer le Clustering
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results -->
+{% if results %}
+{% if results.success %}
+<div class="row">
+    <div class="col-12">
+        <div class="alert alert-success d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-check-circle"></i> Clustering effectué avec succès!</span>
+            <a href="{% url 'client_analytics:clustering_export' dataset.pk %}" class="btn btn-sm btn-success">
+                <i class="bi bi-download"></i> Exporter CSV avec Clusters
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Metrics -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-danger">{{ results.n_clusters }}</h2>
+                <p class="text-muted mb-0">Nombre de Clusters</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-warning">{{ results.inertia|floatformat:2 }}</h2>
+                <p class="text-muted mb-0">Inertia</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center">
+            <div class="card-body">
+                {% if results.silhouette %}
+                <h2 class="text-success">{{ results.silhouette|floatformat:4 }}</h2>
+                {% else %}
+                <h2 class="text-muted">N/A</h2>
+                {% endif %}
+                <p class="text-muted mb-0">Silhouette Score</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- PCA Visualization -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-scatter-chart"></i> Visualisation PCA 2D</h5>
+            </div>
+            <div class="card-body">
+                {{ results.pca_plot_html|safe }}
+                <div class="small text-muted mt-2">
+                    <strong>Variance expliquée:</strong> 
+                    PC1: {{ results.pca_variance_explained.0|floatformat:2 }}%, 
+                    PC2: {{ results.pca_variance_explained.1|floatformat:2 }}%
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cluster Sizes -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Tailles des Clusters</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Cluster</th>
+                            <th>Taille</th>
+                            <th>Pourcentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for size_info in results.cluster_sizes %}
+                        <tr>
+                            <td><span class="badge bg-danger">Cluster {{ size_info.cluster }}</span></td>
+                            <td>{{ size_info.size }}</td>
+                            <td>
+                                {% widthratio size_info.size results.cluster_labels|length 100 %}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Centroids -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-star"></i> Centroïdes</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-sm table-striped">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>Cluster</th>
+                                {% for col in results.feature_columns %}
+                                <th class="small">{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for centroid in results.centroids %}
+                            <tr>
+                                <td><span class="badge bg-danger">{{ centroid.cluster }}</span></td>
+                                {% for col in results.feature_columns %}
+                                <td class="small">{{ centroid|get_item:col|floatformat:2 }}</td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle"></i> <strong>Erreur:</strong> {{ results.error }}
+</div>
+{% endif %}
+{% endif %}
+
+{% if not numeric_columns %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-circle"></i> Aucune variable numérique trouvée dans ce dataset. Le clustering nécessite des variables numériques.
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Custom filter for dict access in template
+// Note: In production, use a custom template filter
+</script>
+{% endblock %}

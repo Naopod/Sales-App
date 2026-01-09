@@ -1,0 +1,146 @@
+{% extends 'client_analytics/base.html' %}
+
+{% block title %}Workflow - Client Analytics{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-5 mb-4">
+            <i class="bi bi-diagram-3 text-primary"></i> Workflow d'Analyse
+        </h1>
+        <p class="lead">Découvrez le processus complet d'analyse de données du portail Client Analytics.</p>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <!-- Step 1 -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4><i class="bi bi-1-circle"></i> Préparation des Données</h4>
+            </div>
+            <div class="card-body">
+                <h5>Upload ou Sélection</h5>
+                <p>Commencez par uploader votre fichier Excel ou sélectionnez un dataset de démonstration. Le système accepte les formats .xlsx et .xls jusqu'à 10MB.</p>
+                <ul>
+                    <li>Upload de fichiers Excel</li>
+                    <li>Sélection de datasets démo</li>
+                    <li>Réutilisation de datasets existants</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h4><i class="bi bi-2-circle"></i> Overview du Dataset</h4>
+            </div>
+            <div class="card-body">
+                <h5>Exploration Initiale</h5>
+                <p>Visualisez les informations générales de votre dataset :</p>
+                <ul>
+                    <li><strong>Dimensions</strong> : Nombre de lignes et colonnes</li>
+                    <li><strong>Types de données</strong> : Numériques vs Catégorielles</li>
+                    <li><strong>Valeurs manquantes</strong> : Identification des données incomplètes</li>
+                    <li><strong>Statistiques descriptives</strong> : Moyennes, médianes, écarts-types</li>
+                    <li><strong>Aperçu des données</strong> : Premières lignes du dataset</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h4><i class="bi bi-3-circle"></i> Analyse Statistique</h4>
+            </div>
+            <div class="card-body">
+                <h5>Visualisations Interactives</h5>
+                <p>Explorez vos données avec des visualisations Plotly interactives :</p>
+                <ul>
+                    <li><strong>Histogrammes</strong> : Distribution des variables numériques</li>
+                    <li><strong>Graphiques en barres</strong> : Fréquences des variables catégorielles</li>
+                    <li><strong>Heatmap de corrélation</strong> : Relations entre variables numériques</li>
+                    <li><strong>Sélection de variables</strong> : Analyse globale ou variable spécifique</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning">
+                <h4><i class="bi bi-4-circle"></i> Modélisation Machine Learning</h4>
+            </div>
+            <div class="card-body">
+                <h5>Prédiction Automatisée</h5>
+                <p>Entraînez des modèles de Machine Learning sans coder :</p>
+                
+                <h6 class="mt-3">Classification</h6>
+                <ul>
+                    <li>Logistic Regression</li>
+                    <li>Random Forest Classifier</li>
+                    <li><strong>Métriques</strong> : Accuracy, F1-Score, Matrice de confusion</li>
+                </ul>
+
+                <h6 class="mt-3">Régression</h6>
+                <ul>
+                    <li>Linear Regression</li>
+                    <li>Random Forest Regressor</li>
+                    <li><strong>Métriques</strong> : RMSE, R², MSE</li>
+                </ul>
+
+                <h6 class="mt-3">Preprocessing Automatique</h6>
+                <ul>
+                    <li>Imputation des valeurs manquantes</li>
+                    <li>One-Hot Encoding pour variables catégorielles</li>
+                    <li>Standardisation des variables numériques</li>
+                    <li>Séparation Train/Test automatique</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="card mb-4">
+            <div class="card-header bg-danger text-white">
+                <h4><i class="bi bi-5-circle"></i> Clustering K-Means</h4>
+            </div>
+            <div class="card-body">
+                <h5>Segmentation Automatique</h5>
+                <p>Découvrez des groupes naturels dans vos données :</p>
+                <ul>
+                    <li><strong>Algorithme K-Means</strong> : Clustering non supervisé</li>
+                    <li><strong>Nombre de clusters</strong> : Ajustable de 2 à 10</li>
+                    <li><strong>Standardisation</strong> : Optionnelle pour normaliser les échelles</li>
+                    <li><strong>Visualisation PCA</strong> : Projection 2D des clusters</li>
+                    <li><strong>Métriques</strong> : Inertia, Silhouette Score</li>
+                    <li><strong>Centroids</strong> : Caractéristiques moyennes par cluster</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Step 6 -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h4><i class="bi bi-6-circle"></i> Interprétation et Export</h4>
+            </div>
+            <div class="card-body">
+                <h5>Outputs Exploitables</h5>
+                <p>Récupérez les résultats pour vos analyses :</p>
+                <ul>
+                    <li><strong>Export CSV</strong> : Dataset avec labels de clusters</li>
+                    <li><strong>Visualisations</strong> : Graphiques interactifs Plotly</li>
+                    <li><strong>Métriques</strong> : Performances détaillées des modèles</li>
+                    <li><strong>Feature Importance</strong> : Variables les plus influentes</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12 text-center">
+        <a href="{% url 'client_analytics:home' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-arrow-left"></i> Retour à l'Accueil
+        </a>
+    </div>
+</div>
+{% endblock %}

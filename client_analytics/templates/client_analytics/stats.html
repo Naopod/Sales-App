@@ -1,0 +1,432 @@
+{% extends 'client_analytics/base.html' %}
+
+{% block title %}Analyses Complètes - {{ dataset.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-5 mb-3">
+            <i class="bi bi-graph-up text-success"></i> Analyses Statistiques & Temporelles - {{ dataset.name }}
+        </h1>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'client_analytics:home' %}">Accueil</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'client_analytics:dataset_overview' dataset.pk %}">{{ dataset.name }}</a></li>
+                <li class="breadcrumb-item active">Analyses Complètes</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h6>Transactions</h6>
+                <h3>{{ kpis.total_transactions }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h6>CA Total</h6>
+                <h3 style="font-size: 1.3rem;">{{ kpis.ca_total }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h6>Clients</h6>
+                <h3>{{ kpis.nb_clients }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h6>Familles</h6>
+                <h3>{{ kpis.nb_familles }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <h6>Panier Moyen</h6>
+                <h3 style="font-size: 1.3rem;">{{ kpis.panier_moyen }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card bg-secondary text-white">
+            <div class="card-body text-center">
+                <h6>Pays</h6>
+                <h3>{{ kpis.nb_pays }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Onglets de navigation -->
+<ul class="nav nav-tabs mb-4" id="analysisTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab">
+            <i class="bi bi-bar-chart"></i> Analyse Statistique
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="temporal-tab" data-bs-toggle="tab" data-bs-target="#temporal" type="button" role="tab">
+            <i class="bi bi-calendar3"></i> Analyse Temporelle
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="clustering-tab" data-bs-toggle="tab" data-bs-target="#clustering" type="button" role="tab">
+            <i class="bi bi-diagram-3"></i> Clustering
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="analysisTabContent">
+    
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ONGLET 1: ANALYSE STATISTIQUE -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade show active" id="stats" role="tabpanel">
+        
+        <!-- TRAITEMENT DES DONNÉES -->
+        <h2 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h2>
+        {% if results.rapport_nettoyage %}
+        <div class="row mb-4">
+            <div class="col-12">
+                {{ results.rapport_nettoyage|safe }}
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- STATISTIQUES DESCRIPTIVES -->
+        <h2 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h2>
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ results.stats_descriptives|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h3 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h3>
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ results.tests_normalite|safe }}
+                        <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ results.valeurs_aberrantes|safe }}
+                        <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h3 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h3>
+        <div class="row mb-4">
+            {% if graphs.correlation_matrix %}
+            <div class="col-md-7">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.correlation_matrix|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if results.correlation_analysis %}
+            <div class="col-md-5">
+                <div class="card">
+                    <div class="card-header bg-danger text-white">
+                        <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
+                    </div>
+                    <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                        {{ results.correlation_analysis|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <h3 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h3>
+        
+        {% if graphs.dist_complete_montant %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.dist_complete_montant|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if graphs.dist_complete_quantite %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.dist_complete_quantite|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if graphs.dist_complete_pu_net %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.dist_complete_pu_net|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <h3 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h3>
+        <div class="row mb-4">
+            {% if graphs.top_pays %}
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.top_pays|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if graphs.top_familles %}
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.top_familles|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h3>
+        <div class="row mb-4">
+            <div class="col-12">
+                {{ results.synthese_analyse|safe }}
+            </div>
+        </div>
+        
+    </div>
+    
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ONGLET 2: ANALYSE TEMPORELLE -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade" id="temporal" role="tabpanel">
+        
+        <h2 class="mb-4 mt-4"><i class="bi bi-calendar3"></i> Analyse Temporelle</h2>
+        <!-- PARTIE 3 : ANALYSE TEMPORELLE -->
+        <h2 class="mb-4 mt-5"><i class="bi bi-calendar3"></i> III. Analyse Temporelle</h2>
+        
+        <h3 class="mb-4"><i class="bi bi-bar-chart"></i> Évolutions Trimestrielles</h3>
+        <div class="row mb-4">
+            {% if graphs.ca_par_trimestre %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.ca_par_trimestre|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            
+            {% if graphs.variation_trimestrielle %}
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.variation_trimestrielle|safe }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution Mensuelle avec Tendance</h3>
+        {% if graphs.evolution_mensuelle %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.evolution_mensuelle|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <h3 class="mb-4"><i class="bi bi-calendar-week"></i> Analyses Détaillées (Jours, Semaines)</h3>
+        {% if graphs.analyse_jour_semaine %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.analyse_jour_semaine|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if graphs.ca_par_semaine %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.ca_par_semaine|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <h3 class="mb-4"><i class="bi bi-fire"></i> Heatmap Temporelle</h3>
+        {% if graphs.heatmap_ca_mensuel %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        {{ graphs.heatmap_ca_mensuel|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Temporelle</h3>
+        <div class="row mb-4">
+            <div class="col-12">
+                {{ results.synthese_temporelle|safe }}
+            </div>
+        </div>
+        
+        <!-- ANALYSES AVANCÉES -->
+        <h2 class="mb-4 mt-5"><i class="bi bi-graph-up-arrow"></i> Analyses Avancées (Séries Temporelles)</h2>
+        
+        <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
+        {% if graphs.stl_decomposition %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu</h5>
+                        {% if results.stl_trend_strength %}
+                        <small>Force de la tendance: {{ results.stl_trend_strength }} | Force de la saisonnalité: {{ results.stl_seasonal_strength }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {{ graphs.stl_decomposition|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <h3 class="mb-4"><i class="bi bi-clipboard-check"></i> Tests de Stationnarité</h3>
+        {% if results.stationarity_tests %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-warning text-white">
+                        <h5 class="mb-0">🧪 Tests ADF et KPSS</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ results.stationarity_tests|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <h3 class="mb-4"><i class="bi bi-crystal-ball"></i> Prévisions ARIMA</h3>
+        {% if graphs.arima_forecast %}
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">🔮 Modèle ARIMA(1,1,1)</h5>
+                        {% if results.arima_mape %}
+                        <small>MAPE: {{ results.arima_mape }} | RMSE: {{ results.arima_rmse }}</small>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        {{ graphs.arima_forecast|safe }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+    </div>
+    
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ONGLET 2: CLUSTERING -->
+    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <div class="tab-pane fade" id="clustering" role="tabpanel">
+        
+        <div class="alert alert-info mt-4">
+            <h4><i class="bi bi-info-circle"></i> Clustering</h4>
+            <p>Cette section contiendra l'analyse de clustering (K-Means, RFM, etc.).</p>
+            <p>Utilisez le bouton "Clustering" dans le menu pour accéder à l'analyse complète.</p>
+            <a href="{% url 'client_analytics:clustering' dataset.pk %}" class="btn btn-primary">
+                <i class="bi bi-diagram-3"></i> Accéder au Clustering
+            </a>
+        </div>
+        
+    </div>
+
+    
+</div>
+
+{% if not graphs %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Chargement des analyses en cours...
+</div>
+{% endif %}
+
+<script>
+// Bootstrap tabs activation
+var triggerTabList = [].slice.call(document.querySelectorAll('#analysisTabs button'))
+triggerTabList.forEach(function (triggerEl) {
+  var tabTrigger = new bootstrap.Tab(triggerEl)
+
+  triggerEl.addEventListener('click', function (event) {
+    event.preventDefault()
+    tabTrigger.show()
+  })
+})
+</script>
+
+{% endblock %}

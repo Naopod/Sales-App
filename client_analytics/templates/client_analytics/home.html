@@ -1,0 +1,175 @@
+{% extends 'client_analytics/base.html' %}
+
+{% block title %}Accueil - Client Analytics{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-4 mb-4">
+            <i class="bi bi-graph-up-arrow text-primary"></i> 
+            Client Analytics Portal
+        </h1>
+        <p class="lead">Analysez vos données clients avec des outils puissants de statistiques, modélisation et clustering.</p>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <!-- Upload Dataset -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-primary text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-cloud-upload"></i> Uploader un Dataset
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>Uploadez votre fichier Excel (.xlsx, .xls) pour commencer l'analyse.</p>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        {{ upload_form.name.label_tag }}
+                        {{ upload_form.name }}
+                        {% if upload_form.name.errors %}
+                        <div class="text-danger small">{{ upload_form.name.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="mb-3">
+                        {{ upload_form.file.label_tag }}
+                        {{ upload_form.file }}
+                        {% if upload_form.file.errors %}
+                        <div class="text-danger small">{{ upload_form.file.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">Taille maximale: 10MB. Formats: .xlsx, .xls</div>
+                    </div>
+                    <button type="submit" name="upload" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Uploader
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Select Dataset -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-success text-white">
+                <h5 class="card-title mb-0">
+                    <i class="bi bi-database"></i> Sélectionner un Dataset
+                </h5>
+            </div>
+            <div class="card-body">
+                <p>Sélectionnez un dataset existant ou utilisez un dataset de démonstration.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Type de dataset</label>
+                        {% for choice in select_form.choice_type %}
+                        <div class="form-check">
+                            {{ choice.tag }}
+                            <label class="form-check-label" for="{{ choice.id_for_label }}">
+                                {{ choice.choice_label }}
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3" id="existing-dataset-group">
+                        {{ select_form.existing_dataset.label_tag }}
+                        {{ select_form.existing_dataset }}
+                        {% if select_form.existing_dataset.errors %}
+                        <div class="text-danger small">{{ select_form.existing_dataset.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3" id="demo-dataset-group">
+                        {{ select_form.demo_dataset.label_tag }}
+                        {{ select_form.demo_dataset }}
+                        {% if select_form.demo_dataset.errors %}
+                        <div class="text-danger small">{{ select_form.demo_dataset.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    {% if select_form.non_field_errors %}
+                    <div class="alert alert-danger">{{ select_form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <button type="submit" name="select" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Sélectionner
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h3 class="mb-3">Fonctionnalités</h3>
+        <div class="row row-cols-1 row-cols-md-4 g-4">
+            <div class="col">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-table display-4 text-primary"></i>
+                        <h5 class="card-title mt-3">Overview</h5>
+                        <p class="card-text">Informations générales sur vos données</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-bar-chart display-4 text-success"></i>
+                        <h5 class="card-title mt-3">Statistiques</h5>
+                        <p class="card-text">Visualisations et analyses statistiques</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-cpu display-4 text-warning"></i>
+                        <h5 class="card-title mt-3">Modélisation</h5>
+                        <p class="card-text">Machine Learning automatisé</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center h-100">
+                    <div class="card-body">
+                        <i class="bi bi-diagram-3 display-4 text-danger"></i>
+                        <h5 class="card-title mt-3">Clustering</h5>
+                        <p class="card-text">Segmentation automatique</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Toggle dataset selection forms
+document.addEventListener('DOMContentLoaded', function() {
+    const choiceTypeRadios = document.querySelectorAll('input[name="choice_type"]');
+    const existingGroup = document.getElementById('existing-dataset-group');
+    const demoGroup = document.getElementById('demo-dataset-group');
+    
+    function updateVisibility() {
+        const selectedType = document.querySelector('input[name="choice_type"]:checked').value;
+        if (selectedType === 'existing') {
+            existingGroup.style.display = 'block';
+            demoGroup.style.display = 'none';
+        } else {
+            existingGroup.style.display = 'none';
+            demoGroup.style.display = 'block';
+        }
+    }
+    
+    choiceTypeRadios.forEach(radio => {
+        radio.addEventListener('change', updateVisibility);
+    });
+    
+    updateVisibility();
+});
+</script>
+{% endblock %}

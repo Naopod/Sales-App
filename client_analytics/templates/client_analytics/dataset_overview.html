@@ -1,0 +1,167 @@
+{% extends 'client_analytics/base.html' %}
+{% load custom_filters %}
+
+{% block title %}Overview - {{ dataset.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="display-5 mb-3">
+            <i class="bi bi-table text-primary"></i> {{ dataset.name }}
+        </h1>
+        <p class="text-muted">
+            <i class="bi bi-calendar"></i> Créé le: {{ dataset.created_at|date:"d/m/Y H:i" }}
+        </p>
+    </div>
+</div>
+
+<!-- Navigation Buttons -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group" role="group">
+            <a href="{% url 'client_analytics:stats' dataset.pk %}" class="btn btn-outline-success">
+                <i class="bi bi-bar-chart"></i> Statistiques
+            </a>
+            <a href="{% url 'client_analytics:clustering' dataset.pk %}" class="btn btn-outline-danger">
+                <i class="bi bi-diagram-3"></i> Clustering
+            </a>
+        </div>
+        <a href="{% url 'client_analytics:home' %}" class="btn btn-outline-secondary float-end">
+            <i class="bi bi-arrow-left"></i> Retour
+        </a>
+    </div>
+</div>
+
+<!-- Dataset Info -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Informations Générales</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th width="40%">Nombre de lignes</th>
+                        <td>{{ info.num_rows|intcomma }}</td>
+                    </tr>
+                    <tr>
+                        <th>Nombre de colonnes</th>
+                        <td>{{ info.num_cols }}</td>
+                    </tr>
+                    <tr>
+                        <th>Taille en mémoire</th>
+                        <td>{{ info.memory_usage|filesizeformat }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-list-columns"></i> Types de Colonnes</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <th width="40%">Colonnes numériques</th>
+                        <td><span class="badge bg-success">{{ column_types.numeric|length }}</span></td>
+                    </tr>
+                    <tr>
+                        <th>Colonnes catégorielles</th>
+                        <td><span class="badge bg-info">{{ column_types.categorical|length }}</span></td>
+                    </tr>
+                </table>
+                <hr>
+                <h6>Colonnes:</h6>
+                <div class="small">
+                    {% for col in info.columns %}
+                    <span class="badge bg-light text-dark me-1 mb-1">{{ col }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Missing Values -->
+{% if missing_info %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Manquantes</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Colonne</th>
+                                <th>Nombre</th>
+                                <th>Pourcentage</th>
+                                <th>Visualisation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in missing_info %}
+                            <tr>
+                                <td><strong>{{ item.column }}</strong></td>
+                                <td>{{ item.count }}</td>
+                                <td>{{ item.percentage }}%</td>
+                                <td>
+                                    <div class="progress" style="height: 20px;">
+                                        <div class="progress-bar bg-warning" role="progressbar" 
+                                             style="width: {{ item.percentage }}%"
+                                             aria-valuenow="{{ item.percentage }}" 
+                                             aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Numeric Summary -->
+{% if numeric_summary_html %}
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-calculator"></i> Statistiques Descriptives (Variables Numériques)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    {{ numeric_summary_html|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Data Preview -->
+<div class="row">
+    <div class="col-12">
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-eye"></i> Aperçu des Données (10 premières lignes)</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    {{ df_head_html|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
