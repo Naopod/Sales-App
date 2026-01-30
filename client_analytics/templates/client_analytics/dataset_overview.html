@@ -1,34 +1,89 @@
 {% extends 'client_analytics/base.html' %}
 {% load custom_filters %}
+{% load static %}
 
-{% block title %}Overview - {{ dataset.name }}{% endblock %}
+{% block title %}Description des données - {{ dataset.name }}{% endblock %}
 
-{% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1 class="display-5 mb-3">
-            <i class="bi bi-table text-primary"></i> {{ dataset.name }}
-        </h1>
-        <p class="text-muted">
-            <i class="bi bi-calendar"></i> Créé le: {{ dataset.created_at|date:"d/m/Y H:i" }}
-        </p>
-    </div>
-</div>
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
+{% endblock %}
 
-<!-- Navigation Buttons -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="btn-group" role="group">
-            <a href="{% url 'client_analytics:stats' dataset.pk %}" class="btn btn-outline-success">
-                <i class="bi bi-bar-chart"></i> Statistiques
+{% block dataset_nav %}
+<nav class="analysis-nav">
+    <div class="container-fluid">
+        <div class="analysis-tabs">
+            <a class="analysis-tab active" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-info-circle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Overview</span>
+                    <span class="tab-subtitle">Description des données</span>
+                </div>
             </a>
-            <a href="{% url 'client_analytics:clustering' dataset.pk %}" class="btn btn-outline-danger">
-                <i class="bi bi-diagram-3"></i> Clustering
+            <a class="analysis-tab" href="{% url 'client_analytics:stats' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-bar-chart-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Statistiques</span>
+                    <span class="tab-subtitle">Analyse de données</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-diagram-3-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Clustering</span>
+                    <span class="tab-subtitle">Segmentation K-Means</span>
+                </div>
             </a>
         </div>
-        <a href="{% url 'client_analytics:home' %}" class="btn btn-outline-secondary float-end">
-            <i class="bi bi-arrow-left"></i> Retour
+        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
+            <i class="bi bi-arrow-left-circle"></i>
+            <span>Accueil</span>
         </a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<!-- Canvas Particules Scientifiques -->
+<canvas id="scientificParticles"></canvas>
+
+<script>
+    document.body.classList.add('analysis-page');
+</script>
+
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <div class="header-content">
+                <span class="header-badge">
+                    <i class="bi bi-database-fill"></i> Dataset
+                </span>
+                <h1 class="page-title">
+                    {{ dataset.name }}
+                </h1>
+                <p class="page-subtitle">
+                    <i class="bi bi-info-circle-fill"></i> Vue d'ensemble des données
+                </p>
+            </div>
+        </div>
+        <div class="col-lg-4 text-end">
+            <div class="header-meta">
+                <div class="meta-item">
+                    <i class="bi bi-calendar-check"></i>
+                    <span>Créé le</span>
+                    <strong>{{ dataset.created_at|date:"d/m/Y" }}</strong>
+                </div>
+                <div class="meta-item">
+                    <i class="bi bi-clock"></i>
+                    <span>{{ dataset.created_at|date:"H:i" }}</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -164,4 +219,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'client_analytics/analysis_pages.js' %}"></script>
 {% endblock %}

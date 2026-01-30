@@ -43,7 +43,15 @@ class UploadDatasetForm(forms.ModelForm):
         instance = super().save(commit=False)
         instance.source_type = 'upload'
         
-        # Apply notebook data processing pipeline
+        # ═══════════════════════════════════════════════════════════════════
+        # 🔄 TRAITEMENT UNIQUE DES DONNÉES BRUTES
+        # ═══════════════════════════════════════════════════════════════════
+        # ⚠️ IMPORTANT : C'est le SEUL endroit où process_raw_data() est appelé !
+        # Les données sont traitées UNE SEULE FOIS lors de l'upload, puis
+        # sauvegardées dans le fichier. Toutes les vues utilisent ensuite
+        # les données DÉJÀ TRAITÉES sans les repasser dans process_raw_data().
+        # ═══════════════════════════════════════════════════════════════════
+        
         if instance.file:
             print("\n" + "="*80)
             print("🔄 APPLICATION DU TRAITEMENT DES DONNÉES (pipeline du notebook)")
@@ -94,47 +102,18 @@ class UploadDatasetForm(forms.ModelForm):
 
 
 class SelectDatasetForm(forms.Form):
-    """Form for selecting an existing or demo dataset"""
-    
-    DEMO_CHOICES = [
-        ('demo_clients_1.xlsx', 'Dataset Démo 1 - Données Clients Basiques'),
-        ('demo_clients_2.xlsx', 'Dataset Démo 2 - Comportement d\'Achat'),
-    ]
-    
-    choice_type = forms.ChoiceField(
-        choices=[
-            ('existing', 'Datasets Existants'),
-            ('demo', 'Datasets Démo'),
-        ],
-        widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
-        initial='demo',
-        label='Type de dataset'
-    )
+    """Form for selecting an existing dataset"""
     
     existing_dataset = forms.ModelChoiceField(
         queryset=Dataset.objects.all(),
-        required=False,
+        required=True,
         empty_label="Sélectionner un dataset...",
         widget=forms.Select(attrs={'class': 'form-select'}),
         label='Dataset existant'
     )
     
-    demo_dataset = forms.ChoiceField(
-        choices=DEMO_CHOICES,
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-select'}),
-        label='Dataset démo'
-    )
-    
     def clean(self):
         cleaned_data = super().clean()
-        choice_type = cleaned_data.get('choice_type')
-        
-        if choice_type == 'existing':
-            if not cleaned_data.get('existing_dataset'):
-                raise ValidationError("Veuillez sélectionner un dataset existant.")
-        elif choice_type == 'demo':
-            if not cleaned_data.get('demo_dataset'):
-                raise ValidationError("Veuillez sélectionner un dataset démo.")
-        
+        if not cleaned_data.get('existing_dataset'):
+            raise ValidationError("Veuillez sélectionner un dataset existant.")
         return cleaned_data

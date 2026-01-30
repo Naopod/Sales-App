@@ -1,5 +1,6 @@
 """
-Dataset Profiling Service - Basic dataset information
+Service pour l'onglet OVERVIEW
+Génère les informations de profiling de base du dataset
 """
 import pandas as pd
 import numpy as np
@@ -7,13 +8,13 @@ import numpy as np
 
 def get_dataset_info(df):
     """
-    Get basic dataset information
+    Informations de base sur le dataset
     
     Args:
         df: pandas.DataFrame
         
     Returns:
-        dict with dataset info
+        dict avec les infos du dataset
     """
     info = {
         'shape': df.shape,
@@ -28,13 +29,13 @@ def get_dataset_info(df):
 
 def get_missing_values(df):
     """
-    Get missing values information
+    Informations sur les valeurs manquantes
     
     Args:
         df: pandas.DataFrame
         
     Returns:
-        dict with missing values count and percentage
+        list de dict avec les valeurs manquantes par colonne
     """
     missing = df.isnull().sum()
     missing_pct = (missing / len(df) * 100).round(2)
@@ -53,13 +54,13 @@ def get_missing_values(df):
 
 def get_numeric_summary(df):
     """
-    Get summary statistics for numeric columns
+    Statistiques descriptives pour les colonnes numériques
     
     Args:
         df: pandas.DataFrame
         
     Returns:
-        pandas.DataFrame with describe() output
+        pandas.DataFrame avec describe()
     """
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     if len(numeric_cols) == 0:
@@ -70,14 +71,14 @@ def get_numeric_summary(df):
 
 def get_categorical_summary(df, max_categories=20):
     """
-    Get summary for categorical columns
+    Résumé pour les colonnes catégorielles
     
     Args:
         df: pandas.DataFrame
-        max_categories: max number of unique values to consider as categorical
+        max_categories: nombre max de valeurs uniques
         
     Returns:
-        dict with categorical column info
+        list de dict avec les infos catégorielles
     """
     categorical_info = []
     
@@ -95,18 +96,41 @@ def get_categorical_summary(df, max_categories=20):
 
 def get_column_types(df):
     """
-    Classify columns into numeric and categorical
+    Classifie les colonnes en numériques et catégorielles
     
     Args:
         df: pandas.DataFrame
         
     Returns:
-        dict with 'numeric' and 'categorical' column lists
+        dict avec les types de colonnes
     """
     numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-    categorical_cols = df.select_dtypes(exclude=[np.number]).columns.tolist()
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    datetime_cols = df.select_dtypes(include=['datetime64']).columns.tolist()
     
     return {
         'numeric': numeric_cols,
-        'categorical': categorical_cols
+        'categorical': categorical_cols,
+        'datetime': datetime_cols
+    }
+
+
+def generate_overview_analysis(df):
+    """
+    Génère une analyse complète pour l'onglet Overview
+    
+    Args:
+        df: pandas.DataFrame
+        
+    Returns:
+        dict avec toutes les analyses pour l'onglet Overview
+    """
+    print("📊 Génération de l'analyse Overview...")
+    
+    return {
+        'info': get_dataset_info(df),
+        'missing_info': get_missing_values(df),
+        'numeric_summary': get_numeric_summary(df),
+        'categorical_summary': get_categorical_summary(df),
+        'column_types': get_column_types(df)
     }

@@ -1,5 +1,5 @@
 """
-Dataset I/O Service - Loading datasets from uploads or demo data
+Dataset I/O Service - Loading datasets from uploads
 """
 import pandas as pd
 import os
@@ -29,31 +29,4 @@ def load_dataset_df(dataset):
         return None
 
 
-def get_demo_datasets():
-    """
-    Get list of available demo datasets
-    
-    Returns:
-        list of dict with 'filename' and 'display_name'
-    """
-    return [
-        {
-            'filename': 'demo_clients_1.xlsx',
-            'display_name': 'Dataset Démo 1 - Données Clients Basiques'
-        },
-        {
-            'filename': 'demo_clients_2.xlsx',
-            'display_name': 'Dataset Démo 2 - Comportement d\'Achat'
-        }
-    ]
 
-
-def check_demo_file_exists(filename):
-    """Check if a demo file exists"""
-    demo_path = os.path.join(
-        settings.BASE_DIR,
-        'client_analytics',
-        'demo_data',
-        filename
-    )
-    return os.path.exists(demo_path)

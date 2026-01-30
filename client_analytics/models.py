@@ -3,11 +3,10 @@ from django.utils import timezone
 
 
 class Dataset(models.Model):
-    """Model representing a dataset (uploaded or stored demo)"""
+    """Model representing an uploaded dataset"""
     
     SOURCE_TYPE_CHOICES = [
         ('upload', 'Upload'),
-        ('stored', 'Stored'),
     ]
     
     name = models.CharField(max_length=255, help_text="Dataset name")
@@ -19,15 +18,7 @@ class Dataset(models.Model):
     )
     file = models.FileField(
         upload_to='datasets/',
-        blank=True,
-        null=True,
-        help_text="Uploaded file (for upload type)"
-    )
-    stored_key = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Stored dataset key (for stored type)"
+        help_text="Uploaded Excel file"
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
@@ -42,16 +33,6 @@ class Dataset(models.Model):
     
     def get_file_path(self):
         """Return the full path to the file"""
-        if self.source_type == 'upload' and self.file:
+        if self.file:
             return self.file.path
-        elif self.source_type == 'stored' and self.stored_key:
-            import os
-            from django.conf import settings
-            demo_path = os.path.join(
-                settings.BASE_DIR,
-                'client_analytics',
-                'demo_data',
-                self.stored_key
-            )
-            return demo_path
         return None

@@ -1,90 +1,192 @@
 {% extends 'client_analytics/base.html' %}
+{% load custom_filters %}
+{% load static %}
 
 {% block title %}Analyses Complètes - {{ dataset.name }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
+<style>
+.interpretation-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+.interpretation-box h5 {
+    color: white;
+    font-weight: bold;
+}
+.interpretation-box ul {
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
+
+{% block dataset_nav %}
+<nav class="analysis-nav">
+    <div class="container-fluid">
+        <div class="analysis-tabs">
+            <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-info-circle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Overview</span>
+                    <span class="tab-subtitle">Description des données</span>
+                </div>
+            </a>
+            <a class="analysis-tab active" href="{% url 'client_analytics:stats' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-bar-chart-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Statistiques</span>
+                    <span class="tab-subtitle">Analyse de données</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-diagram-3-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Clustering</span>
+                    <span class="tab-subtitle">Segmentation K-Means</span>
+                </div>
+            </a>
+        </div>
+        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
+            <i class="bi bi-arrow-left-circle"></i>
+            <span>Accueil</span>
+        </a>
+    </div>
+</nav>
+{% endblock %}
+
 {% block content %}
-<div class="row">
-    <div class="col-12">
-        <h1 class="display-5 mb-3">
-            <i class="bi bi-graph-up text-success"></i> Analyses Statistiques & Temporelles - {{ dataset.name }}
-        </h1>
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{% url 'client_analytics:home' %}">Accueil</a></li>
-                <li class="breadcrumb-item"><a href="{% url 'client_analytics:dataset_overview' dataset.pk %}">{{ dataset.name }}</a></li>
-                <li class="breadcrumb-item active">Analyses Complètes</li>
-            </ol>
-        </nav>
+<!-- Canvas Particules Scientifiques -->
+<canvas id="scientificParticles"></canvas>
+
+<script>
+    document.body.classList.add('analysis-page');
+</script>
+
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
+            <div class="header-content">
+                <span class="header-badge">
+                    <i class="bi bi-database-fill"></i> Dataset
+                </span>
+                <h1 class="page-title">
+                    {{ dataset.name }}
+                </h1>
+                <p class="page-subtitle">
+                    <i class="bi bi-bar-chart-fill"></i> Analyses statistiques & temporelles
+                </p>
+            </div>
+        </div>
     </div>
 </div>
 
 <!-- KPI Cards -->
-<div class="row mb-4">
-    <div class="col-md-2">
-        <div class="card bg-primary text-white">
+<div class="kpi-grid mb-4">
+    <div class="kpi-card-wrapper">
+        <div class="card bg-primary text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Transactions</h6>
-                <h3>{{ kpis.total_transactions }}</h3>
+                <h3>{{ kpis.total_transactions|default:"—" }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-2">
-        <div class="card bg-success text-white">
+    <div class="kpi-card-wrapper">
+        <div class="card bg-success text-white kpi-card">
             <div class="card-body text-center">
                 <h6>CA Total</h6>
-                <h3 style="font-size: 1.3rem;">{{ kpis.ca_total }}</h3>
+                <h3 style="font-size: 1.3rem;">{{ kpis.ca_total|default:"—" }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-2">
-        <div class="card bg-info text-white">
+    <div class="kpi-card-wrapper">
+        <div class="card bg-info text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Clients</h6>
-                <h3>{{ kpis.nb_clients }}</h3>
+                <h3>{{ kpis.nb_clients|default:"—" }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-2">
-        <div class="card bg-warning text-white">
+    <div class="kpi-card-wrapper">
+        <div class="card bg-warning text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Familles</h6>
-                <h3>{{ kpis.nb_familles }}</h3>
+                <h3>{{ kpis.nb_familles|default:"—" }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-2">
-        <div class="card bg-danger text-white">
+    <div class="kpi-card-wrapper">
+        <div class="card bg-danger text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Panier Moyen</h6>
-                <h3 style="font-size: 1.3rem;">{{ kpis.panier_moyen }}</h3>
+                <h3 style="font-size: 1.3rem;">{{ kpis.panier_moyen|default:"—" }}</h3>
             </div>
         </div>
     </div>
-    <div class="col-md-2">
-        <div class="card bg-secondary text-white">
+    <div class="kpi-card-wrapper">
+        <div class="card bg-secondary text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Pays</h6>
-                <h3>{{ kpis.nb_pays }}</h3>
+                <h3>{{ kpis.nb_pays|default:"—" }}</h3>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Sélecteur de Période (déplacé ici) -->
+<div class="period-selector-wrapper mb-4">
+    <div class="period-selector">
+        <button class="period-btn active" data-period="month">
+            <i class="bi bi-calendar-month"></i> Mois
+        </button>
+        <button class="period-btn" data-period="quarter">
+            <i class="bi bi-calendar3"></i> Trimestre
+        </button>
+        <button class="period-btn" data-period="year">
+            <i class="bi bi-calendar-year"></i> Année Fiscale
+        </button>
+    </div>
+</div>
+
 <!-- Onglets de navigation -->
-<ul class="nav nav-tabs mb-4" id="analysisTabs" role="tablist">
+<ul class="nav nav-tabs nav-tabs-modern mb-4" id="analysisTabs" role="tablist">
     <li class="nav-item" role="presentation">
         <button class="nav-link active" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab">
-            <i class="bi bi-bar-chart"></i> Analyse Statistique
+            <i class="bi bi-bar-chart"></i> Analyse par périodes
         </button>
     </li>
     <li class="nav-item" role="presentation">
         <button class="nav-link" id="temporal-tab" data-bs-toggle="tab" data-bs-target="#temporal" type="button" role="tab">
-            <i class="bi bi-calendar3"></i> Analyse Temporelle
+            <i class="bi bi-calendar3"></i> Analyse Série temporelle
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="clustering-tab" data-bs-toggle="tab" data-bs-target="#clustering" type="button" role="tab">
-            <i class="bi bi-diagram-3"></i> Clustering
+        <button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab">
+            <i class="bi bi-box-seam"></i> Analyse produits
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button" role="tab">
+            <i class="bi bi-people-fill"></i> Analyses clients
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="geography-tab" data-bs-toggle="tab" data-bs-target="#geography" type="button" role="tab">
+            <i class="bi bi-globe"></i> Analyses géographique
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="currency-tab" data-bs-toggle="tab" data-bs-target="#currency" type="button" role="tab">
+            <i class="bi bi-currency-exchange"></i> Dépendance aux devises
         </button>
     </li>
 </ul>
@@ -92,245 +194,971 @@
 <div class="tab-content" id="analysisTabContent">
     
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- ONGLET 1: ANALYSE STATISTIQUE -->
+    <!-- ONGLET 1: ANALYSE PAR PÉRIODES -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="tab-pane fade show active" id="stats" role="tabpanel">
         
-        <!-- TRAITEMENT DES DONNÉES -->
-        <h2 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h2>
-        {% if results.rapport_nettoyage %}
-        <div class="row mb-4">
-            <div class="col-12">
-                {{ results.rapport_nettoyage|safe }}
-            </div>
-        </div>
-        {% endif %}
+        <h2 class="mb-4 mt-4"><i class="bi bi-bar-chart-line"></i> Analyse par périodes</h2>
         
-        <!-- STATISTIQUES DESCRIPTIVES -->
-        <h2 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h2>
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
-                    </div>
-                    <div class="card-body">
-                        {{ results.stats_descriptives|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- SOUS-ONGLETS POUR PÉRIODES (masqués car déplacés en haut) -->
+        <ul class="nav nav-pills mb-4 d-none" id="periodTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="month-tab" data-bs-toggle="pill" data-bs-target="#month-period" type="button" role="tab" aria-controls="month-period" aria-selected="true">
+                    <i class="bi bi-calendar-month"></i> Mois
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="quarter-tab" data-bs-toggle="pill" data-bs-target="#quarter-period" type="button" role="tab" aria-controls="quarter-period" aria-selected="false">
+                    <i class="bi bi-calendar3"></i> Trimestre
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="fiscal-tab" data-bs-toggle="pill" data-bs-target="#fiscal-period" type="button" role="tab" aria-controls="fiscal-period" aria-selected="false">
+                    <i class="bi bi-calendar-year"></i> Année Fiscale
+                </button>
+            </li>
+        </ul>
         
-        <h3 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h3>
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
-                    </div>
-                    <div class="card-body">
-                        {{ results.tests_normalite|safe }}
-                        <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-warning text-white">
-                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
-                    </div>
-                    <div class="card-body">
-                        {{ results.valeurs_aberrantes|safe }}
-                        <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <h3 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h3>
-        <div class="row mb-4">
-            {% if graphs.correlation_matrix %}
-            <div class="col-md-7">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.correlation_matrix|safe }}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            {% if results.correlation_analysis %}
-            <div class="col-md-5">
-                <div class="card">
-                    <div class="card-header bg-danger text-white">
-                        <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
-                    </div>
-                    <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                        {{ results.correlation_analysis|safe }}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-        
-        <h3 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h3>
-        
-        {% if graphs.dist_complete_montant %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.dist_complete_montant|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        {% if graphs.dist_complete_quantite %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.dist_complete_quantite|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        {% if graphs.dist_complete_pu_net %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.dist_complete_pu_net|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <h3 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h3>
-        <div class="row mb-4">
-            {% if graphs.top_pays %}
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.top_pays|safe }}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
+        <!-- CONTENU DES SOUS-ONGLETS -->
+        <div class="tab-content" id="periodTabContent">
             
-            {% if graphs.top_familles %}
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.top_familles|safe }}
+            <!-- SOUS-ONGLET: MOIS -->
+            <div class="tab-pane fade show active" id="month-period" role="tabpanel" aria-labelledby="month-tab">
+                
+                <div class="alert alert-primary mb-4" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
+                    <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
+                </div>
+                
+                <!-- TRAITEMENT DES DONNÉES -->
+                <h3 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h3>
+                {% if results_month.rapport_nettoyage %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_month.rapport_nettoyage|safe }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- STATISTIQUES DESCRIPTIVES -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_month.stats_descriptives|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h4>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_month.tests_normalite|safe }}
+                                <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
+                                <div class="alert alert-info mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
+                                    Le test de Shapiro-Wilk évalue si les données suivent une distribution normale.
+                                    Si p-value < 0.05, les données ne sont pas normalement distribuées, ce qui est fréquent pour les données de ventes (présence de valeurs extrêmes, pics saisonniers).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_month.valeurs_aberrantes|safe }}
+                                <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
+                                <div class="alert alert-warning mt-3">
+                                    <strong><i class="bi bi-exclamation-triangle"></i> Interprétation :</strong>
+                                    Les valeurs aberrantes sont des observations exceptionnelles qui s'écartent fortement de la tendance générale.
+                                    Elles peuvent représenter des commandes exceptionnelles (très grandes ou très petites) qui méritent une attention particulière.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h4>
+                <div class="row mb-4">
+                    {% if graphs_month.correlation_matrix %}
+                    <div class="col-md-7">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_month.correlation_matrix|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if results_month.correlation_analysis %}
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
+                            </div>
+                            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                                {{ results_month.correlation_analysis|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-md-5">
+                        <div class="alert alert-info">
+                            <strong><i class="bi bi-lightbulb"></i> Interprétation de la matrice :</strong>
+                            <p>La matrice de corrélation montre les relations linéaires entre les variables numériques.</p>
+                            <ul class="mb-0">
+                                <li><strong>Proche de +1</strong> : Forte corrélation positive</li>
+                                <li><strong>Proche de -1</strong> : Forte corrélation négative</li>
+                                <li><strong>Proche de 0</strong> : Pas de corrélation</li>
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-activity"></i> Tests de Normalité - Visualisations Graphiques</h4>
+                
+                <!-- Bouton pour afficher/masquer les détails avancés -->
+                <div class="mb-3">
+                    <button type="button" class="btn btn-outline-info btn-advanced-toggle" data-target="advanced-normality">
+                        <i class="bi bi-chevron-down"></i> Afficher les détails avancés (QQ-Plots)
+                    </button>
+                </div>
+                
+                <!-- GRAPHIQUES ESSENTIELS: Distribution avec courbe normale (Montant + PU Net) -->
+                {% if graphs_month.normality_test_montant %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - Montant</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.normality_test_montant|safe }}
+                                <div class="alert alert-info mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
+                                    La courbe rouge représente une distribution normale théorique. 
+                                    Plus les barres bleues s'en éloignent, plus la distribution est non-normale.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_month.normality_test_pu_net %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - PU Net</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.normality_test_pu_net|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- SECTION REPLIABLE: Détails avancés -->
+                <div class="advanced-section" id="advanced-normality" style="display:none;">
+                    <div class="alert alert-secondary">
+                        <strong><i class="bi bi-info-circle"></i> Détails statistiques avancés</strong>
+                        <p class="mb-0">Ces graphiques fournissent des analyses supplémentaires pour les utilisateurs avancés.</p>
+                    </div>
+                
+                <!-- QQ-Plots et Tests de Normalité pour Montant -->
+                {% if graphs_month.qq_plot_montant %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> QQ-Plot - Montant</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.qq_plot_montant|safe }}
+                                <div class="alert alert-info mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
+                                    Si les points s'alignent sur la ligne rouge, les données suivent une distribution normale. 
+                                    Des écarts aux extrémités indiquent des queues plus lourdes (valeurs extrêmes).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% if graphs_month.normality_test_montant %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - Montant</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.normality_test_montant|safe }}
+                                <div class="alert alert-info mt-3">
+                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
+                                    La courbe rouge représente une distribution normale théorique. 
+                                    Plus les barres bleues s'en éloignent, plus la distribution est non-normale.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <!-- QQ-Plots et Tests de Normalité pour Quantité -->
+                {% if graphs_month.qq_plot_quantite %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> QQ-Plot - Quantité</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.qq_plot_quantite|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% if graphs_month.normality_test_quantite %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - Quantité</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.normality_test_quantite|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <!-- QQ-Plots et Tests de Normalité pour PU Net -->
+                {% if graphs_month.qq_plot_pu_net %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> QQ-Plot - Prix Unitaire Net</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.qq_plot_pu_net|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% if graphs_month.normality_test_pu_net %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - PU Net</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.normality_test_pu_net|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                </div>
+                <!-- FIN SECTION REPLIABLE -->
+                
+                <h4 class="mb-4"><i class="bi bi-box"></i> Analyse des Valeurs Aberrantes - Boxplot Interactif</h4>
+                {% if graphs_month.outliers_boxplot %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Visualisation des Outliers</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.outliers_boxplot|safe }}
+                                <div class="alert alert-warning mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Comment lire ce graphique :</strong>
+                                    <ul class="mb-0">
+                                        <li>La <strong>boîte</strong> représente 50% des données centrales (entre Q1 et Q3)</li>
+                                        <li>La <strong>ligne médiane</strong> dans la boîte est la médiane (50e percentile)</li>
+                                        <li>Les <strong>moustaches</strong> s'étendent jusqu'à 1.5× l'écart interquartile</li>
+                                        <li>Les <strong>points isolés</strong> sont les valeurs aberrantes (outliers)</li>
+                                    </ul>
+                                    <p class="mt-2 mb-0"><strong>Action recommandée :</strong> Examinez manuellement ces valeurs aberrantes pour vérifier s'il s'agit d'erreurs de saisie ou de transactions légitimes exceptionnelles.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h4 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h4>
+                
+                {% if graphs_month.dist_complete_montant %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-down"></i> Distribution du Montant</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.dist_complete_montant|safe }}
+                                <div class="alert alert-success mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
+                                    Ce graphique montre comment les montants de transactions sont répartis. Une distribution asymétrique avec une longue queue à droite indique la présence de quelques transactions à montant élevé, ce qui est typique dans le commerce B2B.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_month.dist_complete_quantite %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_month.dist_complete_quantite|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_month.dist_complete_pu_net %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-down"></i> Distribution du Prix Unitaire Net</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.dist_complete_pu_net|safe }}
+                                <div class="alert alert-success mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
+                                    Cette distribution révèle la structure de tarification de vos produits. Plusieurs pics peuvent indiquer différentes catégories de prix. Les valeurs extrêmes correspondent aux produits premium ou aux promotions.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h4 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h4>
+                <div class="row mb-4">
+                    {% if graphs_month.top_pays %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-globe"></i> Top 10 Pays par CA</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.top_pays|safe }}
+                                <div class="alert alert-info mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
+                                    Ces pays représentent vos marchés les plus importants. Concentrez vos efforts marketing et commerciaux sur ces zones géographiques. Une forte concentration sur un seul pays peut représenter un risque de dépendance.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_month.top_familles %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Top 10 Familles par CA</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.top_familles|safe }}
+                                <div class="alert alert-info mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
+                                    Ces familles de produits génèrent l'essentiel de votre chiffre d'affaires. Assurez-vous d'avoir des stocks suffisants et surveillez leur performance. Considérez le développement de produits complémentaires dans ces catégories.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h4>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Conclusion de l'Analyse Mensuelle</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_month.synthese_analyse|safe }}
+                                {% if not results_month.synthese_analyse %}
+                                <div class="alert alert-info">
+                                    <h6><strong>Points clés de l'analyse :</strong></h6>
+                                    <ul>
+                                        <li><strong>Distributions :</strong> Les données de ventes présentent généralement une distribution asymétrique avec quelques valeurs extrêmes, ce qui est normal dans le commerce.</li>
+                                        <li><strong>Corrélations :</strong> Les relations entre variables révèlent les comportements d'achat et peuvent guider la stratégie commerciale.</li>
+                                        <li><strong>Top Performers :</strong> La concentration du CA sur certains pays et familles de produits doit être surveillée pour équilibrer risque et opportunités.</li>
+                                        <li><strong>Valeurs aberrantes :</strong> Les outliers identifiés méritent une analyse au cas par cas pour comprendre s'ils représentent des opportunités ou des anomalies.</li>
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- ÉVOLUTION MENSUELLE -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution Mensuelle du Chiffre d'Affaires</h3>
+                {% if graphs_month.evolution_mensuelle %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-calendar-month"></i> Tendance Mensuelle</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.evolution_mensuelle|safe }}
+                                <div class="alert alert-success mt-3">
+                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
+                                    Ce graphique montre l'évolution mensuelle du chiffre d'affaires avec sa ligne de tendance. Les pics et creux peuvent révéler la saisonnalité de votre activité. Utilisez ces informations pour optimiser vos stocks et prévisions.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+            </div>
+            <!-- FIN SOUS-ONGLET: MOIS -->
+            
+            <!-- SOUS-ONGLET: TRIMESTRE -->
+            <div class="tab-pane fade" id="quarter-period" role="tabpanel" aria-labelledby="quarter-tab">
+                
+                <div class="alert alert-info" role="alert">
+                    <h4 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h4>
+                    <p class="mb-0">Données agrégées par <strong>trimestre fiscal</strong> (Q1: Avr-Jun, Q2: Jul-Sep, Q3: Oct-Déc, Q4: Jan-Mar).</p>
+                </div>
+                
+                <!-- TRAITEMENT DES DONNÉES -->
+                <h3 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h3>
+                {% if results_quarter.rapport_nettoyage %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_quarter.rapport_nettoyage|safe }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- STATISTIQUES DESCRIPTIVES -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_quarter.stats_descriptives|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h4>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_quarter.tests_normalite|safe }}
+                                <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_quarter.valeurs_aberrantes|safe }}
+                                <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h4>
+                <div class="row mb-4">
+                    {% if graphs_quarter.correlation_matrix %}
+                    <div class="col-md-7">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.correlation_matrix|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if results_quarter.correlation_analysis %}
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
+                            </div>
+                            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                                {{ results_quarter.correlation_analysis|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h4>
+                
+                {% if graphs_quarter.dist_complete_montant %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.dist_complete_montant|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_quarter.dist_complete_quantite %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.dist_complete_quantite|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_quarter.dist_complete_pu_net %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.dist_complete_pu_net|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h4 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h4>
+                <div class="row mb-4">
+                    {% if graphs_quarter.top_pays %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.top_pays|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_quarter.top_familles %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.top_familles|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h4>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_quarter.synthese_analyse|safe }}
+                    </div>
+                </div>
+                
+                <!-- ANALYSES TEMPORELLES -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-bar-chart"></i> Évolutions Trimestrielles</h3>
+                <div class="row mb-4">
+                    {% if graphs_quarter.ca_par_trimestre %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.ca_par_trimestre|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_quarter.variation_trimestrielle %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.variation_trimestrielle|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution Mensuelle avec Tendance</h3>
+                {% if graphs_quarter.evolution_mensuelle %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.evolution_mensuelle|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-fire"></i> Heatmap Temporelle</h3>
+                {% if graphs_quarter.heatmap_ca_mensuel %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.heatmap_ca_mensuel|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Temporelle</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_quarter.synthese_temporelle|safe }}
+                    </div>
+                </div>
+                
+            </div>
+            <!-- FIN SOUS-ONGLET: TRIMESTRE -->
+            
+            <!-- SOUS-ONGLET: ANNÉE FISCALE -->
+            <div class="tab-pane fade" id="fiscal-period" role="tabpanel" aria-labelledby="fiscal-tab">
+                
+                <div class="alert alert-success" role="alert">
+                    <h4 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h4>
+                    <p class="mb-0">Données agrégées par <strong>année fiscale complète</strong> (Avril → Mars de l'année suivante).</p>
+                </div>
+                
+                <!-- TRAITEMENT DES DONNÉES -->
+                <h3 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h3>
+                {% if results_fiscal.rapport_nettoyage %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_fiscal.rapport_nettoyage|safe }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- STATISTIQUES DESCRIPTIVES -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_fiscal.stats_descriptives|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h4>
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_fiscal.tests_normalite|safe }}
+                                <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ results_fiscal.valeurs_aberrantes|safe }}
+                                <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h4>
+                <div class="row mb-4">
+                    {% if graphs_fiscal.correlation_matrix %}
+                    <div class="col-md-7">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.correlation_matrix|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if results_fiscal.correlation_analysis %}
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
+                            </div>
+                            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                                {{ results_fiscal.correlation_analysis|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h4>
+                
+                {% if graphs_fiscal.dist_complete_montant %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.dist_complete_montant|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_fiscal.dist_complete_quantite %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.dist_complete_quantite|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if graphs_fiscal.dist_complete_pu_net %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.dist_complete_pu_net|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h4 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h4>
+                <div class="row mb-4">
+                    {% if graphs_fiscal.top_pays %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.top_pays|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_fiscal.top_familles %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.top_familles|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h4 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h4>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_fiscal.synthese_analyse|safe }}
+                    </div>
+                </div>
+                
+                <!-- ANALYSES TEMPORELLES -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-bar-chart"></i> Évolutions Trimestrielles</h3>
+                <div class="row mb-4">
+                    {% if graphs_fiscal.ca_par_trimestre %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.ca_par_trimestre|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_fiscal.variation_trimestrielle %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.variation_trimestrielle|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution Mensuelle avec Tendance</h3>
+                {% if graphs_fiscal.evolution_mensuelle %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.evolution_mensuelle|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-fire"></i> Heatmap Temporelle</h3>
+                {% if graphs_fiscal.heatmap_ca_mensuel %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.heatmap_ca_mensuel|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Temporelle</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {{ results_fiscal.synthese_temporelle|safe }}
+                    </div>
+                </div>
+                
+            </div>
+            <!-- FIN SOUS-ONGLET: ANNÉE FISCALE -->
+            
+        </div>
+        <!-- FIN DES SOUS-ONGLETS PÉRIODES -->
+        
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- NOUVELLE SECTION: ANALYSE DES DÉLAIS DE LIVRAISON -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <div class="mt-5 pt-4 border-top">
+            <h2 class="mb-4"><i class="bi bi-clock-history"></i> Analyse des Délais de Livraison (Analyse Mensuelle)</h2>
+            
+            <div class="alert alert-primary mb-4">
+                <i class="bi bi-info-circle"></i>
+                <strong>Note :</strong> Cette analyse est effectuée sur l'agrégation mensuelle des données.
+                Le délai est calculé comme : <strong>Date Expédition - Date Commande</strong> (ou Date Facturation - 60 jours si date commande absente).
+            </div>
+            
+            <!-- KPIs Lead Time -->
+            {% if lead_time_analysis and 'error' not in lead_time_analysis %}
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body text-center">
+                            <h6>Médiane</h6>
+                            <h3>{{ lead_time_analysis.median|floatformat:1 }} j</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body text-center">
+                            <h6>Moyenne</h6>
+                            <h3>{{ lead_time_analysis.mean|floatformat:1 }} j</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body text-center">
+                            <h6>% Anomalies</h6>
+                            <h3>{{ lead_time_analysis.pct_anomalies|floatformat:1 }}%</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body text-center">
+                            <h6>% Extrêmes</h6>
+                            <h3>{{ lead_time_analysis.pct_extremes|floatformat:1 }}%</h3>
+                        </div>
                     </div>
                 </div>
             </div>
-            {% endif %}
-        </div>
-        
-        <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h3>
-        <div class="row mb-4">
-            <div class="col-12">
-                {{ results.synthese_analyse|safe }}
+            
+            <!-- Distribution des délais -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-bar-chart-fill"></i> Distribution des Délais</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="leadTimeDistChart" style="max-height: 400px;"></canvas>
+                </div>
             </div>
+            
+            <!-- Évolution médiane dans le temps -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-graph-up"></i> Évolution de la Médiane des Délais</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="leadTimeSeriesChart" style="max-height: 300px;"></canvas>
+                </div>
+            </div>
+            
+            <!-- Bloc Interprétation -->
+            {{ lead_time_interpretation|safe }}
+            
+            {% else %}
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Analyse des délais indisponible.</strong>
+                {% if lead_time_analysis.error %}
+                <br>{{ lead_time_analysis.error }}
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
         
     </div>
     
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- ONGLET 2: ANALYSE TEMPORELLE -->
+    <!-- ONGLET 2: ANALYSE SÉRIE TEMPORELLE -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <div class="tab-pane fade" id="temporal" role="tabpanel">
         
-        <h2 class="mb-4 mt-4"><i class="bi bi-calendar3"></i> Analyse Temporelle</h2>
-        <!-- PARTIE 3 : ANALYSE TEMPORELLE -->
-        <h2 class="mb-4 mt-5"><i class="bi bi-calendar3"></i> III. Analyse Temporelle</h2>
-        
-        <h3 class="mb-4"><i class="bi bi-bar-chart"></i> Évolutions Trimestrielles</h3>
-        <div class="row mb-4">
-            {% if graphs.ca_par_trimestre %}
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.ca_par_trimestre|safe }}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-            
-            {% if graphs.variation_trimestrielle %}
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.variation_trimestrielle|safe }}
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-        </div>
-        
-        <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution Mensuelle avec Tendance</h3>
-        {% if graphs.evolution_mensuelle %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.evolution_mensuelle|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <h3 class="mb-4"><i class="bi bi-calendar-week"></i> Analyses Détaillées (Jours, Semaines)</h3>
-        {% if graphs.analyse_jour_semaine %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.analyse_jour_semaine|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        {% if graphs.ca_par_semaine %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.ca_par_semaine|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <h3 class="mb-4"><i class="bi bi-fire"></i> Heatmap Temporelle</h3>
-        {% if graphs.heatmap_ca_mensuel %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-body">
-                        {{ graphs.heatmap_ca_mensuel|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Temporelle</h3>
-        <div class="row mb-4">
-            <div class="col-12">
-                {{ results.synthese_temporelle|safe }}
-            </div>
-        </div>
+        <h2 class="mb-4 mt-4"><i class="bi bi-calendar3"></i> Analyse Série temporelle</h2>
         
         <!-- ANALYSES AVANCÉES -->
         <h2 class="mb-4 mt-5"><i class="bi bi-graph-up-arrow"></i> Analyses Avancées (Séries Temporelles)</h2>
@@ -392,25 +1220,937 @@
     </div>
     
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <!-- ONGLET 2: CLUSTERING -->
+    <!-- ONGLET 3: ANALYSE TEMPORELLE APPROFONDIE - SUPPRIMER TOUT CE BLOC -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="tab-pane fade" id="clustering" role="tabpanel">
+    <!--
+    <div class="tab-pane fade" id="temporal-advanced" role="tabpanel">
+    CONTENU SUPPRIMÉ POUR SIMPLIFICATION
+    </div>
+    -->
+    
+</div> <!-- end temporal -->
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ONGLET 3: ANALYSE DES FAMILLES DE PRODUITS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="products" role="tabpanel">
+    
+    <h2 class="mb-4 mt-4"><i class="bi bi-box-seam"></i> Analyse produits</h2>
+    
+    <!-- SOUS-ONGLETS: Mois / Trimestre / Année Fiscale -->
+    <ul class="nav nav-pills mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="products-month-tab" data-bs-toggle="pill" data-bs-target="#products-month-period" type="button" role="tab">
+                <i class="bi bi-calendar-month"></i> Mois
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="products-quarter-tab" data-bs-toggle="pill" data-bs-target="#products-quarter-period" type="button" role="tab">
+                <i class="bi bi-calendar3"></i> Trimestre
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="products-fiscal-tab" data-bs-toggle="pill" data-bs-target="#products-fiscal-period" type="button" role="tab">
+                <i class="bi bi-calendar-year"></i> Année Fiscale
+            </button>
+        </li>
+    </ul>
+    
+    <!-- CONTENU DES SOUS-ONGLETS -->
+    <div class="tab-content">
         
-        <div class="alert alert-info mt-4">
-            <h4><i class="bi bi-info-circle"></i> Clustering</h4>
-            <p>Cette section contiendra l'analyse de clustering (K-Means, RFM, etc.).</p>
-            <p>Utilisez le bouton "Clustering" dans le menu pour accéder à l'analyse complète.</p>
-            <a href="{% url 'client_analytics:clustering' dataset.pk %}" class="btn btn-primary">
-                <i class="bi bi-diagram-3"></i> Accéder au Clustering
-            </a>
+        <!-- SOUS-ONGLET: MOIS -->
+        <div class="tab-pane fade show active" id="products-month-period" role="tabpanel">
+            
+            <div class="alert alert-primary mb-4" role="alert">
+                <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
+                <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
+            </div>
+    
+    {% with stats_famille=family_analysis_month.stats_famille abc_summary=family_analysis_month.abc_summary classe_a=family_analysis_month.classe_a classe_b=family_analysis_month.classe_b classe_c=family_analysis_month.classe_c classe_a_nb=family_analysis_month.classe_a_nb classe_a_ca=family_analysis_month.classe_a_ca classe_a_part=family_analysis_month.classe_a_part classe_b_nb=family_analysis_month.classe_b_nb classe_b_ca=family_analysis_month.classe_b_ca classe_b_part=family_analysis_month.classe_b_part classe_c_nb=family_analysis_month.classe_c_nb classe_c_ca=family_analysis_month.classe_c_ca classe_c_part=family_analysis_month.classe_c_part family_graphs=family_analysis_month.family_graphs %}
+    {% if stats_famille is not None %}
+    
+    <!-- CLASSIFICATION ABC - Vue synthétique -->
+    <div class="row mb-4">
+        {% if abc_summary is not None %}
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h6 class="mb-0"><i class="bi bi-trophy"></i> Classe A - Stratégiques</h6>
+                </div>
+                <div class="card-body">
+                    <h3 class="text-success">{{ classe_a_nb }} familles</h3>
+                    <p class="mb-1"><strong>{{ classe_a_ca|floatformat:0 }}€</strong></p>
+                    <p class="text-muted mb-0">{{ classe_a_part|floatformat:1 }}% du CA total</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-warning">
+                <div class="card-header bg-warning text-dark">
+                    <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Classe B - Intermédiaires</h6>
+                </div>
+                <div class="card-body">
+                    <h3 class="text-warning">{{ classe_b_nb }} familles</h3>
+                    <p class="mb-1"><strong>{{ classe_b_ca|floatformat:0 }}€</strong></p>
+                    <p class="text-muted mb-0">{{ classe_b_part|floatformat:1 }}% du CA total</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-secondary">
+                <div class="card-header bg-secondary text-white">
+                    <h6 class="mb-0"><i class="bi bi-moon"></i> Classe C - Marginales</h6>
+                </div>
+                <div class="card-body">
+                    <h3 class="text-secondary">{{ classe_c_nb }} familles</h3>
+                    <p class="mb-1"><strong>{{ classe_c_ca|floatformat:0 }}€</strong></p>
+                    <p class="text-muted mb-0">{{ classe_c_part|floatformat:1 }}% du CA total</p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- FAMILLES CLASSE A - TOP Performers -->
+    {% if classe_a is not None %}
+    <div class="card mb-4 border-success">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-trophy"></i> TOP Familles Stratégiques (Classe A)</h5>
+            <small>Ces familles représentent 80% du chiffre d'affaires</small>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                {% for idx, row in classe_a.iterrows %}
+                <div class="col-md-6 mb-3">
+                    <div class="card h-100 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="card-title mb-0">
+                                    <span class="badge bg-success me-2">#{{ row.Rang|floatformat:0 }}</span>
+                                    {{ row.Famille }}
+                                </h6>
+                                <span class="badge bg-light text-dark">{{ row.Part_Pct|floatformat:1 }}%</span>
+                            </div>
+                            <hr class="my-2">
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <small class="text-muted d-block">CA Total</small>
+                                    <strong class="text-success">{{ row.CA_Total|floatformat:0 }}€</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Nb Ventes</small>
+                                    <strong>{{ row.Nb_Ventes|floatformat:0 }}</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">PU Moyen</small>
+                                    <strong>{{ row.PU_Moyen|floatformat:2 }}€</strong>
+                                </div>
+                                <div class="col-6">
+                                    <small class="text-muted d-block">Panier Moyen</small>
+                                    <strong>{{ row.Panier_Moyen|floatformat:0 }}€</strong>
+                                </div>
+                                <div class="col-12">
+                                    <small class="text-muted d-block">Clients</small>
+                                    <strong>{{ row.Nb_Clients|floatformat:0 }} clients</strong>
+                                    <small class="text-muted">({{ row.CA_par_Client|floatformat:0 }}€/client)</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- FAMILLES CLASSE B -->
+    {% if classe_b is not None %}
+    <div class="card mb-4 border-warning">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Familles Intermédiaires (Classe B)</h5>
+            <small>Potentiel de développement - 15% du CA</small>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Famille</th>
+                            <th class="text-end">CA Total</th>
+                            <th class="text-end">Part %</th>
+                            <th class="text-end">Nb Ventes</th>
+                            <th class="text-end">PU Moyen</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for idx, row in classe_b.iterrows %}
+                        <tr>
+                            <td><span class="badge bg-warning text-dark">#{{ row.Rang|floatformat:0 }}</span></td>
+                            <td><strong>{{ row.Famille }}</strong></td>
+                            <td class="text-end">{{ row.CA_Total|floatformat:0 }}€</td>
+                            <td class="text-end">{{ row.Part_Pct|floatformat:1 }}%</td>
+                            <td class="text-end">{{ row.Nb_Ventes|floatformat:0 }}</td>
+                            <td class="text-end">{{ row.PU_Moyen|floatformat:2 }}€</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- FAMILLES CLASSE C -->
+    {% if classe_c is not None %}
+    <div class="card mb-4 border-secondary">
+        <div class="card-header bg-secondary text-white">
+            <h5 class="mb-0"><i class="bi bi-moon"></i> Familles Marginales (Classe C)</h5>
+            <small>Contribution faible - 5% du CA</small>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Famille</th>
+                            <th class="text-end">CA Total</th>
+                            <th class="text-end">Part %</th>
+                            <th class="text-end">Nb Ventes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for idx, row in classe_c.iterrows %}
+                        <tr>
+                            <td><span class="badge bg-secondary">#{{ row.Rang|floatformat:0 }}</span></td>
+                            <td>{{ row.Famille }}</td>
+                            <td class="text-end">{{ row.CA_Total|floatformat:0 }}€</td>
+                            <td class="text-end">{{ row.Part_Pct|floatformat:1 }}%</td>
+                            <td class="text-end">{{ row.Nb_Ventes|floatformat:0 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- VISUALISATIONS GRAPHIQUES -->
+    {% if family_graphs %}
+    <h3 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Visualisations Détaillées</h3>
+    
+    <!-- Ligne 1 : Top 15 CA + ABC Donut -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.top15_ca }}" class="img-fluid" alt="Top 15 Familles par CA">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.abc_donut }}" class="img-fluid" alt="Classification ABC">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ligne 2 : Courbe de Pareto -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.pareto_curve }}" class="img-fluid" alt="Courbe de Pareto">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ligne 3 : Scatter Volume/Valeur + Top 10 PU -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.scatter_volume_valeur }}" class="img-fluid" alt="Segmentation Volume vs Valeur">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.top10_pu }}" class="img-fluid" alt="Top 10 PU Moyen">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ligne 4 : Top 10 Clients + CA par Client -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.top10_clients }}" class="img-fluid" alt="Top 10 Nombre de Clients">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.top10_ca_client }}" class="img-fluid" alt="Top 10 CA par Client">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ligne 5 : Panier Moyen -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.top10_panier }}" class="img-fluid" alt="Top 10 Panier Moyen">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ligne 6 : Radar Top 5 + Heatmap -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.radar_top5 }}" class="img-fluid" alt="Performance Multidimensionnelle Top 5">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ family_graphs.heatmap_segment_abc }}" class="img-fluid" alt="Heatmap Ventes par Segment et Classe ABC">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> Analyse des familles de produits en cours de chargement...
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+        </div> <!-- end products-month-period -->
+        
+        <!-- SOUS-ONGLET: TRIMESTRE -->
+        <div class="tab-pane fade" id="products-quarter-period" role="tabpanel">
+            
+            <div class="alert alert-info mb-4" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h4>
+                <p class="mb-0">Données agrégées par <strong>trimestre fiscal</strong> (Q1: Avr-Jun, Q2: Jul-Sep, Q3: Oct-Déc, Q4: Jan-Mar).</p>
+            </div>
+    
+    {% with stats_famille=family_analysis_quarter.stats_famille abc_summary=family_analysis_quarter.abc_summary classe_a=family_analysis_quarter.classe_a classe_b=family_analysis_quarter.classe_b classe_c=family_analysis_quarter.classe_c classe_a_nb=family_analysis_quarter.classe_a_nb classe_a_ca=family_analysis_quarter.classe_a_ca classe_a_part=family_analysis_quarter.classe_a_part classe_b_nb=family_analysis_quarter.classe_b_nb classe_b_ca=family_analysis_quarter.classe_b_ca classe_b_part=family_analysis_quarter.classe_b_part classe_c_nb=family_analysis_quarter.classe_c_nb classe_c_ca=family_analysis_quarter.classe_c_ca classe_c_part=family_analysis_quarter.classe_c_part family_graphs=family_analysis_quarter.family_graphs %}
+    {% if stats_famille is not None %}
+    
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> <strong>Analyse trimestrielle opérationnelle !</strong> La fonction <code>analyze_product_families()</code> agrège maintenant les données par <strong>trimestre fiscal</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+    </div>
+    
+    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
+    
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> Analyse des familles de produits en cours de chargement...
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+        </div> <!-- end products-quarter-period -->
+        
+        <!-- SOUS-ONGLET: ANNÉE FISCALE -->
+        <div class="tab-pane fade" id="products-fiscal-period" role="tabpanel">
+            
+            <div class="alert alert-success mb-4" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h4>
+                <p class="mb-0">Données agrégées par <strong>année fiscale complète</strong> (Avril → Mars de l'année suivante).</p>
+            </div>
+    
+    {% with stats_famille=family_analysis_fiscal.stats_famille abc_summary=family_analysis_fiscal.abc_summary classe_a=family_analysis_fiscal.classe_a classe_b=family_analysis_fiscal.classe_b classe_c=family_analysis_fiscal.classe_c classe_a_nb=family_analysis_fiscal.classe_a_nb classe_a_ca=family_analysis_fiscal.classe_a_ca classe_a_part=family_analysis_fiscal.classe_a_part classe_b_nb=family_analysis_fiscal.classe_b_nb classe_b_ca=family_analysis_fiscal.classe_b_ca classe_b_part=family_analysis_fiscal.classe_b_part classe_c_nb=family_analysis_fiscal.classe_c_nb classe_c_ca=family_analysis_fiscal.classe_c_ca classe_c_part=family_analysis_fiscal.classe_c_part family_graphs=family_analysis_fiscal.family_graphs %}
+    {% if stats_famille is not None %}
+    
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> <strong>Analyse annuelle opérationnelle !</strong> La fonction <code>analyze_product_families()</code> agrège maintenant les données par <strong>année fiscale</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+    </div>
+    
+    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
+    
+    {% else %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> Analyse des familles de produits en cours de chargement...
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+        </div> <!-- end products-fiscal-period -->
+        
+    </div> <!-- end tab-content for products -->
+    
+    </div> <!-- end products -->
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ONGLET 4: ANALYSES CLIENTS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="clients" role="tabpanel">
+    <h2 class="mb-4 mt-4"><i class="bi bi-people-fill"></i> Analyses clients</h2>
+    
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Cette section est en cours de développement. 
+        Les analyses clients incluront : segmentation RFM, analyse de cohortes, valeur vie client (CLV), etc.
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-people"></i> Total Clients</h5>
+                    <h2 class="text-primary">{{ kpis.nb_clients }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cash-coin"></i> CA Moyen / Client</h5>
+                    <h2 class="text-success">{{ kpis.ca_total|floatformat:0 }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cart"></i> Panier Moyen</h5>
+                    <h2 class="text-warning">{{ kpis.panier_moyen }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+</div> <!-- end clients -->
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ONGLET 5: ANALYSE GÉOGRAPHIQUE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="geography" role="tabpanel">
+    <h2 class="mb-4 mt-4"><i class="bi bi-globe"></i> Analyses géographique</h2>
+    
+    <!-- SOUS-ONGLETS: Mois / Trimestre / Année Fiscale -->
+    <ul class="nav nav-pills mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="geo-month-tab" data-bs-toggle="pill" data-bs-target="#geo-month-period" type="button" role="tab">
+                <i class="bi bi-calendar-month"></i> Mois
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="geo-quarter-tab" data-bs-toggle="pill" data-bs-target="#geo-quarter-period" type="button" role="tab">
+                <i class="bi bi-calendar3"></i> Trimestre
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="geo-fiscal-tab" data-bs-toggle="pill" data-bs-target="#geo-fiscal-period" type="button" role="tab">
+                <i class="bi bi-calendar-year"></i> Année Fiscale
+            </button>
+        </li>
+    </ul>
+    
+    <!-- CONTENU DES SOUS-ONGLETS -->
+    <div class="tab-content">
+        
+        <!-- SOUS-ONGLET: MOIS -->
+        <div class="tab-pane fade show active" id="geo-month-period" role="tabpanel">
+            
+            <div class="alert alert-primary mb-4" role="alert">
+                <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
+                <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
+            </div>
+    
+    {% with stats_zone=geo_analysis_month.stats_zone stats_pays=geo_analysis_month.stats_pays classif_summary=geo_analysis_month.classif_summary top10_score=geo_analysis_month.top10_score geo_graphs=geo_analysis_month.geo_graphs %}
+        
+        <!-- Section Zones Géographiques -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <h3 class="mb-3"><i class="bi bi-map"></i> Performance par Zone Géographique</h3>
+            </div>
         </div>
         
+        {% if stats_zone %}
+        <div class="row mb-4">
+        {% for row in stats_zone %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card border-info h-100">
+                <div class="card-header bg-info text-white">
+                    <strong>{{ row.Zone }}</strong>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>CA Total:</strong> {{ row.CA_Total|floatformat:0 }} €</p>
+                    <p class="mb-2"><strong>Part du CA:</strong> {{ row.Part_Pct|floatformat:1 }}%</p>
+                    <p class="mb-2"><strong>Nombre de pays:</strong> {{ row.Nb_Pays }}</p>
+                    <p class="mb-2"><strong>Clients:</strong> {{ row.Nb_Clients }}</p>
+                    <p class="mb-2"><strong>Panier Moyen:</strong> {{ row.Panier_Moyen|floatformat:2 }} €</p>
+                    <p class="mb-0"><strong>CA Moyen/Pays:</strong> {{ row.CA_Moyen|floatformat:0 }} €</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
-
+    {% endif %}
     
-</div>
+    <!-- Section Classification des Pays -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="mb-3"><i class="bi bi-trophy"></i> Classification par Performance</h3>
+        </div>
+    </div>
+    
+    {% if classif_summary %}
+    <div class="row mb-4">
+        {% for row in classif_summary %}
+        <div class="col-md-6 col-lg-3 mb-3">
+            <div class="card {% if row.Classification == 'Excellence' %}border-success{% elif row.Classification == 'Performant' %}border-primary{% elif row.Classification == 'Moyen' %}border-warning{% else %}border-danger{% endif %} h-100">
+                <div class="card-header {% if row.Classification == 'Excellence' %}bg-success{% elif row.Classification == 'Performant' %}bg-primary{% elif row.Classification == 'Moyen' %}bg-warning{% else %}bg-danger{% endif %} text-white">
+                    <strong>{{ row.Classification }}</strong>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2"><strong>Nombre de pays:</strong> {{ row.Nb_Pays }}</p>
+                    <p class="mb-2"><strong>CA Total:</strong> {{ row.CA_Total|floatformat:0 }} €</p>
+                    <p class="mb-2"><strong>Part du CA:</strong> {{ row.Part_CA_Pct|floatformat:1 }}%</p>
+                    <p class="mb-0"><strong>Score Moyen:</strong> {{ row.Score_Moyen|floatformat:1 }}/100</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    
+    <!-- Section Top 10 Pays -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="mb-3"><i class="bi bi-star-fill"></i> Top 10 Pays par Score de Performance</h3>
+        </div>
+    </div>
+    
+    {% if top10_score %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Rang</th>
+                            <th>Pays</th>
+                            <th>Zone</th>
+                            <th>Classification</th>
+                            <th>CA Total (€)</th>
+                            <th>Score CA</th>
+                            <th>Score Panier</th>
+                            <th>Score Clients</th>
+                            <th>Score Global</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in top10_score %}
+                        <tr>
+                            <td><strong>{{ forloop.counter }}</strong></td>
+                            <td><strong>{{ row.Pays }}</strong></td>
+                            <td>{{ row.Zone }}</td>
+                            <td>
+                                <span class="badge {% if row.Classification == 'Excellence' %}bg-success{% elif row.Classification == 'Performant' %}bg-primary{% elif row.Classification == 'Moyen' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ row.Classification }}
+                                </span>
+                            </td>
+                            <td>{{ row.CA_Total|floatformat:0 }}</td>
+                            <td>{{ row.Score_CA|floatformat:1 }}</td>
+                            <td>{{ row.Score_Panier|floatformat:1 }}</td>
+                            <td>{{ row.Score_Clients|floatformat:1 }}</td>
+                            <td><strong>{{ row.Score_Global|floatformat:1 }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Tous les Pays -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="mb-3"><i class="bi bi-table"></i> Détails de Tous les Pays</h3>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-12">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped table-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Pays</th>
+                            <th>Zone</th>
+                            <th>CA Total (€)</th>
+                            <th>Part CA (%)</th>
+                            <th>Nb Clients</th>
+                            <th>Panier Moyen (€)</th>
+                            <th>Score Global</th>
+                            <th>Classification</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in stats_pays %}
+                        <tr>
+                            <td><strong>{{ row.Pays }}</strong></td>
+                            <td>{{ row.Zone }}</td>
+                            <td>{{ row.CA_Total|floatformat:0 }}</td>
+                            <td>{{ row.Part_Pct|floatformat:2 }}</td>
+                            <td>{{ row.Nb_Clients }}</td>
+                            <td>{{ row.Panier_Moyen|floatformat:2 }}</td>
+                            <td>{{ row.Score_Global|floatformat:1 }}</td>
+                            <td>
+                                <span class="badge {% if row.Classification == 'Excellence' %}bg-success{% elif row.Classification == 'Performant' %}bg-primary{% elif row.Classification == 'Moyen' %}bg-warning{% else %}bg-danger{% endif %}">
+                                    {{ row.Classification }}
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualisations Géographiques -->
+    {% if geo_graphs %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="mb-3"><i class="bi bi-bar-chart-fill"></i> Tableau de Bord Géographique</h3>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <img src="{{ geo_graphs.dashboard_complet }}" class="img-fluid" alt="Tableau de Bord Géographique Complet">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% endwith %}
+    
+        </div> <!-- end geo-month-period -->
+        
+        <!-- SOUS-ONGLET: TRIMESTRE -->
+        <div class="tab-pane fade" id="geo-quarter-period" role="tabpanel">
+            
+            <div class="alert alert-info mb-4" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h4>
+                <p class="mb-0">Données agrégées par <strong>trimestre fiscal</strong> (Q1: Avr-Jun, Q2: Jul-Sep, Q3: Oct-Déc, Q4: Jan-Mar).</p>
+            </div>
+    
+    {% with stats_zone=geo_analysis_quarter.stats_zone stats_pays=geo_analysis_quarter.stats_pays classif_summary=geo_analysis_quarter.classif_summary top10_score=geo_analysis_quarter.top10_score geo_graphs=geo_analysis_quarter.geo_graphs %}
+    
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> <strong>Analyse trimestrielle opérationnelle !</strong> La fonction <code>analyze_geographic_data()</code> agrège maintenant les données par <strong>trimestre fiscal</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+    </div>
+    
+    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
+    
+    {% endwith %}
+    
+        </div> <!-- end geo-quarter-period -->
+        
+        <!-- SOUS-ONGLET: ANNÉE FISCALE -->
+        <div class="tab-pane fade" id="geo-fiscal-period" role="tabpanel">
+            
+            <div class="alert alert-success mb-4" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h4>
+                <p class="mb-0">Données agrégées par <strong>année fiscale complète</strong> (Avril → Mars de l'année suivante).</p>
+            </div>
+    
+    {% with stats_zone=geo_analysis_fiscal.stats_zone stats_pays=geo_analysis_fiscal.stats_pays classif_summary=geo_analysis_fiscal.classif_summary top10_score=geo_analysis_fiscal.top10_score geo_graphs=geo_analysis_fiscal.geo_graphs %}
+    
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> <strong>Analyse annuelle opérationnelle !</strong> La fonction <code>analyze_geographic_data()</code> agrège maintenant les données par <strong>année fiscale</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+    </div>
+    
+    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
+    
+    {% endwith %}
+    
+        </div> <!-- end geo-fiscal-period -->
+        
+    </div> <!-- end tab-content for geography -->
+    
+</div> <!-- end geography -->
 
-{% if not graphs %}
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ONGLET 6: ANALYSE DE LA DÉPENDANCE AUX DEVISES -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="tab-pane fade" id="currency" role="tabpanel">
+    
+    <h2 class="mb-4 mt-4"><i class="bi bi-currency-exchange"></i> Dépendance aux devises</h2>
+    
+    <!-- SOUS-ONGLETS: Mois / Trimestre / Année Fiscale -->
+    <ul class="nav nav-pills mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="currency-month-tab" data-bs-toggle="pill" data-bs-target="#currency-month-period" type="button" role="tab">
+                <i class="bi bi-calendar-month"></i> Mois
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="currency-quarter-tab" data-bs-toggle="pill" data-bs-target="#currency-quarter-period" type="button" role="tab">
+                <i class="bi bi-calendar3"></i> Trimestre
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="currency-fiscal-tab" data-bs-toggle="pill" data-bs-target="#currency-fiscal-period" type="button" role="tab">
+                <i class="bi bi-calendar-year"></i> Année Fiscale
+            </button>
+        </li>
+    </ul>
+    
+    <!-- CONTENU DES SOUS-ONGLETS -->
+    <div class="tab-content">
+        
+        <!-- SOUS-ONGLET: MOIS -->
+        <div class="tab-pane fade show active" id="currency-month-period" role="tabpanel">
+            
+            <div class="alert alert-primary mb-4" role="alert">
+                <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
+                <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
+            </div>
+    
+    {% with currency_kpi=currency_kpi_month currency_charts=currency_charts_month %}
+    
+    {% if currency_kpi %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="mb-3"><i class="bi bi-currency-exchange"></i> Analyse de la Dépendance aux Devises</h2>
+            <p class="text-muted">
+                Analyse de l'exposition aux devises étrangères - Mix de devises, concentration et volatilité
+            </p>
+        </div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">CA Total</h5>
+                    <h2 class="text-primary">{{ currency_kpi.total_revenue|floatformat:0|default:"N/A" }} €</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Devises Détectées</h5>
+                    <h2 class="text-info">{{ currency_kpi.currencies_detected|length|default:"0" }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">Part Non-EUR</h5>
+                    <h2 class="text-warning">{{ currency_kpi.non_eur_pct|floatformat:1|default:"0.0" }}%</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title text-muted">HHI Concentration</h5>
+                    <h2 class="text-danger">{{ currency_kpi.hhi_currency|floatformat:0|default:"N/A" }}</h2>
+                    <small class="text-muted">Base 10,000</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Devises -->
+    {% if currency_kpi.top_currencies %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-trophy-fill"></i> Top 5 Devises</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Devise</th>
+                                <th>Montant</th>
+                                <th>% CA Total</th>
+                                <th>% CA Non-EUR</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in currency_kpi.top_currencies %}
+                            <tr>
+                                <td><strong>{{ item.currency }}</strong></td>
+                                <td>{{ item.amount|floatformat:0 }} €</td>
+                                <td>{{ item.pct_total|floatformat:1 }}%</td>
+                                <td>{{ item.pct_non_eur|floatformat:1 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Graphiques -->
+    {% if currency_charts %}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> CA par Devise</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ currency_charts.revenue_by_currency }}" class="img-fluid" alt="CA par Devise">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Évolution Mensuelle Part Non-EUR</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ currency_charts.non_eur_pct_over_time }}" class="img-fluid" alt="Évolution Part Non-EUR">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-people"></i> Top Clients Non-EUR (Pareto)</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ currency_charts.pareto_non_eur_clients }}" class="img-fluid" alt="Top Clients Non-EUR">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-box"></i> Part Non-EUR par Famille Produits</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ currency_charts.non_eur_by_family }}" class="img-fluid" alt="Part Non-EUR par Famille">
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-grid"></i> Carte Thermique Pays × Devises</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ currency_charts.country_currency_heatmap }}" class="img-fluid" alt="Carte Thermique Pays × Devises">
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-layers"></i> CA Mensuel Empilé par Devise</h5>
+                </div>
+                <div class="card-body">
+                    <img src="{{ currency_charts.monthly_stacked_area }}" class="img-fluid" alt="CA Mensuel Empilé">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Analyse de dépendance aux devises non disponible ou en cours de chargement.
+    </div>
+    {% endif %}
+    {% endwith %}
+    
+        </div> <!-- end currency-month-period -->
+        
+        <!-- SOUS-ONGLET: TRIMESTRE -->
+        <div class="tab-pane fade" id="currency-quarter-period" role="tabpanel">
+            
+            <div class="alert alert-info mb-4" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h4>
+                <p class="mb-0">Données agrégées par <strong>trimestre fiscal</strong> (Q1: Avr-Jun, Q2: Jul-Sep, Q3: Oct-Déc, Q4: Jan-Mar).</p>
+            </div>
+    
+    {% with currency_kpi=currency_kpi_quarter currency_charts=currency_charts_quarter %}
+    
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> <strong>Analyse trimestrielle opérationnelle !</strong> La fonction <code>analyze_currency_dependency()</code> agrège maintenant les données par <strong>trimestre fiscal</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+    </div>
+    
+    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
+    
+    {% endwith %}
+    
+        </div> <!-- end currency-quarter-period -->
+        
+        <!-- SOUS-ONGLET: ANNÉE FISCALE -->
+        <div class="tab-pane fade" id="currency-fiscal-period" role="tabpanel">
+            
+            <div class="alert alert-success mb-4" role="alert">
+                <h4 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h4>
+                <p class="mb-0">Données agrégées par <strong>année fiscale complète</strong> (Avril → Mars de l'année suivante).</p>
+            </div>
+    
+    {% with currency_kpi=currency_kpi_fiscal currency_charts=currency_charts_fiscal %}
+    
+    <div class="alert alert-success">
+        <i class="bi bi-check-circle"></i> <strong>Analyse annuelle opérationnelle !</strong> La fonction <code>analyze_currency_dependency()</code> agrège maintenant les données par <strong>année fiscale</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+    </div>
+    
+    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
+    
+    {% endwith %}
+    
+        </div> <!-- end currency-fiscal-period -->
+        
+    </div> <!-- end tab-content for currency -->
+    
+</div> <!-- end currency -->
+
+</div> <!-- end tab-content -->
+
+</div> <!-- end container -->
+
+{% if not graphs and not stats_trimestre %}
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i> Chargement des analyses en cours...
 </div>
@@ -427,6 +2167,129 @@ triggerTabList.forEach(function (triggerEl) {
     tabTrigger.show()
   })
 })
+</script>
+
+<!-- CHART.JS : Graphiques Lead Time -->
+{% if lead_time_analysis and 'error' not in lead_time_analysis %}
+<script>
+// Récupérer les données JSON
+const leadTimeDistData = {{ lead_time_dist_json|safe }};
+const leadTimeSeriesData = {{ lead_time_series_json|safe }};
+
+// === GRAPHIQUE 1 : Distribution des délais ===
+const ctxDist = document.getElementById('leadTimeDistChart').getContext('2d');
+new Chart(ctxDist, {
+    type: 'bar',
+    data: {
+        labels: leadTimeDistData.map(d => d.label),
+        datasets: [{
+            label: 'Nombre de commandes',
+            data: leadTimeDistData.map(d => d.count),
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.parsed.y + ' commandes';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value + ' cmd';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// === GRAPHIQUE 2 : Évolution médiane lead time ===
+const ctxSeries = document.getElementById('leadTimeSeriesChart').getContext('2d');
+new Chart(ctxSeries, {
+    type: 'line',
+    data: {
+        labels: leadTimeSeriesData.map(d => d.label),
+        datasets: [{
+            label: 'Médiane (jours)',
+            data: leadTimeSeriesData.map(d => d.value),
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            fill: true,
+            tension: 0.3
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.parsed.y.toFixed(1) + ' jours';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value + ' j';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+
+<script src="{% static 'client_analytics/analysis_pages.js' %}"></script>
+
+<!-- Script pour toggle des sections avancées -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Gestion des boutons toggle pour sections avancées
+    const toggleButtons = document.querySelectorAll('.btn-advanced-toggle');
+    
+    toggleButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const targetId = this.getAttribute('data-target');
+            const targetSection = document.getElementById(targetId);
+            const icon = this.querySelector('i');
+            
+            if (targetSection) {
+                if (targetSection.style.display === 'none') {
+                    // Afficher la section
+                    targetSection.style.display = 'block';
+                    icon.classList.remove('bi-chevron-down');
+                    icon.classList.add('bi-chevron-up');
+                    this.innerHTML = '<i class="bi bi-chevron-up"></i> Masquer les détails avancés';
+                } else {
+                    // Cacher la section
+                    targetSection.style.display = 'none';
+                    icon.classList.remove('bi-chevron-up');
+                    icon.classList.add('bi-chevron-down');
+                    this.innerHTML = '<i class="bi bi-chevron-down"></i> Afficher les détails avancés (QQ-Plots)';
+                }
+            }
+        });
+    });
+});
 </script>
 
 {% endblock %}

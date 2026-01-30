@@ -27,25 +27,15 @@ python manage.py migrate
 python manage.py createsuperuser
 ```
 
-5. **Générer les datasets démo**
-```bash
-python manage.py generate_demo_data
-```
-
-6. **Lancer le serveur**
+5. **Lancer le serveur**
 ```bash
 python manage.py runserver
 ```
 
-7. **Accéder à l'application**
+6. **Accéder à l'application**
 Ouvrir http://127.0.0.1:8000/ dans votre navigateur
 
 ## Utilisation
-
-### Datasets Démo
-L'application inclut 2 datasets démo :
-- **demo_clients_1.xlsx** : Données clients avec informations démographiques et transactionnelles
-- **demo_clients_2.xlsx** : Données clients avec comportement d'achat
 
 ### Workflow
 1. **Home** : Uploader un fichier Excel ou sélectionner un dataset démo

@@ -1,0 +1,18 @@
+<!-- Sélecteur de période réutilisable -->
+<div class="period-selector mb-4">
+    <div class="btn-group" role="group" aria-label="Sélection période">
+        <a href="?period=month" class="btn btn-outline-primary {% if period == 'month' %}active{% endif %}">
+            <i class="bi bi-calendar-month"></i> Mois
+        </a>
+        <a href="?period=quarter" class="btn btn-outline-primary {% if period == 'quarter' %}active{% endif %}">
+            <i class="bi bi-calendar3"></i> Trimestre
+        </a>
+        <a href="?period=year" class="btn btn-outline-primary {% if period == 'year' %}active{% endif %}">
+            <i class="bi bi-calendar-year"></i> Année
+        </a>
+    </div>
+    <small class="text-muted ms-3">
+        <i class="bi bi-info-circle"></i> 
+        Sélectionnez la granularité d'analyse
+    </small>
+</div>

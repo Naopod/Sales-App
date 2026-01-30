@@ -27,3 +27,17 @@ def intcomma(value):
         return "{:,}".format(int(value))
     except (ValueError, TypeError):
         return value
+
+
+@register.filter
+def granularity_label(value):
+    """
+    Convert granularity code to French label
+    Usage: {{ granularity|granularity_label }}
+    """
+    labels = {
+        'month': 'mois',
+        'quarter': 'trimestre',
+        'year': 'année'
+    }
+    return labels.get(value, value)

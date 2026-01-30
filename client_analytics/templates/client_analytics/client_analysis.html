@@ -1,0 +1,310 @@
+{% extends 'client_analytics/base.html' %}
+{% load custom_filters %}
+{% load static %}
+
+{% block title %}Analyse Client - {{ dataset.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
+<style>
+.interpretation-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin: 20px 0;
+}
+.interpretation-box h5 {
+    color: white;
+    font-weight: bold;
+}
+.interpretation-box ul {
+    margin-bottom: 0;
+}
+</style>
+{% endblock %}
+
+{% block dataset_nav %}
+<nav class="analysis-nav">
+    <div class="container-fluid">
+        <div class="analysis-tabs">
+            <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-info-circle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Overview</span>
+                    <span class="tab-subtitle">Description des données</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:stats' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-bar-chart-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Statistiques</span>
+                    <span class="tab-subtitle">Analyses temporelles</span>
+                </div>
+            </a>
+            <a class="analysis-tab active" href="{% url 'client_analytics:client_analysis' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Analyse Client</span>
+                    <span class="tab-subtitle">Portefeuille & Pareto</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:currency_dependency' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-currency-exchange"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Dépendance Devise</span>
+                    <span class="tab-subtitle">Exposition marchés</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-diagram-3-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Clustering</span>
+                    <span class="tab-subtitle">Segmentation K-Means</span>
+                </div>
+            </a>
+        </div>
+        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
+            <i class="bi bi-arrow-left-circle"></i>
+            <span>Accueil</span>
+        </a>
+    </div>
+</nav>
+{% endblock %}
+
+{% block content %}
+<h1 class="mb-4"><i class="bi bi-people-fill"></i> Analyse Client</h1>
+
+<!-- Sélecteur de période -->
+{% include 'client_analytics/_period_selector.html' with period=period %}
+
+<!-- KPIs -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <h6>CA Total</h6>
+                <h3>{{ kpis.ca_total|floatformat:0 }} €</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <h6>Nombre de Clients</h6>
+                <h3>{{ kpis.nb_clients }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <h6>Panier Moyen</h6>
+                <h3>{{ kpis.panier_moyen|floatformat:0 }} €</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <h6>Part Top 10</h6>
+                <h3>{{ pareto.top_10_share|floatformat:1 }}%</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top 10 Clients -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-trophy-fill"></i> Top 10 Clients par CA</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="topClientsChart" style="max-height: 400px;"></canvas>
+    </div>
+</div>
+
+<!-- Courbe de Pareto -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-graph-up"></i> Courbe de Pareto - Concentration du CA</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="paretoChart" style="max-height: 400px;"></canvas>
+        <div class="mt-3 text-center">
+            <p><strong>Part des top 20% de clients :</strong> {{ pareto.top_20pct_share|floatformat:1 }}%</p>
+            <p class="text-muted">Sur {{ pareto.n_total }} clients, les top {{ pareto.n_20pct }} génèrent {{ pareto.top_20pct_share|floatformat:1 }}% du CA</p>
+        </div>
+    </div>
+</div>
+
+<!-- CA over time (optionnel) -->
+{% if ca_over_time %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5><i class="bi bi-calendar-week"></i> Évolution du CA dans le temps</h5>
+    </div>
+    <div class="card-body">
+        <canvas id="caTimeChart" style="max-height: 300px;"></canvas>
+    </div>
+</div>
+{% endif %}
+
+<!-- Bloc Interprétation -->
+{{ pareto_interpretation|safe }}
+
+<!-- Données JSON pour Chart.js -->
+{{ top_clients_json|json_script:"topClientsData" }}
+{{ pareto_json|json_script:"paretoData" }}
+{% if ca_over_time %}
+{{ ca_over_time_json|json_script:"caTimeData" }}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Récupérer les données JSON
+const topClientsData = JSON.parse(document.getElementById('topClientsData').textContent);
+const paretoData = JSON.parse(document.getElementById('paretoData').textContent);
+
+// === GRAPHIQUE 1 : Top 10 Clients ===
+const ctxTop = document.getElementById('topClientsChart').getContext('2d');
+new Chart(ctxTop, {
+    type: 'bar',
+    data: {
+        labels: topClientsData.map(d => d.label),
+        datasets: [{
+            label: 'CA (€)',
+            data: topClientsData.map(d => d.value),
+            backgroundColor: 'rgba(54, 162, 235, 0.8)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'CA: ' + context.parsed.y.toLocaleString('fr-FR') + ' €';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString('fr-FR') + ' €';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// === GRAPHIQUE 2 : Courbe de Pareto ===
+const ctxPareto = document.getElementById('paretoChart').getContext('2d');
+new Chart(ctxPareto, {
+    type: 'line',
+    data: {
+        labels: paretoData.map(d => 'Client ' + d.index),
+        datasets: [{
+            label: '% CA Cumulé',
+            data: paretoData.map(d => d.cumsum_pct),
+            borderColor: 'rgba(255, 99, 132, 1)',
+            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+            fill: true,
+            tension: 0.4
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.parsed.y.toFixed(1) + '% du CA';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                ticks: {
+                    callback: function(value) {
+                        return value + '%';
+                    }
+                }
+            },
+            x: {
+                ticks: {
+                    maxTicksLimit: 20
+                }
+            }
+        }
+    }
+});
+
+// === GRAPHIQUE 3 : CA over time (si présent) ===
+{% if ca_over_time %}
+const caTimeData = JSON.parse(document.getElementById('caTimeData').textContent);
+const ctxTime = document.getElementById('caTimeChart').getContext('2d');
+new Chart(ctxTime, {
+    type: 'line',
+    data: {
+        labels: caTimeData.map(d => d.label),
+        datasets: [{
+            label: 'CA (€)',
+            data: caTimeData.map(d => d.value),
+            borderColor: 'rgba(75, 192, 192, 1)',
+            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+            fill: true,
+            tension: 0.3
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return 'CA: ' + context.parsed.y.toLocaleString('fr-FR') + ' €';
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value.toLocaleString('fr-FR') + ' €';
+                    }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}
