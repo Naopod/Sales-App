@@ -327,44 +327,26 @@ def analyze_currency_dependency(
         >>> print(f"Part non-EUR: {report['kpi']['non_eur_pct']:.1f}%")
     """
     
-    print("\n" + "=" * 80)
-    print("           📊 ANALYSE DE DÉPENDANCE À LA DEVISE")
-    print("=" * 80)
-    
     # Validation
     if df_final.empty:
         raise ValueError("DataFrame vide : impossible d'analyser")
     
-    print(f"\n   📋 Dataset : {len(df_final):,} lignes × {len(df_final.columns)} colonnes")
     
     # Nettoyage
-    print("\n   🧹 Nettoyage et normalisation des devises...")
     df_clean = clean_dataframe(df_final)
-    print(f"      ✅ Dataset nettoyé : {len(df_clean):,} lignes")
     
     # Calcul KPI
-    print("\n   📈 Calcul des KPI...")
     kpi = compute_kpi(df_clean)
     
     if "error" in kpi:
-        print(f"      ❌ Erreur : {kpi['error']}")
         return {"kpi": kpi, "charts": {}, "chart_paths": {}}
     
-    print(f"      ✅ CA total : {kpi['total_revenue']:,.0f} €")
-    print(f"      ✅ Part non-EUR : {kpi['non_eur_pct']:.1f}%")
-    print(f"      ✅ Devises détectées : {len(kpi['currencies_detected'])}")
-    
-    if kpi.get("hhi_currency"):
-        print(f"      ✅ HHI (concentration) : {kpi['hhi_currency']:.0f}")
-    
     # Génération graphiques
-    print("\n   📊 Génération des graphiques...")
     
     output_path_obj = Path(output_dir) if output_dir else None
     
     if output_path_obj:
         output_path_obj.mkdir(parents=True, exist_ok=True)
-        print(f"      📁 Répertoire de sortie : {output_path_obj}")
     
     charts = {}
     chart_paths = {}
@@ -376,7 +358,6 @@ def analyze_currency_dependency(
         charts["revenue_by_currency"] = fig
     if path:
         chart_paths["revenue_by_currency"] = str(path)
-        print(f"      ✅ Graph 1 : {path.name}")
     
     # Graph 2: Aire empilée mensuelle
     path = output_path_obj / "2_monthly_stacked_area.png" if output_path_obj else None
@@ -385,7 +366,6 @@ def analyze_currency_dependency(
         charts["monthly_stacked_area"] = fig
     if path:
         chart_paths["monthly_stacked_area"] = str(path)
-        print(f"      ✅ Graph 2 : {path.name}")
     
     # Graph 3: % non-EUR temporel
     path = output_path_obj / "3_non_eur_pct_over_time.png" if output_path_obj else None
@@ -394,7 +374,6 @@ def analyze_currency_dependency(
         charts["non_eur_pct_over_time"] = fig
     if path:
         chart_paths["non_eur_pct_over_time"] = str(path)
-        print(f"      ✅ Graph 3 : {path.name}")
     
     # Graph 4: Heatmap Country × Devise
     path = output_path_obj / "4_country_currency_heatmap.png" if output_path_obj else None
@@ -403,7 +382,6 @@ def analyze_currency_dependency(
         charts["country_currency_heatmap"] = fig
     if path:
         chart_paths["country_currency_heatmap"] = str(path)
-        print(f"      ✅ Graph 4 : {path.name}")
     
     # Graph 5: Pareto clients non-EUR
     path = output_path_obj / "5_pareto_non_eur_clients.png" if output_path_obj else None
@@ -412,7 +390,6 @@ def analyze_currency_dependency(
         charts["pareto_non_eur_clients"] = fig
     if path:
         chart_paths["pareto_non_eur_clients"] = str(path)
-        print(f"      ✅ Graph 5 : {path.name}")
     
     # Graph 6: % non-EUR par Famille
     path = output_path_obj / "6_non_eur_by_family.png" if output_path_obj else None
@@ -421,13 +398,9 @@ def analyze_currency_dependency(
         charts["non_eur_by_family"] = fig
     if path:
         chart_paths["non_eur_by_family"] = str(path)
-        print(f"      ✅ Graph 6 : {path.name}")
-    
-    print("\n🎉 Analyse terminée !")
     
     # Convertir les figures en base64 si output_dir=None (pour usage web)
     if not output_dir and charts:
-        print("\n   🔄 Conversion des graphiques en base64...")
         charts_base64 = {}
         for name, fig in charts.items():
             if fig:
@@ -481,5 +454,4 @@ def run_full_pipeline(df_raw: pd.DataFrame, output_dir: str = "outputs/currency"
 
 
 if __name__ == "__main__":
-    print("Module analysis_currency_dependency.py")
-    print("Utilisez analyze_currency_dependency() pour analyser la dépendance à la devise")
+    pass

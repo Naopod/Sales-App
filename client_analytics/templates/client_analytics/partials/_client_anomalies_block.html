@@ -1,0 +1,146 @@
+{% if anom.error %}
+  <div class="alert alert-warning mb-0">
+    <i class="bi bi-exclamation-circle"></i>
+    {{ anom.error }}
+  </div>
+{% else %}
+
+  <div class="alert alert-info">
+    <div><strong>Comment lire les résultats</strong></div>
+    <div class="small">
+      Le <strong>Score</strong> est un z-score robuste (médiane + MAD) calculé sur l’historique.
+      Quand l’historique est quasi constant (<strong>MAD=0</strong>) et qu’il y a une rupture, on affiche un score extrême (±999) pour signaler l’écart.
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-3">
+      <div class="card text-center border-danger h-100">
+        <div class="card-body">
+          <div class="small text-muted">Dernière période</div>
+          <div class="h4 mb-0">{{ anom.kpis.latest_period|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center border-danger h-100">
+        <div class="card-body">
+          <div class="small text-muted">Anomalies (dernière période)</div>
+          <div class="h4 mb-0">{{ anom.kpis.n_anomalies_latest|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center border-danger h-100">
+        <div class="card-body">
+          <div class="small text-muted">Clients concernés</div>
+          <div class="h4 mb-0">{{ anom.kpis.n_clients_anomalous_latest|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card text-center border-danger h-100">
+        <div class="card-body">
+          <div class="small text-muted">Seuil z (MAD)</div>
+          <div class="h4 mb-0">{{ anom.meta.z_thresh|default:"—" }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if anom.top_anomalies_latest %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Période</th>
+          <th class="text-end">Score</th>
+          <th class="text-end">CA</th>
+          <th class="text-end">Qté</th>
+          <th class="text-end">Fréq.</th>
+          <th class="text-end">Prix moy.</th>
+          <th>Raison (top contributeurs)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in anom.top_anomalies_latest %}
+        <tr>
+          <td><strong>{{ row.client }}</strong></td>
+          <td>{{ row.period|default:"—" }}</td>
+          <td class="text-end">
+            {% if row.score is not None and row.score >= 900 or row.score is not None and row.score <= -900 %}
+              <span class="badge bg-secondary" title="Historique quasi-constant (MAD=0) : rupture détectée">MAD=0</span>
+              <span class="text-muted" title="Valeur technique">({{ row.score|floatformat:0 }})</span>
+            {% else %}
+              {{ row.score|floatformat:2 }}
+            {% endif %}
+          </td>
+          <td class="text-end">{% if row.ca is not None %}{{ row.ca|floatformat:0 }}€{% else %}—{% endif %}</td>
+          <td class="text-end">{% if row.qty is not None %}{{ row.qty|floatformat:0 }}{% else %}—{% endif %}</td>
+          <td class="text-end">{% if row.freq is not None %}{{ row.freq|floatformat:0 }}{% else %}—{% endif %}</td>
+          <td class="text-end">{% if row.price is not None %}{{ row.price|floatformat:2 }}€{% else %}—{% endif %}</td>
+          <td><span class="text-muted">{{ row.reason|default:"—" }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="form-text mt-2">Astuce : si tu vois <strong>MAD=0</strong>, c’est un changement par rapport à un historique sans variance (ex. fréquence toujours identique).</div>
+  {% else %}
+    <div class="alert alert-secondary mb-0">
+      <i class="bi bi-check2-circle"></i> Aucune anomalie détectée sur la dernière période.
+    </div>
+
+    {% if anom.top_anomalies_all %}
+    <div class="mt-3">
+      <h6 class="mb-2">Top anomalies (historique)</h6>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Période</th>
+              <th class="text-end">Score</th>
+              <th class="text-end">CA</th>
+              <th class="text-end">Qté</th>
+              <th class="text-end">Fréq.</th>
+              <th class="text-end">Prix moy.</th>
+              <th>Raison (top contributeurs)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in anom.top_anomalies_all %}
+            <tr>
+              <td><strong>{{ row.client }}</strong></td>
+              <td>{{ row.period|default:"—" }}</td>
+              <td class="text-end">
+                {% if row.score is not None and row.score >= 900 or row.score is not None and row.score <= -900 %}
+                  <span class="badge bg-secondary" title="Historique quasi-constant (MAD=0) : rupture détectée">MAD=0</span>
+                  <span class="text-muted" title="Valeur technique">({{ row.score|floatformat:0 }})</span>
+                {% else %}
+                  {{ row.score|floatformat:2 }}
+                {% endif %}
+              </td>
+              <td class="text-end">{% if row.ca is not None %}{{ row.ca|floatformat:0 }}€{% else %}—{% endif %}</td>
+              <td class="text-end">{% if row.qty is not None %}{{ row.qty|floatformat:0 }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if row.freq is not None %}{{ row.freq|floatformat:0 }}{% else %}—{% endif %}</td>
+              <td class="text-end">{% if row.price is not None %}{{ row.price|floatformat:2 }}€{% else %}—{% endif %}</td>
+              <td><span class="text-muted">{{ row.reason|default:"—" }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="form-text mt-2">Astuce : <strong>MAD=0</strong> = rupture sur une métrique historiquement très stable.</div>
+    </div>
+    {% endif %}
+  {% endif %}
+
+  {% if anom.graphs.scatter_latest %}
+    <div class="mt-3">
+      {{ anom.graphs.scatter_latest|safe }}
+    </div>
+  {% endif %}
+
+{% endif %}

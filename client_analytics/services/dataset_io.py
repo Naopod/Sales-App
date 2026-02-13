@@ -25,7 +25,6 @@ def load_dataset_df(dataset):
         df = pd.read_excel(file_path)
         return df
     except Exception as e:
-        print(f"Error loading dataset: {e}")
         return None
 
 

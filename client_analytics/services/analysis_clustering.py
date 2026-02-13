@@ -62,7 +62,6 @@ def generate_clustering_analysis(df):
             'kpis': dict avec métriques globales
         }
     """
-    print("🎯 Génération de l'analyse de clustering...")
     
     results = {}
     graphs = {}
@@ -104,7 +103,6 @@ def generate_clustering_tab_analysis(df):
     Returns:
         dict avec l'analyse de clustering complète
     """
-    print("📊 Génération de l'analyse de clustering...")
     
     # Utilise la fonction complète de clustering
     return generate_clustering_analysis(df)

@@ -1,0 +1,308 @@
+{% if not client_portfolio %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Analyse client en cours de chargement...
+</div>
+{% else %}
+
+{% if client_portfolio.error %}
+<div class="alert alert-warning mt-3">
+    <i class="bi bi-exclamation-triangle"></i>
+    {{ client_portfolio.error }}
+</div>
+{% endif %}
+
+{% if client_portfolio.kpis %}
+<div class="row mt-3">
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h6 class="mb-1">CA Client</h6>
+                <h3 class="mb-0">{{ client_portfolio.kpis.ca_client|floatformat:0|default:"—" }}€</h3>
+                <small>{{ client_portfolio.kpis.weight_pct|floatformat:1|default:"—" }}% du CA</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <h6 class="mb-1">Commandes</h6>
+                <h3 class="mb-0">{{ client_portfolio.kpis.nb_orders|default:"—" }}</h3>
+                <small>CA / cmd: {{ client_portfolio.kpis.ca_per_order|floatformat:0|default:"—" }}€</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-warning text-dark">
+            <div class="card-body">
+                <h6 class="mb-1">Récence</h6>
+                <h3 class="mb-0">{{ client_portfolio.kpis.recency_days|default:"—" }}</h3>
+                <small>jours</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 mb-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <h6 class="mb-1">Fréquence</h6>
+                <h3 class="mb-0">{{ client_portfolio.kpis.orders_per_period|default_if_none:client_portfolio.kpis.orders_per_month|floatformat:2|default:"—" }}</h3>
+                <small>cmd / {{ client_portfolio.meta.period_unit|default:"mois" }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-header">Pricing</div>
+            <div class="card-body">
+                <div>PU Net (moy. pondérée): <strong>{{ client_portfolio.kpis.pu_net_weighted_mean|floatformat:2|default:"—" }}</strong></div>
+                <div>PU Net (médiane): <strong>{{ client_portfolio.kpis.pu_net_median|floatformat:2|default:"—" }}</strong></div>
+                <div>CV: <strong>{{ client_portfolio.kpis.pu_net_cv|floatformat:2|default:"—" }}</strong></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-header">Logistique</div>
+            <div class="card-body">
+                <div>Lead time médian: <strong>{{ client_portfolio.kpis.lead_time_median|floatformat:1|default:"—" }}</strong> j</div>
+                <div>Lead time P90: <strong>{{ client_portfolio.kpis.lead_time_p90|floatformat:1|default:"—" }}</strong> j</div>
+                <div>Taux de retard: <strong>{% if client_portfolio.kpis.late_rate_pct %}{{ client_portfolio.kpis.late_rate_pct|floatformat:1 }}%{% else %}—{% endif %}</strong></div>
+                <hr class="my-2">
+                <div class="text-muted" style="font-size: 0.9rem;">Impact délai → activité</div>
+                <div>Corr(LT, cmd): <strong>{{ client_portfolio.kpis.lt_orders_corr_same|floatformat:2|default:"—" }}</strong></div>
+                <div>Corr(LT, CA): <strong>{{ client_portfolio.kpis.lt_ca_corr_same|floatformat:2|default:"—" }}</strong></div>
+                <div>Corr(LTₜ, cmdₜ₊₁): <strong>{{ client_portfolio.kpis.lt_orders_corr_lag1|floatformat:2|default:"—" }}</strong></div>
+                <div>Corr(LTₜ, CAₜ₊₁): <strong>{{ client_portfolio.kpis.lt_ca_corr_lag1|floatformat:2|default:"—" }}</strong></div>
+                {% if client_portfolio.kpis.gap_delta_days %}
+                    <div>Δ délai avant prochaine cmd (LT élevé vs bas): <strong>{{ client_portfolio.kpis.gap_delta_days|floatformat:0 }} j</strong></div>
+                {% else %}
+                    <div>Δ délai avant prochaine cmd: <strong>—</strong></div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card">
+            <div class="card-header">Profil</div>
+            <div class="card-body">
+                <div>Pays (mode): <strong>{{ client_portfolio.kpis.country|default:"—" }}</strong></div>
+                <div>Nb familles: <strong>{{ client_portfolio.kpis.nb_families|default:"—" }}</strong></div>
+                <div>HHI: <strong>{{ client_portfolio.kpis.hhi|floatformat:3|default:"—" }}</strong></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if client_portfolio.kpis.currency_mix %}
+<div class="card mb-4">
+    <div class="card-header">Devises (mix)</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-striped">
+                <thead>
+                    <tr>
+                        <th>Devise</th>
+                        <th class="text-end">CA</th>
+                        <th class="text-end">Part</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in client_portfolio.kpis.currency_mix %}
+                    <tr>
+                        <td>{{ r.currency }}</td>
+                        <td class="text-end">{{ r.ca|floatformat:0 }}</td>
+                        <td class="text-end">{{ r.share_pct|floatformat:1 }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Portefeuille familles (Top + Autres)</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Famille</th>
+                                <th class="text-end">CA</th>
+                                <th class="text-end">Part</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in client_portfolio.tables.families_portfolio %}
+                            <tr>
+                                <td>{{ r.family }}</td>
+                                <td class="text-end">{{ r.ca|floatformat:0 }}</td>
+                                <td class="text-end">{{ r.share_pct|floatformat:1 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Top produits</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th class="text-end">CA</th>
+                                <th class="text-end">Part</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in client_portfolio.tables.top_products %}
+                            <tr>
+                                <td>{{ r.product }}</td>
+                                <td class="text-end">{{ r.ca|floatformat:0 }}</td>
+                                <td class="text-end">{{ r.share_pct|floatformat:1 }}%</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-muted">Aucun produit disponible.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if client_portfolio.tables.lead_time_by_product %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Logistique — Délai par produit (Top)</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th class="text-end">Nb cmd</th>
+                                <th class="text-end">LT médian (j)</th>
+                                <th class="text-end">LT P90 (j)</th>
+                                <th class="text-end">Retard</th>
+                                <th class="text-end">CA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in client_portfolio.tables.lead_time_by_product %}
+                            <tr>
+                                <td>{{ r.product }}</td>
+                                <td class="text-end">{{ r.nb_orders|default:"—" }}</td>
+                                <td class="text-end">{{ r.lead_time_median|floatformat:1|default:"—" }}</td>
+                                <td class="text-end">{{ r.lead_time_p90|floatformat:1|default:"—" }}</td>
+                                <td class="text-end">{% if r.late_rate_pct %}{{ r.late_rate_pct|floatformat:1 }}%{% else %}—{% endif %}</td>
+                                <td class="text-end">{{ r.ca|floatformat:0|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mb-4">
+    {% if client_portfolio.graphs.families_pie %}
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-light">Mix familles (pie)</div>
+            <div class="card-body">{{ client_portfolio.graphs.families_pie|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if client_portfolio.graphs.families_stacked %}
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-light">Mix familles (stacked)</div>
+            <div class="card-body">{{ client_portfolio.graphs.families_stacked|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row mb-4">
+    {% if client_portfolio.graphs.orders_over_time %}
+    <div class="col-12 mb-3">
+        <div class="card">
+            <div class="card-header bg-light">Commandes & CA ({{ client_portfolio.meta.period_adjective|default:"mensuel" }})</div>
+            <div class="card-body">{{ client_portfolio.graphs.orders_over_time|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if client_portfolio.graphs.pu_over_time %}
+    <div class="col-12 mb-3">
+        <div class="card">
+            <div class="card-header bg-light">PU Net (pondéré) par {{ client_portfolio.meta.period_label|default:"Mois"|lower }}</div>
+            <div class="card-body">{{ client_portfolio.graphs.pu_over_time|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row mb-4">
+    {% if client_portfolio.graphs.lead_time_hist %}
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-light">Lead time (distribution)</div>
+            <div class="card-body">{{ client_portfolio.graphs.lead_time_hist|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if client_portfolio.graphs.lead_time_over_time %}
+    <div class="col-lg-6 mb-3">
+        <div class="card">
+            <div class="card-header bg-light">Lead time ({{ client_portfolio.meta.period_adjective|default:"mensuel" }})</div>
+            <div class="card-body">{{ client_portfolio.graphs.lead_time_over_time|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+{% if client_portfolio.graphs.lead_time_impact %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-light">Impact du délai sur les commandes / CA</div>
+            <div class="card-body">{{ client_portfolio.graphs.lead_time_impact|safe }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if client_portfolio.alerts %}
+<div class="card mb-4 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <strong><i class="bi bi-bell"></i> Alertes</strong>
+    </div>
+    <div class="card-body">
+        <ul class="mb-0">
+            {% for a in client_portfolio.alerts %}
+                <li>{{ a.text }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endif %}

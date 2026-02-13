@@ -5,8 +5,14 @@ from .models import Dataset
 from .forms import UploadDatasetForm, SelectDatasetForm
 from .services import dataset_io, data_processing, analysis_currency_dependency
 from .services import analysis_overview, analysis_by_period, analysis_time_series, analysis_clustering
-from .services import analysis_products, analysis_geographic
+from .services import analysis_products, analysis_geographic, analysis_clients
+from .services import analysis_anomalies
+from .services import anomaly_detection
 import pandas as pd
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def home(request):
@@ -82,11 +88,29 @@ def stats(request, pk):
     dataset = get_object_or_404(Dataset, pk=pk)
     
     # ═══════════════════════════════════════════════════════════════════
-    # 📊 CHARGEMENT DES DONNÉES DÉJÀ TRAITÉES
+    # 📊 LECTURE DES PARAMÈTRES DEPUIS L'URL
     # ═══════════════════════════════════════════════════════════════════
-    # ⚠️ IMPORTANT : Les données ont été traitées UNE SEULE FOIS dans forms.py
-    # lors de l'upload. On charge ici les données DÉJÀ NETTOYÉES.
-    # NE PAS RAPPELER process_raw_data() !
+    granularity_param = request.GET.get('granularity', 'month')
+    active_tab = request.GET.get('tab', 'statistics')  # statistics, temporal, products, clients, geographic, currency
+    selected_client = request.GET.get('client', '')
+    selected_product = request.GET.get('product', '')
+    selected_family = request.GET.get('family', '')
+
+    compare_products = request.GET.getlist('compare_products')
+    compare_families = request.GET.getlist('compare_families')
+    compare_products_metric = request.GET.get('compare_products_metric', 'Qty_Total')
+    compare_families_metric = request.GET.get('compare_families_metric', 'Qty_Total')
+    
+    # Normalisation et validation
+    if granularity_param in ['fiscal_year', 'fiscal']:
+        granularity = 'year'
+    elif granularity_param in ['month', 'quarter', 'year']:
+        granularity = granularity_param
+    else:
+        granularity = 'month'  # Valeur par défaut si invalide
+    
+    # ═══════════════════════════════════════════════════════════════════
+    # 📊 CHARGEMENT DES DONNÉES DÉJÀ TRAITÉES
     # ═══════════════════════════════════════════════════════════════════
     
     df_processed = dataset_io.load_dataset_df(dataset)
@@ -96,189 +120,328 @@ def stats(request, pk):
         return redirect('client_analytics:home')
     
     # ════════════════════════════════════════════════════════════════
-    # PARTIE 1 : ANALYSES SUR DONNÉES DÉJÀ TRAITÉES
-    # ════════════════════════════════════════════════════════════════
-    print("\n" + "="*100)
-    print("📊 ANALYSES SUR DONNÉES TRAITÉES")
-    print("="*100 + "\n")
-    
-    # Analyse temporelle approfondie (trimestres, mois, années fiscales)
-    temporal_stats = analysis_time_series.analyze_temporal_data(df_processed)
-    
-    # ════════════════════════════════════════════════════════════════
-    # ANALYSES PAR GRANULARITÉ (Mois/Trimestre/Année)
+    # OPTIMISATION : Ne calculer QUE ce qui est nécessaire
     # ════════════════════════════════════════════════════════════════
     
-    # Analyse des familles de produits (ABC, segmentation) - VERSION GLOBALE
-    print("\n📦 Analyse produits - VERSION GLOBALE")
-    family_analysis = analysis_products.analyze_product_families(df_processed)
-    
-    # Analyse géographique (pays, zones, scoring) - VERSION GLOBALE
-    print("\n🌍 Analyse géographique - VERSION GLOBALE")
-    geo_analysis = analysis_geographic.analyze_geographic_data(df_processed)
-    
-    # DEBUG: Afficher les clés et types
-    print("\n🔍 DEBUG GÉOGRAPHIQUE:")
-    for key, value in geo_analysis.items():
-        if hasattr(value, 'shape'):
-            print(f"   {key}: DataFrame {value.shape} - {len(value)} rows")
-        else:
-            print(f"   {key}: {type(value)}")
-    
-    print("\n" + "="*100)
-    print("✅ ANALYSES TERMINÉES")
-    print("="*100 + "\n")
+    # Initialiser toutes les variables (vides par défaut)
+    temporal_stats = {}
+    client_analysis = {}
+    available_periods = {}
+    client_options = []
+    client_portfolio = None
+    client_portfolio_month = None
+    client_portfolio_quarter = None
+    client_portfolio_fiscal = None
     
     # ════════════════════════════════════════════════════════════════
-    # PARTIE 2 : GÉNÉRATION DES GRAPHIQUES PAR PÉRIODE
+    # CALCUL DES KPI GLOBAUX (toujours nécessaires pour l'affichage)
     # ════════════════════════════════════════════════════════════════
-    print("🔄 Génération des graphiques par période...")
+    global_kpis = {
+        'total_transactions': int(len(df_processed)),
+        'ca_total': f"{df_processed['Montant'].sum():,.2f} €",
+        'nb_clients': int(df_processed['Cpt Client'].nunique()),
+        'nb_familles': int(df_processed['Famille'].nunique()) if 'Famille' in df_processed.columns else 0,
+        'panier_moyen': f"{df_processed['Montant'].mean():,.2f} €",
+        'nb_pays': int(df_processed['Pays'].nunique()) if 'Pays' in df_processed.columns else 0,
+        'ca_moyen_client': (
+            float(df_processed['Montant'].sum() / df_processed['Cpt Client'].nunique())
+            if 'Cpt Client' in df_processed.columns and df_processed['Cpt Client'].nunique() else None
+        ),
+    }
     
-    # Analyse globale (toutes périodes) - utilise granularité mensuelle par défaut
-    stat_analytics_all = analysis_by_period.generate_period_analysis(df_processed, granularity='month')
-    
-    # 2. Obtenir les périodes disponibles
-    available_periods = data_processing.get_available_periods(df_processed)
-    print(f"\n📅 Périodes disponibles:")
-    print(f"   • Mois: {len(available_periods['months'])} périodes")
-    print(f"   • Trimestres: {len(available_periods['quarters'])} périodes")
-    print(f"   • Années fiscales: {len(available_periods['fiscal_years'])} périodes")
-    
-    # 3. Analyses statistiques ET TEMPORELLES PAR PÉRIODE
-    # Par défaut, prendre la dernière période disponible de chaque type
-    
-    # MOIS : Analyse avec agrégation MENSUELLE (tous les mois)
-    print(f"\n📊 Génération analyse MENSUELLE (toutes les données agrégées par mois)")
-    stat_analytics_month = analysis_by_period.generate_period_analysis(df_processed, granularity='month', skip_preprocessing=True)
-    temp_analytics_month = analysis_time_series.generate_temporal_analysis(df_processed)
-    selected_month = None
-    
-    # TRIMESTRE : Analyse avec agrégation TRIMESTRIELLE (tous les trimestres fiscaux)
-    print(f"\n📊 Génération analyse TRIMESTRIELLE (toutes les données agrégées par trimestre fiscal)")
-    stat_analytics_quarter = analysis_by_period.generate_period_analysis(df_processed, granularity='quarter', skip_preprocessing=True)
-    temp_analytics_quarter = analysis_time_series.generate_temporal_analysis(df_processed)
-    selected_quarter = None
-    
-    # ANNÉE FISCALE : Analyse avec agrégation ANNUELLE (toutes les années fiscales)
-    print(f"\n📊 Génération analyse ANNUELLE (toutes les données agrégées par année fiscale)")
-    stat_analytics_fiscal = analysis_by_period.generate_period_analysis(df_processed, granularity='year', skip_preprocessing=True)
-    temp_analytics_fiscal = analysis_time_series.generate_temporal_analysis(df_processed)
-    selected_fiscal = None
-    
+    stat_analytics_month = {'results': {}, 'graphs': {}, 'kpis': {}}
+    stat_analytics_quarter = {'results': {}, 'graphs': {}, 'kpis': {}}
+    stat_analytics_fiscal = {'results': {}, 'graphs': {}, 'kpis': {}}
+    family_analysis_fiscal = {}
+    geo_analysis_month = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}}
+    geo_analysis_quarter = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}}
+    geo_analysis_fiscal = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}}
+    currency_kpi_month = {}
+    currency_charts_month = {}
+    currency_kpi_quarter = {}
+    currency_charts_quarter = {}
+    temp_analytics_month = {'results': {}, 'graphs': {}}
+    temp_analytics_quarter = {'results': {}, 'graphs': {}}
+    temp_analytics_fiscal = {'results': {}, 'graphs': {}}
+    family_analysis_month = {}
+    family_analysis_quarter = {}
+    family_analysis_year = {}
+    family_analysis_fiscal = {}
+    geo_analysis_month = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}}
+    geo_analysis_quarter = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}}
+    geo_analysis_fiscal = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}}
+    currency_kpi_month = {}
+    currency_charts_month = {}
+    currency_kpi_quarter = {}
+    currency_charts_quarter = {}
+    currency_kpi_fiscal = {}
+    currency_charts_fiscal = {}
+
     # ════════════════════════════════════════════════════════════════
-    # ANALYSES PRODUITS PAR GRANULARITÉ
+    # ANALYSE CLIENTS (TOUJOURS CALCULÉE)
     # ════════════════════════════════════════════════════════════════
-    print("\n" + "="*100)
-    print("📦 ANALYSES PRODUITS PAR GRANULARITÉ")
-    print("="*100)
-    
-    print(f"\n📦 Analyse produits - MENSUELLE")
-    family_analysis_month = analysis_products.analyze_product_families(df_processed, granularity='month')
-    
-    print(f"\n📦 Analyse produits - TRIMESTRIELLE")
-    family_analysis_quarter = analysis_products.analyze_product_families(df_processed, granularity='quarter')
-    
-    print(f"\n📦 Analyse produits - ANNUELLE")
-    family_analysis_fiscal = analysis_products.analyze_product_families(df_processed, granularity='year')
-    
-    # ════════════════════════════════════════════════════════════════
-    # ANALYSES GÉOGRAPHIQUES PAR GRANULARITÉ
-    # ════════════════════════════════════════════════════════════════
-    print("\n" + "="*100)
-    print("🌍 ANALYSES GÉOGRAPHIQUES PAR GRANULARITÉ")
-    print("="*100)
-    
-    print(f"\n🌍 Analyse géographique - MENSUELLE")
-    geo_analysis_month = analysis_geographic.analyze_geographic_data(df_processed, granularity='month')
-    
-    print(f"\n🌍 Analyse géographique - TRIMESTRIELLE")
-    geo_analysis_quarter = analysis_geographic.analyze_geographic_data(df_processed, granularity='quarter')
-    
-    print(f"\n🌍 Analyse géographique - ANNUELLE")
-    geo_analysis_fiscal = analysis_geographic.analyze_geographic_data(df_processed, granularity='year')
-    
-    # 4. Analyse temporelle complète
-    temp_analytics = analysis_time_series.generate_temporal_analysis(df_processed)
-    
-    # 5. Métriques temporelles (mensuel par défaut)
-    temporal_metrics = analysis_time_series.get_temporal_metrics(df_processed, granularity='month')
-    
-    # Fusionner les résultats classiques (utiliser la version globale par défaut)
-    all_results = {**stat_analytics_all.get('results', {}), **temp_analytics.get('results', {})}
-    all_graphs = {**stat_analytics_all.get('graphs', {}), **temp_analytics.get('graphs', {})}
-    all_kpis = stat_analytics_all.get('kpis', {})
-    
-    print("✅ Graphiques générés\n")
-    
-    # ════════════════════════════════════════════════════════════════
-    # PARTIE 7 : ANALYSE DE LA DÉPENDANCE AUX DEVISES
-    # ════════════════════════════════════════════════════════════════
-    print("\n" + "="*100)
-    print("💱 ANALYSE DE LA DÉPENDANCE AUX DEVISES (VERSION GLOBALE)")
-    print("="*100 + "\n")
-    
-    currency_kpi = {}
-    currency_charts = {}
-    
+    # Les onglets Bootstrap ne rechargent pas la page : si on ne calcule
+    # l'analyse clients que lorsque ?tab=clients, l'onglet peut sembler vide.
     try:
-        # Analyse complète de dépendance aux devises - VERSION GLOBALE
-        currency_report = analysis_currency_dependency.analyze_currency_dependency(df_processed, output_dir=None)
-        
-        if 'error' not in currency_report.get('kpi', {}):
-            currency_kpi = currency_report.get('kpi', {})
-            currency_charts = currency_report.get('charts', {})
-            
-            print(f"✅ Analyse devise terminée")
-            print(f"   CA Total: {currency_kpi.get('total_revenue', 0):,.0f} €")
-            print(f"   Devises détectées: {len(currency_kpi.get('currencies_detected', []))}")
-            print(f"   Part non-EUR: {currency_kpi.get('non_eur_pct', 0):.1f}%")
-            print(f"   HHI: {currency_kpi.get('hhi_currency', 0):.0f}")
-        else:
-            print(f"⚠️ Erreur analyse devise: {currency_report['kpi'].get('error')}")
+        client_analysis = analysis_clients.analyze_clients(df_processed, time_granularity=granularity)
     except Exception as e:
-        print(f"⚠️ Erreur lors de l'analyse de dépendance aux devises: {str(e)}")
-        import traceback
-        traceback.print_exc()
-    
-    # ════════════════════════════════════════════════════════════════
-    # ANALYSES DEVISES PAR GRANULARITÉ
-    # ════════════════════════════════════════════════════════════════
-    print("\n" + "="*100)
-    print("💱 ANALYSES DEVISES PAR GRANULARITÉ")
-    print("="*100)
-    
-    # Génération des 3 analyses par granularité
+        logger.exception("[clients] ERROR in view")
+        client_analysis = {'error': str(e), 'client_graphs': {}}
+
+
+    # Client 360 (portefeuille complet) - via GET param ?client=...
     try:
-        print(f"\n💱 Analyse devises - MENSUELLE")
+        client_options = analysis_clients.get_client_options(df_processed, max_clients=500)
+    except Exception as e:
+        logger.exception("[client360] ERROR get_client_options in view")
+        client_options = []
+
+    if selected_client:
+        try:
+            client_portfolio_month = analysis_clients.analyze_client_portfolio_full(
+                df_processed,
+                selected_client,
+                time_granularity='month',
+                top_n_families=8,
+                top_n_products=10,
+            )
+            client_portfolio_quarter = analysis_clients.analyze_client_portfolio_full(
+                df_processed,
+                selected_client,
+                time_granularity='quarter',
+                top_n_families=8,
+                top_n_products=10,
+            )
+            client_portfolio_fiscal = analysis_clients.analyze_client_portfolio_full(
+                df_processed,
+                selected_client,
+                time_granularity='year',
+                top_n_families=8,
+                top_n_products=10,
+            )
+
+            # compat: variable historique utilisée dans le template
+            client_portfolio = client_portfolio_month
+        except Exception as e:
+            logger.exception("[client360] ERROR analyze_client_portfolio_full in view")
+            err = {'client_id': str(selected_client), 'error': str(e), 'kpis': {}, 'tables': {}, 'graphs': {}, 'alerts': [], 'meta': {}}
+            client_portfolio_month = err
+            client_portfolio_quarter = err
+            client_portfolio_fiscal = err
+            client_portfolio = err
+
+
+    # ════════════════════════════════════════════════════════════════
+    # ANALYSE GÉOGRAPHIQUE (TOUJOURS CALCULÉE)
+    # ════════════════════════════════════════════════════════════════
+    # Les sous-onglets géographiques (pills) ne rechargent pas la page.
+    # On calcule donc les 3 granularités à l'avance.
+    try:
+        geo_analysis_month = analysis_geographic.analyze_geographic_data(df_processed, granularity='month')
+    except Exception as e:
+        logger.exception("[geographic:month] ERROR in view")
+        geo_analysis_month = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}, 'error': str(e)}
+
+    try:
+        geo_analysis_quarter = analysis_geographic.analyze_geographic_data(df_processed, granularity='quarter')
+    except Exception as e:
+        logger.exception("[geographic:quarter] ERROR in view")
+        geo_analysis_quarter = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}, 'error': str(e)}
+
+    try:
+        geo_analysis_fiscal = analysis_geographic.analyze_geographic_data(df_processed, granularity='year')
+    except Exception as e:
+        logger.exception("[geographic:year] ERROR in view")
+        geo_analysis_fiscal = {'stats_zone': pd.DataFrame(), 'stats_pays': pd.DataFrame(), 'classif_summary': pd.DataFrame(), 'top10_score': pd.DataFrame(), 'geo_graphs': {}, 'error': str(e)}
+
+    # ════════════════════════════════════════════════════════════════
+    # ANALYSE DEVISES (TOUJOURS CALCULÉE)
+    # ════════════════════════════════════════════════════════════════
+    # Le template affiche les 3 granularités via currency_kpi_* / currency_charts_*.
+    # On calcule donc au moins la version mensuelle; les autres restent compatibles.
+    try:
         currency_report_month = analysis_currency_dependency.analyze_currency_dependency(df_processed, output_dir=None, granularity='month')
         currency_kpi_month = currency_report_month.get('kpi', {})
         currency_charts_month = currency_report_month.get('charts', {})
-        
-        print(f"\n💱 Analyse devises - TRIMESTRIELLE")
+    except Exception as e:
+        logger.exception("[currency:month] ERROR in view")
+        currency_kpi_month = {}
+        currency_charts_month = {}
+
+    try:
         currency_report_quarter = analysis_currency_dependency.analyze_currency_dependency(df_processed, output_dir=None, granularity='quarter')
         currency_kpi_quarter = currency_report_quarter.get('kpi', {})
         currency_charts_quarter = currency_report_quarter.get('charts', {})
-        
-        print(f"\n💱 Analyse devises - ANNUELLE")
+    except Exception as e:
+        logger.exception("[currency:quarter] ERROR in view")
+        currency_kpi_quarter = {}
+        currency_charts_quarter = {}
+
+    try:
         currency_report_fiscal = analysis_currency_dependency.analyze_currency_dependency(df_processed, output_dir=None, granularity='year')
         currency_kpi_fiscal = currency_report_fiscal.get('kpi', {})
         currency_charts_fiscal = currency_report_fiscal.get('charts', {})
     except Exception as e:
-        print(f"⚠️ Erreur lors de l'analyse de dépendance aux devises par granularité: {str(e)}")
-        # Fallback sur l'analyse globale
-        currency_kpi_month = currency_kpi
-        currency_charts_month = currency_charts
-        currency_kpi_quarter = currency_kpi
-        currency_charts_quarter = currency_charts
-        currency_kpi_fiscal = currency_kpi
-        currency_charts_fiscal = currency_charts
+        logger.exception("[currency:year] ERROR in view")
+        currency_kpi_fiscal = {}
+        currency_charts_fiscal = {}
     
+    # ════════════════════════════════════════════════════════════════
+    # CALCUL CONDITIONNEL SELON L'ONGLET ACTIF
+    # ════════════════════════════════════════════════════════════════
+    
+    if active_tab == 'statistics':
+        # ONGLET STATISTIQUES (Analyse par période)
+        available_periods = data_processing.get_available_periods(df_processed)
+        
+        if granularity == 'month':
+            stat_analytics_month = analysis_by_period.generate_period_analysis(df_processed, granularity='month', skip_preprocessing=True)
+            temp_analytics_month = analysis_time_series.generate_temporal_analysis(df_processed, granularity='month')
+        elif granularity == 'quarter':
+            stat_analytics_quarter = analysis_by_period.generate_period_analysis(df_processed, granularity='quarter', skip_preprocessing=True)
+            temp_analytics_quarter = analysis_time_series.generate_temporal_analysis(df_processed, granularity='quarter')
+        elif granularity == 'year':
+            stat_analytics_fiscal = analysis_by_period.generate_period_analysis(df_processed, granularity='year', skip_preprocessing=True)
+            temp_analytics_fiscal = analysis_time_series.generate_temporal_analysis(df_processed, granularity='year')
+    
+    elif active_tab == 'temporal':
+        # ONGLET ANALYSE TEMPORELLE
+        logger.info("[temporal] Onglet temporal actif")
+        temporal_stats = analysis_time_series.analyze_temporal_data(df_processed)
+
+        # Cache: série journalière calculée une seule fois
+        try:
+            df_daily_cache = analysis_time_series.aggregate_daily(df_processed)
+        except Exception as e:
+            logger.exception("[temporal] ERROR aggregate_daily in view")
+            df_daily_cache = None
+
+        # Cache anomalies: calculé une seule fois (base daily)
+        anomaly_report_cache = None
+        if df_daily_cache is not None and not df_daily_cache.empty:
+            try:
+                anomaly_report_cache = anomaly_detection.build_anomaly_report(
+                    df_daily_cache,
+                    value_cols=['CA_Total', 'Qty_Total', 'Nb_Clients'],
+                    z_thresh=3.5,
+                )
+            except Exception:
+                logger.exception("[temporal] ERROR build_anomaly_report")
+                anomaly_report_cache = None
+        
+        # Calculer les analyses temporelles pour les 3 granularités
+        logger.info("[temporal] Calcul analyses temporelles (month/quarter/year)")
+        temp_analytics_month = analysis_time_series.generate_temporal_analysis(
+            df_processed,
+            granularity='month',
+            df_daily_cache=df_daily_cache,
+            anomaly_report_cache=anomaly_report_cache,
+        )
+        
+        temp_analytics_quarter = analysis_time_series.generate_temporal_analysis(
+            df_processed,
+            granularity='quarter',
+            df_daily_cache=df_daily_cache,
+            anomaly_report_cache=anomaly_report_cache,
+        )
+        
+        temp_analytics_fiscal = analysis_time_series.generate_temporal_analysis(
+            df_processed,
+            granularity='year',
+            df_daily_cache=df_daily_cache,
+            anomaly_report_cache=anomaly_report_cache,
+        )
+
+    
+    elif active_tab == 'products':
+        # ONGLET ANALYSE PRODUITS
+        # Les analyses produits sont pré-calculées côté serveur (month/quarter/year)
+        # pour que les pills Bootstrap n'affichent pas de contenu vide.
+        logger.info("[products] Onglet produits actif")
+    
+    elif active_tab == 'clients':
+        # ONGLET ANALYSE CLIENTS
+        # Déjà calculé plus haut pour garantir l'affichage
+        pass
+    
+    elif active_tab == 'geographic':
+        # ONGLET ANALYSE GÉOGRAPHIQUE
+        # Déjà calculé plus haut pour garantir l'affichage
+        pass
+    
+    elif active_tab == 'currency':
+        # ONGLET ANALYSE DEVISES
+        # Déjà calculé plus haut pour garantir l'affichage
+        pass
+    
+    else:
+        # Par défaut (première visite) : calculer analyse temporelle et clients pour l'affichage initial
+        temporal_stats = analysis_time_series.analyze_temporal_data(df_processed)
+        # Analyse clients déjà calculée plus haut
+    
+    # ════════════════════════════════════════════════════════════════
+    # ANALYSE PRODUITS (TOUJOURS CALCULÉE)
+    # ════════════════════════════════════════════════════════════════
+    # Les sous-onglets Produits (pills) ne rechargent pas la page.
+    # On doit donc fournir les 3 granularités dès le rendu initial.
+    try:
+        family_analysis_month = analysis_products.analyze_product_families(
+            df_processed,
+            time_granularity='month',
+            selected_product=selected_product,
+            selected_family=selected_family,
+            compare_products=compare_products if granularity == 'month' else None,
+            compare_families=compare_families if granularity == 'month' else None,
+            compare_products_metric=compare_products_metric,
+            compare_families_metric=compare_families_metric,
+            max_compare_items=5,
+        )
+    except Exception as e:
+        logger.exception("[products:month] ERROR in view")
+        family_analysis_month = {'error': str(e)}
+
+    try:
+        family_analysis_quarter = analysis_products.analyze_product_families(
+            df_processed,
+            time_granularity='quarter',
+            selected_product=selected_product,
+            selected_family=selected_family,
+            compare_products=compare_products if granularity == 'quarter' else None,
+            compare_families=compare_families if granularity == 'quarter' else None,
+            compare_products_metric=compare_products_metric,
+            compare_families_metric=compare_families_metric,
+            max_compare_items=5,
+        )
+    except Exception as e:
+        logger.exception("[products:quarter] ERROR in view")
+        family_analysis_quarter = {'error': str(e)}
+
+    try:
+        family_analysis_year = analysis_products.analyze_product_families(
+            df_processed,
+            time_granularity='year',
+            selected_product=selected_product,
+            selected_family=selected_family,
+            compare_products=compare_products if granularity == 'year' else None,
+            compare_families=compare_families if granularity == 'year' else None,
+            compare_products_metric=compare_products_metric,
+            compare_families_metric=compare_families_metric,
+            max_compare_items=5,
+        )
+    except Exception as e:
+        logger.exception("[products:year] ERROR in view")
+        family_analysis_year = {'error': str(e)}
+
+    # Alias compat (anciens templates/variables)
+    family_analysis_fiscal = family_analysis_year
+
+    selected_month = None
+    selected_quarter = None
+    selected_fiscal = None
+
     # ════════════════════════════════════════════════════════════════
     # ANALYSE DES DÉLAIS DE LIVRAISON (LEAD TIME)
     # ════════════════════════════════════════════════════════════════
-    print("\n" + "="*100)
-    print("⏱️ ANALYSE DES DÉLAIS DE LIVRAISON")
-    print("="*100 + "\n")
     
     # Import des nouveaux services
     from .services import aggregations, insights, periods
@@ -288,6 +451,42 @@ def stats(request, pk):
     period_param = request.GET.get('period', 'month')
     period = periods.normalize_period(period_param)
     
+    # ════════════════════════════════════════════════════════════════
+    # SÉLECTION DES ANALYSES SELON GRANULARITÉ (pour compatibilité template)
+    # ════════════════════════════════════════════════════════════════
+    # Le template utilise family_analysis, geo_analysis, currency_kpi/charts
+    # On utilise les versions correspondant à la granularité sélectionnée
+    if granularity == 'month':
+        family_analysis = family_analysis_month
+        geo_analysis = geo_analysis_month
+        currency_kpi = currency_kpi_month
+        currency_charts = currency_charts_month
+        # Variables pour compatibilité avec ancien template
+        all_results = {**stat_analytics_month.get('results', {}), **temp_analytics_month.get('results', {})}
+        all_graphs = {**stat_analytics_month.get('graphs', {}), **temp_analytics_month.get('graphs', {})}
+        all_kpis = {**global_kpis, **stat_analytics_month.get('kpis', {})}
+    elif granularity == 'quarter':
+        family_analysis = family_analysis_quarter
+        geo_analysis = geo_analysis_quarter
+        currency_kpi = currency_kpi_quarter
+        currency_charts = currency_charts_quarter
+        # Variables pour compatibilité avec ancien template
+        all_results = {**stat_analytics_quarter.get('results', {}), **temp_analytics_quarter.get('results', {})}
+        all_graphs = {**stat_analytics_quarter.get('graphs', {}), **temp_analytics_quarter.get('graphs', {})}
+        all_kpis = {**global_kpis, **stat_analytics_quarter.get('kpis', {})}
+    else:  # year
+        family_analysis = family_analysis_year
+        geo_analysis = geo_analysis_fiscal
+        currency_kpi = currency_kpi_fiscal
+        currency_charts = currency_charts_fiscal
+        # Variables pour compatibilité avec ancien template
+        all_results = {**stat_analytics_fiscal.get('results', {}), **temp_analytics_fiscal.get('results', {})}
+        all_graphs = {**stat_analytics_fiscal.get('graphs', {}), **temp_analytics_fiscal.get('graphs', {})}
+        all_kpis = {**global_kpis, **stat_analytics_fiscal.get('kpis', {})}
+    
+    # Métriques temporelles (utilise la granularité sélectionnée)
+    temporal_metrics = analysis_time_series.get_temporal_metrics(df_processed, granularity=granularity)
+    
     # Analyse des délais
     try:
         lead_time_analysis = aggregations.lead_time_pack(df_processed, period=period)
@@ -296,12 +495,7 @@ def stats(request, pk):
         # Convertir en JSON pour Chart.js
         lead_time_dist_json = json.dumps(lead_time_analysis.get('distribution', []))
         lead_time_series_json = json.dumps(lead_time_analysis.get('series_over_time', []))
-        
-        print(f"✅ Analyse lead time terminée")
-        print(f"   Médiane: {lead_time_analysis.get('median', 0):.1f} jours")
-        print(f"   % anomalies: {lead_time_analysis.get('pct_anomalies', 0):.1f}%")
     except Exception as e:
-        print(f"⚠️ Erreur lors de l'analyse des délais: {str(e)}")
         import traceback
         traceback.print_exc()
         lead_time_analysis = {'error': str(e)}
@@ -314,6 +508,10 @@ def stats(request, pk):
     # ════════════════════════════════════════════════════════════════
     context = {
         'dataset': dataset,
+        # Granularité sélectionnée
+        'granularity': granularity,
+        # Onglet actif (pilotage template)
+        'active_tab': active_tab,
         # Ancien système (graphiques, etc.) - VERSION GLOBALE
         'results': all_results,
         'graphs': all_graphs,
@@ -343,6 +541,21 @@ def stats(request, pk):
         'n_colonnes': len(df_processed.columns),
         'date_min': df_processed['Date Fact.'].min() if 'Date Fact.' in df_processed.columns else None,
         'date_max': df_processed['Date Fact.'].max() if 'Date Fact.' in df_processed.columns else None,
+        # Analyse des clients
+        'client_analysis': client_analysis,
+        'client_stats': client_analysis.get('client_stats'),
+        'top10_clients': client_analysis.get('top10_clients'),
+        'top20_clients': client_analysis.get('top20_clients'),
+        'concentration_top20_pct': client_analysis.get('concentration_top20_pct'),
+        'concentration_top10_pct': client_analysis.get('concentration_top10_pct'),
+        'client_graphs': client_analysis.get('client_graphs', {}),
+        # Client 360
+        'client_options': client_options,
+        'selected_client': selected_client,
+        'client_portfolio': client_portfolio,
+        'client_portfolio_month': client_portfolio_month,
+        'client_portfolio_quarter': client_portfolio_quarter,
+        'client_portfolio_fiscal': client_portfolio_fiscal,
         # Analyse des familles de produits
         'family_analysis': family_analysis,
         'stats_famille': family_analysis.get('stats_famille'),
@@ -365,6 +578,7 @@ def stats(request, pk):
         # === ANALYSES PRODUITS PAR GRANULARITÉ ===
         'family_analysis_month': family_analysis_month,
         'family_analysis_quarter': family_analysis_quarter,
+        'family_analysis_year': family_analysis_year,
         'family_analysis_fiscal': family_analysis_fiscal,
         # Analyse géographique - Conversion des DataFrames en listes de dicts
         'geo_analysis': geo_analysis,
@@ -413,18 +627,125 @@ def stats(request, pk):
         'lead_time_series_json': lead_time_series_json,
     }
     
-    # DEBUG: Afficher les données converties
-    print("\n🔍 DEBUG CONTEXTE:")
-    print(f"   stats_pays: {len(context['stats_pays'])} items")
-    print(f"   stats_zone: {len(context['stats_zone'])} items")
-    print(f"   classif_summary: {len(context['classif_summary'])} items")
-    print(f"   top10_score: {len(context['top10_score'])} items")
-    if context['stats_pays']:
-        print(f"   Premier pays: {context['stats_pays'][0].get('Pays', 'N/A')}")
-    if context['stats_zone']:
-        print(f"   Première zone: {context['stats_zone'][0].get('Zone', 'N/A')}")
-    
     return render(request, 'client_analytics/stats.html', context)
+
+
+def anomalies(request, pk):
+    """Page Détection d'Anomalies (portefeuille client)."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+
+    granularity_param = request.GET.get('granularity', 'month')
+    if granularity_param in ['fiscal_year', 'fiscal']:
+        granularity = 'year'
+    elif granularity_param in ['month', 'quarter', 'year']:
+        granularity = granularity_param
+    else:
+        granularity = 'month'
+
+    all_clients = (request.GET.get('all') or '').strip() in {'1', 'true', 'True', 'yes', 'on'}
+
+    # Support multi-sélection: ?client=A&client=B ...
+    selected_clients = [c.strip() for c in request.GET.getlist('client') if (c or '').strip()]
+    # rétro-compat si jamais un client unique arrive via ?client=...
+    if not selected_clients:
+        single = (request.GET.get('client') or '').strip()
+        if single:
+            selected_clients = [single]
+
+    selected_client = selected_clients[0] if len(selected_clients) == 1 else ''
+
+    df_processed = dataset_io.load_dataset_df(dataset)
+    if df_processed is None:
+        messages.error(request, 'Erreur lors du chargement du dataset')
+        return redirect('client_analytics:home')
+
+    # Options pour le sélecteur client
+    try:
+        client_options = analysis_clients.get_client_options(df_processed, max_clients=500)
+    except Exception as e:
+        logger.exception('[anomalies] ERROR get_client_options')
+        client_options = []
+
+    anom = None
+    if all_clients:
+        try:
+            anom = analysis_anomalies.analyze_client_anomalies(
+                df_processed,
+                time_granularity=granularity,
+                z_thresh=3.5,
+                include_scatter=False,
+            )
+        except Exception as e:
+            logger.exception('[anomalies] ERROR analyze_client_anomalies')
+            anom = {'error': str(e), 'kpis': {}, 'top_anomalies_latest': [], 'graphs': {}, 'meta': {}}
+
+    anom_client = None
+    anom_clients = []
+    anom_clients_graph = None
+    if selected_clients and not all_clients:
+        for client_id in selected_clients:
+            try:
+                report = analysis_anomalies.analyze_client_anomalies_for_client(
+                    df_processed,
+                    client_id=client_id,
+                    time_granularity=granularity,
+                    z_thresh=3.5,
+                )
+            except Exception as e:
+                logger.exception('[anomalies] ERROR analyze_client_anomalies_for_client (client=%s)', client_id)
+                report = {'error': str(e), 'client': {'id': str(client_id)}}
+            anom_clients.append(report)
+
+        if len(anom_clients) == 1:
+            anom_client = anom_clients[0]
+
+    # Graphiques (Matplotlib base64)
+    try:
+        from .services.visualizations.viz_anomalies_client import (
+            plot_client_timeline,
+            plot_multi_clients_anomaly_counts,
+            plot_top_anomalies,
+        )
+
+        if anom_client and not anom_client.get('error'):
+            png = plot_client_timeline(
+                anom_client.get('series') or [],
+                client_id=str(((anom_client.get('client') or {}).get('id')) or selected_client or ''),
+                granularity=granularity,
+            )
+            if png:
+                anom_client.setdefault('graphs', {})['timeline'] = png
+
+        if len(anom_clients) > 1:
+            anom_clients_graph = plot_multi_clients_anomaly_counts(anom_clients, granularity=granularity)
+
+        if all_clients and anom and not (anom.get('error') if isinstance(anom, dict) else False):
+            rows = (anom.get('top_anomalies_latest') or []) if isinstance(anom, dict) else []
+            if not rows:
+                rows = (anom.get('top_anomalies_all') or []) if isinstance(anom, dict) else []
+            png = plot_top_anomalies(
+                rows,
+                granularity=granularity,
+                title="Top anomalies (vue globale)",
+            )
+            if png and isinstance(anom, dict):
+                anom.setdefault('graphs', {})['top_anomalies_bar'] = png
+    except Exception:
+        logger.exception('[anomalies] ERROR generating graphs')
+
+    context = {
+        'dataset': dataset,
+        'granularity': granularity,
+        'anom': anom,
+        'client_options': client_options,
+        'selected_client': selected_client,
+        'selected_clients': selected_clients,
+        'all_clients': all_clients,
+        'anom_client': anom_client,
+        'anom_clients': anom_clients,
+        'anom_clients_graph': anom_clients_graph,
+    }
+    return render(request, 'client_analytics/anomalies.html', context)
 
 
 def clustering(request, pk):
@@ -507,14 +828,4 @@ def clustering_export(request, pk):
     # L'export sera géré différemment maintenant
     messages.info(request, 'Fonctionnalité d\'export en cours de mise à jour')
     return redirect('client_analytics:clustering', pk=pk)
-    
-    # Create CSV response
-    response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="{dataset.name}_clustering.csv"'
-    
-    df_export.to_csv(response, index=False)
-    
-    return response
 
-# === COPILOT: BEGIN NEW VIEWS ===
-# === COPILOT: END NEW VIEWS ===

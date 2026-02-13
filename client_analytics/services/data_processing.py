@@ -33,13 +33,9 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
         df_final: DataFrame nettoyé avec devises originales et lead times
     """
 
-    print("🔄 Début du traitement des données...")
-    print(f"   📊 Données initiales : {len(df):,} lignes × {len(df.columns)} colonnes")
-
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 1 : EXTRACTION DU PAYS DEPUIS CPT CLIENT
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   🌍 Étape 1 : Extraction du pays...")
 
     country_mapping = {
         **{str(i).zfill(2): "FR" for i in range(0, 100)},  # 00-99 = France
@@ -61,21 +57,12 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
 
     if "Cpt Client" in df.columns:
         df["Country"] = df["Cpt Client"].apply(get_country_code)
-        print(f"      ✅ Pays extraits : {df['Country'].nunique()} pays uniques")
     else:
         df["Country"] = "Unknown"
-        print("      ⚠️ Colonne 'Cpt Client' absente -> Country='Unknown'")
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 2 : CONVERSIONS DE TYPES + Date_Ref
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   🔧 Étape 2 : Conversions de types...")
-
-    # Debug NaT
-    for col in ["Date Fact.", "Date Cde", "Date Exp."]:
-        if col in df.columns:
-            n_nat = pd.to_datetime(df[col], errors="coerce", dayfirst=True).isna().sum()
-            print(f"      🕒 {col} -> NaT: {n_nat:,}")
 
     # Parsing dates
     for col in ["Date Exp.", "Date Fact.", "Date Cde", "Delai Prev"]:
@@ -87,18 +74,14 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    print("      ✅ Conversions terminées")
-
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 3 : SUPPRESSION DE COLONNES
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   🗑️ Étape 3 : Suppression de colonnes inutiles...")
 
     cols_to_drop = ["Code Group", "Cpt Compta", "Cpte vente"]
     existing_cols_to_drop = [c for c in cols_to_drop if c in df.columns]
     if existing_cols_to_drop:
         df.drop(existing_cols_to_drop, axis=1, inplace=True)
-        print(f"      ✅ Colonnes supprimées : {existing_cols_to_drop}")
 
     # Extraction code recette
     if "Code Artic" in df.columns:
@@ -112,59 +95,46 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
             return None
         
         df['Code Recette'] = df['Code Artic'].apply(extract_code)
-        print("      ✅ Code Recette extrait")
     else:
         df['Code Recette'] = None
-        print("      ⚠️ Colonne 'Code Artic' absente -> Code Recette=None")
     
     if "Date Cde" in df.columns:
         df.sort_values('Date Cde', inplace=True)
 
     if "Libelle 1" in df.columns and "Code Artic" in df.columns:
         df['Libelle 1'] = df.groupby('Code Artic')['Libelle 1'].transform('first')
-        print("      ✅ Libelle 1 homogénéisé par Code Artic")
     elif "Libelle 1" not in df.columns:
         df['Libelle 1'] = None
-        print("      ⚠️ Colonne 'Libelle 1' absente")
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 4 : SUPPRESSION DES DOUBLONS
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   🔍 Étape 4 : Suppression des doublons...")
 
     nb_avant = len(df)
     df = df.drop_duplicates()
-    print(f"      ❌ Supprimé {nb_avant - len(df):,} doublons")
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 5 : FILTRAGE DES FAMILLES ET CLIENTS
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   🎯 Étape 5 : Filtrage des familles et clients...")
 
     nb_avant = len(df)
 
     if "Famille" in df.columns:
         familles_exclues = ["LIQ", "DEVL", "ZDIV", "POUD"]
         df = df[~df["Famille"].isin(familles_exclues)]
-        print(f"      ❌ Familles exclues : {familles_exclues}")
 
     if "Cpt Client" in df.columns:
         clients_exclus = ["13RLCA", "IENEWY"]
         df = df[~df["Cpt Client"].isin(clients_exclus)]
-        print(f"      ❌ Clients exclus : {clients_exclus}")
-
-    print(f"      ✅ Total filtré : {nb_avant - len(df):,} lignes")
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 6 : VARIABLES TEMPORELLES (Fiscal Avril->Mars)
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   📅 Étape 6 : Création des variables temporelles...")
 
     # Filtrer les NaT avant set_index pour éviter les problèmes
     if "Date Fact." in df.columns:
         nb_nat = df["Date Fact."].isna().sum()
         if nb_nat > 0:
-            print(f"      ⚠️ Suppression de {nb_nat:,} lignes avec Date Fact. = NaT")
             df = df.dropna(subset=["Date Fact."])
         
         df.sort_values("Date Fact.", inplace=True)
@@ -195,10 +165,7 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
         df["Fiscal_Quarter"] = df["Trimestre_Num"].map(quarter_labels) + " " + df["Fiscal_Year_Label"]
 
         df["Weekday"] = df.index.weekday
-        
-        print(f"      ✅ Variables temporelles créées (FY range: {df['Fiscal_Year'].min()}-{df['Fiscal_Year'].max()})")
     else:
-        print("      ⚠️ Colonne 'Date Fact.' absente -> variables temporelles non créées")
         df["Year"] = np.nan
         df["Month"] = None
         df["Quarter"] = None
@@ -224,55 +191,28 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 7 : NETTOYAGE
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   🧹 Étape 7 : Nettoyage des données...")
 
     lignes_initiales = len(df)
-    print(f"      📊 Lignes avant nettoyage : {lignes_initiales:,}")
 
     # sécurité : si colonnes absentes, on évite de crasher
     if "Quantité" in df.columns:
-        qty_zero = (df["Quantité"] == 0).sum()
         df = df[df["Quantité"] != 0]
-        print(f"      ❌ Supprimé {qty_zero:,} lignes avec Quantité = 0")
-
-        qty_negative = (df["Quantité"] < 0).sum()
         df = df[df["Quantité"] >= 0]
-        print(f"      ❌ Supprimé {qty_negative:,} lignes avec Quantité négative")
 
     if "Montant" in df.columns:
-        montant_zero = (df["Montant"] == 0).sum()
         df = df[df["Montant"] != 0]
-        print(f"      ❌ Supprimé {montant_zero:,} lignes avec Montant = 0")
-
-        montant_negative = (df["Montant"] < 0).sum()
         df = df[df["Montant"] >= 0]
-        print(f"      ❌ Supprimé {montant_negative:,} lignes avec Montant négatif")
-
-    print(f"      📊 Lignes après nettoyage : {len(df):,}")
-    print(f"      🗑️ Total supprimé : {lignes_initiales - len(df):,} lignes")
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 8 : RECALCUL PU NET
     # ═══════════════════════════════════════════════════════════════════
-    print("\n" + "=" * 80)
-    print("                    🔧 RECALCUL DU PU NET")
-    print("=" * 80)
-
-    print("\n   🔧 Étape 8 : Recalcul du PU Net...")
 
     if "Montant" in df.columns and "Quantité" in df.columns:
         df["PU Net"] = df["Montant"] / df["Quantité"]
 
-    print(
-        f"      ✅ PU Net recalculé (Min : {df['PU Net'].min():.2f}, Max : {df['PU Net'].max():.2f})"
-        if "PU Net" in df.columns and not df["PU Net"].dropna().empty
-        else "      ⚠️ PU Net indisponible"
-    )
-
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 10 : DATASET FINAL
     # ═══════════════════════════════════════════════════════════════════
-    print("\n   📋 Étape 10 : Création du dataset final...")
 
     colonnes_finales = [
         # Dates & Temps
@@ -300,9 +240,12 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     colonnes_existantes = [c for c in colonnes_finales if c in df.columns]
     df_final = df[colonnes_existantes].copy()
 
-    print(f"      ✅ Dataset final : {len(df_final):,} lignes × {len(df_final.columns)} colonnes")
-    print("🎉 Traitement terminé !")
-    print(f"      📊 Colonnes finales : {df_final.columns.tolist()}")
+    # AFFICHAGE DATAFRAME FINAL (seul print du module)
+    print("\n" + "="*80)
+    print("DATAFRAME FINAL APRÈS PROCESSING")
+    print("="*80)
+    print(df_final.head(10))
+    print("="*80 + "\n")
 
     return df_final
 
@@ -338,14 +281,13 @@ def filter_data_by_period(df: pd.DataFrame, period_type: str = 'month', period_v
         if 'Fiscal_Quarter' in df_filtered.columns:
             df_filtered = df_filtered[df_filtered['Fiscal_Quarter'] == period_value]
         else:
-            print(f"⚠️ ATTENTION: Colonne 'Fiscal_Quarter' non trouvée. Colonnes disponibles: {df_filtered.columns.tolist()}")
+            pass  # Colonne non trouvée
     
     elif period_type == 'fiscal_year':
         # Filtrer par année fiscale (ex: 'FY2024')
         if 'Fiscal_Year_Label' in df_filtered.columns:
             df_filtered = df_filtered[df_filtered['Fiscal_Year_Label'] == period_value]
     
-    print(f"   🔍 Filtrage: {period_type}={period_value} -> {len(df_filtered):,} lignes (avant: {len(df):,})")
     return df_filtered
 
 def get_available_periods(df: pd.DataFrame) -> dict:

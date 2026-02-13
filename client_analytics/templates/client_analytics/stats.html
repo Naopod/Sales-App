@@ -21,13 +21,25 @@
 .interpretation-box ul {
     margin-bottom: 0;
 }
+
+/* Plotly (onglet Produits) : éviter l'espace blanc à droite */
+.products-plotly {
+    overflow-x: hidden;
+}
+.products-plotly .plotly-graph-div,
+.products-plotly .js-plotly-plot {
+    width: 100% !important;
+}
 </style>
 {% endblock %}
 
 {% block dataset_nav %}
-<nav class="analysis-nav">
+<nav class="analysis-nav" id="analysisNav">
     <div class="container-fluid">
-        <div class="analysis-tabs">
+        <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
+            <i class="bi bi-chevron-up"></i>
+        </button>
+        <div class="analysis-tabs" id="analysisTabs">
             <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
                 <div class="tab-icon">
                     <i class="bi bi-info-circle-fill"></i>
@@ -55,6 +67,24 @@
                     <span class="tab-subtitle">Segmentation K-Means</span>
                 </div>
             </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:anomalies' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Détection d'Anomalies</span>
+                    <span class="tab-subtitle">Portefeuille client</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="#" onclick="alert('Fonctionnalité en développement'); return false;" style="opacity: 0.7;">
+                <div class="tab-icon">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Projections</span>
+                    <span class="tab-subtitle">Prévisions & Tendances</span>
+                </div>
+            </a>
         </div>
         <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
             <i class="bi bi-arrow-left-circle"></i>
@@ -62,6 +92,27 @@
         </a>
     </div>
 </nav>
+
+<script>
+// Toggle navigation compacte
+document.addEventListener('DOMContentLoaded', function() {
+    const navToggleBtn = document.getElementById('navToggleBtn');
+    const analysisNav = document.getElementById('analysisNav');
+    const analysisTabs = document.getElementById('analysisTabs');
+    
+    // Vérifier l'état sauvegardé
+    const isCollapsed = localStorage.getItem('navCollapsed') === 'true';
+    if (isCollapsed) {
+        analysisNav.classList.add('collapsed');
+    }
+    
+    navToggleBtn?.addEventListener('click', function() {
+        analysisNav.classList.toggle('collapsed');
+        const collapsed = analysisNav.classList.contains('collapsed');
+        localStorage.setItem('navCollapsed', collapsed);
+    });
+});
+</script>
 {% endblock %}
 
 {% block content %}
@@ -160,32 +211,32 @@
 <!-- Onglets de navigation -->
 <ul class="nav nav-tabs nav-tabs-modern mb-4" id="analysisTabs" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab">
+        <button class="nav-link {% if not active_tab or active_tab == 'statistics' %}active{% endif %}" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab">
             <i class="bi bi-bar-chart"></i> Analyse par périodes
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="temporal-tab" data-bs-toggle="tab" data-bs-target="#temporal" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'temporal' %}active{% endif %}" id="temporal-tab" data-bs-toggle="tab" data-bs-target="#temporal" type="button" role="tab">
             <i class="bi bi-calendar3"></i> Analyse Série temporelle
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'products' %}active{% endif %}" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab">
             <i class="bi bi-box-seam"></i> Analyse produits
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'clients' %}active{% endif %}" id="clients-tab" data-bs-toggle="tab" data-bs-target="#clients" type="button" role="tab">
             <i class="bi bi-people-fill"></i> Analyses clients
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="geography-tab" data-bs-toggle="tab" data-bs-target="#geography" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'geographic' %}active{% endif %}" id="geography-tab" data-bs-toggle="tab" data-bs-target="#geography" type="button" role="tab">
             <i class="bi bi-globe"></i> Analyses géographique
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link" id="currency-tab" data-bs-toggle="tab" data-bs-target="#currency" type="button" role="tab">
+        <button class="nav-link {% if active_tab == 'currency' %}active{% endif %}" id="currency-tab" data-bs-toggle="tab" data-bs-target="#currency" type="button" role="tab">
             <i class="bi bi-currency-exchange"></i> Dépendance aux devises
         </button>
     </li>
@@ -196,7 +247,7 @@
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- ONGLET 1: ANALYSE PAR PÉRIODES -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="tab-pane fade show active" id="stats" role="tabpanel">
+    <div class="tab-pane fade {% if not active_tab or active_tab == 'statistics' %}show active{% endif %}" id="stats" role="tabpanel">
         
         <h2 class="mb-4 mt-4"><i class="bi bi-bar-chart-line"></i> Analyse par périodes</h2>
         
@@ -225,582 +276,384 @@
             <!-- SOUS-ONGLET: MOIS -->
             <div class="tab-pane fade show active" id="month-period" role="tabpanel" aria-labelledby="month-tab">
                 
-                <div class="alert alert-primary mb-4" role="alert">
-                    <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
-                    <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
-                </div>
-                
-                <!-- TRAITEMENT DES DONNÉES -->
-                <h3 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h3>
-                {% if results_month.rapport_nettoyage %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_month.rapport_nettoyage|safe }}
-                    </div>
-                </div>
-                {% endif %}
-                
                 <!-- STATISTIQUES DESCRIPTIVES -->
                 <h3 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h3>
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                                {% if results_month.available_months %}
+                                <select class="form-select form-select-sm w-auto" id="monthStatsSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                    {% for month in results_month.available_months %}
+                                    <option value="{{ month }}">{{ month }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% endif %}
                             </div>
                             <div class="card-body">
-                                {{ results_month.stats_descriptives|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h4>
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ results_month.tests_normalite|safe }}
-                                <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
-                                <div class="alert alert-info mt-3">
-                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
-                                    Le test de Shapiro-Wilk évalue si les données suivent une distribution normale.
-                                    Si p-value < 0.05, les données ne sont pas normalement distribuées, ce qui est fréquent pour les données de ventes (présence de valeurs extrêmes, pics saisonniers).
+                                <!-- Tableau global -->
+                                <div class="stats-table-container" data-month="all">
+                                    {{ results_month.stats_descriptives|safe }}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ results_month.valeurs_aberrantes|safe }}
-                                <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
-                                <div class="alert alert-warning mt-3">
-                                    <strong><i class="bi bi-exclamation-triangle"></i> Interprétation :</strong>
-                                    Les valeurs aberrantes sont des observations exceptionnelles qui s'écartent fortement de la tendance générale.
-                                    Elles peuvent représenter des commandes exceptionnelles (très grandes ou très petites) qui méritent une attention particulière.
+                                
+                                <!-- Tableaux par mois -->
+                                {% for month, table_html in results_month.stats_by_month.items %}
+                                <div class="stats-table-container" data-month="{{ month }}" style="display:none;">
+                                    {{ table_html|safe }}
                                 </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
                 </div>
-                
-                <h4 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h4>
-                <div class="row mb-4">
-                    {% if graphs_month.correlation_matrix %}
-                    <div class="col-md-7">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_month.correlation_matrix|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% if results_month.correlation_analysis %}
-                    <div class="col-md-5">
-                        <div class="card">
-                            <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
-                            </div>
-                            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                                {{ results_month.correlation_analysis|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="col-md-5">
-                        <div class="alert alert-info">
-                            <strong><i class="bi bi-lightbulb"></i> Interprétation de la matrice :</strong>
-                            <p>La matrice de corrélation montre les relations linéaires entre les variables numériques.</p>
-                            <ul class="mb-0">
-                                <li><strong>Proche de +1</strong> : Forte corrélation positive</li>
-                                <li><strong>Proche de -1</strong> : Forte corrélation négative</li>
-                                <li><strong>Proche de 0</strong> : Pas de corrélation</li>
-                            </ul>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-activity"></i> Tests de Normalité - Visualisations Graphiques</h4>
-                
-                <!-- Bouton pour afficher/masquer les détails avancés -->
-                <div class="mb-3">
-                    <button type="button" class="btn btn-outline-info btn-advanced-toggle" data-target="advanced-normality">
-                        <i class="bi bi-chevron-down"></i> Afficher les détails avancés (QQ-Plots)
-                    </button>
-                </div>
-                
-                <!-- GRAPHIQUES ESSENTIELS: Distribution avec courbe normale (Montant + PU Net) -->
-                {% if graphs_month.normality_test_montant %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - Montant</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.normality_test_montant|safe }}
-                                <div class="alert alert-info mt-3">
-                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
-                                    La courbe rouge représente une distribution normale théorique. 
-                                    Plus les barres bleues s'en éloignent, plus la distribution est non-normale.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_month.normality_test_pu_net %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - PU Net</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.normality_test_pu_net|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- SECTION REPLIABLE: Détails avancés -->
-                <div class="advanced-section" id="advanced-normality" style="display:none;">
-                    <div class="alert alert-secondary">
-                        <strong><i class="bi bi-info-circle"></i> Détails statistiques avancés</strong>
-                        <p class="mb-0">Ces graphiques fournissent des analyses supplémentaires pour les utilisateurs avancés.</p>
-                    </div>
-                
-                <!-- QQ-Plots et Tests de Normalité pour Montant -->
-                {% if graphs_month.qq_plot_montant %}
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> QQ-Plot - Montant</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.qq_plot_montant|safe }}
-                                <div class="alert alert-info mt-3">
-                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
-                                    Si les points s'alignent sur la ligne rouge, les données suivent une distribution normale. 
-                                    Des écarts aux extrémités indiquent des queues plus lourdes (valeurs extrêmes).
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% if graphs_month.normality_test_montant %}
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - Montant</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.normality_test_montant|safe }}
-                                <div class="alert alert-info mt-3">
-                                    <strong><i class="bi bi-info-circle"></i> Interprétation :</strong>
-                                    La courbe rouge représente une distribution normale théorique. 
-                                    Plus les barres bleues s'en éloignent, plus la distribution est non-normale.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-                
-                <!-- QQ-Plots et Tests de Normalité pour Quantité -->
-                {% if graphs_month.qq_plot_quantite %}
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> QQ-Plot - Quantité</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.qq_plot_quantite|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% if graphs_month.normality_test_quantite %}
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - Quantité</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.normality_test_quantite|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-                
-                <!-- QQ-Plots et Tests de Normalité pour PU Net -->
-                {% if graphs_month.qq_plot_pu_net %}
-                <div class="row mb-4">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> QQ-Plot - Prix Unitaire Net</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.qq_plot_pu_net|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% if graphs_month.normality_test_pu_net %}
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Distribution avec Courbe Normale - PU Net</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.normality_test_pu_net|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
-                
-                </div>
-                <!-- FIN SECTION REPLIABLE -->
-                
-                <h4 class="mb-4"><i class="bi bi-box"></i> Analyse des Valeurs Aberrantes - Boxplot Interactif</h4>
-                {% if graphs_month.outliers_boxplot %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Visualisation des Outliers</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.outliers_boxplot|safe }}
-                                <div class="alert alert-warning mt-3">
-                                    <strong><i class="bi bi-lightbulb"></i> Comment lire ce graphique :</strong>
-                                    <ul class="mb-0">
-                                        <li>La <strong>boîte</strong> représente 50% des données centrales (entre Q1 et Q3)</li>
-                                        <li>La <strong>ligne médiane</strong> dans la boîte est la médiane (50e percentile)</li>
-                                        <li>Les <strong>moustaches</strong> s'étendent jusqu'à 1.5× l'écart interquartile</li>
-                                        <li>Les <strong>points isolés</strong> sont les valeurs aberrantes (outliers)</li>
-                                    </ul>
-                                    <p class="mt-2 mb-0"><strong>Action recommandée :</strong> Examinez manuellement ces valeurs aberrantes pour vérifier s'il s'agit d'erreurs de saisie ou de transactions légitimes exceptionnelles.</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <h4 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h4>
-                
-                {% if graphs_month.dist_complete_montant %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-down"></i> Distribution du Montant</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.dist_complete_montant|safe }}
-                                <div class="alert alert-success mt-3">
-                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
-                                    Ce graphique montre comment les montants de transactions sont répartis. Une distribution asymétrique avec une longue queue à droite indique la présence de quelques transactions à montant élevé, ce qui est typique dans le commerce B2B.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_month.dist_complete_quantite %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_month.dist_complete_quantite|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_month.dist_complete_pu_net %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-down"></i> Distribution du Prix Unitaire Net</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.dist_complete_pu_net|safe }}
-                                <div class="alert alert-success mt-3">
-                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
-                                    Cette distribution révèle la structure de tarification de vos produits. Plusieurs pics peuvent indiquer différentes catégories de prix. Les valeurs extrêmes correspondent aux produits premium ou aux promotions.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <h4 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h4>
-                <div class="row mb-4">
-                    {% if graphs_month.top_pays %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-header bg-success text-white">
-                                <h5 class="mb-0"><i class="bi bi-globe"></i> Top 10 Pays par CA</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.top_pays|safe }}
-                                <div class="alert alert-info mt-3">
-                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
-                                    Ces pays représentent vos marchés les plus importants. Concentrez vos efforts marketing et commerciaux sur ces zones géographiques. Une forte concentration sur un seul pays peut représenter un risque de dépendance.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
+
+                <script>
+                // Gestion du dropdown pour les statistiques descriptives
+                const monthSelector = document.getElementById('monthStatsSelector');
+                if (monthSelector) {
+                    // Sélectionner le premier mois par défaut et afficher son tableau
+                    const firstMonth = monthSelector.options[0].value;
+                    document.querySelectorAll('.stats-table-container').forEach(container => {
+                        container.style.display = container.dataset.month === firstMonth ? 'block' : 'none';
+                    });
                     
-                    {% if graphs_month.top_familles %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-box-seam"></i> Top 10 Familles par CA</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ graphs_month.top_familles|safe }}
-                                <div class="alert alert-info mt-3">
-                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
-                                    Ces familles de produits génèrent l'essentiel de votre chiffre d'affaires. Assurez-vous d'avoir des stocks suffisants et surveillez leur performance. Considérez le développement de produits complémentaires dans ces catégories.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
+                    monthSelector.addEventListener('change', function() {
+                        const selectedMonth = this.value;
+                        document.querySelectorAll('.stats-table-container').forEach(container => {
+                            container.style.display = container.dataset.month === selectedMonth ? 'block' : 'none';
+                        });
+                    });
+                }
+                </script>
                 
-                <h4 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h4>
+                <!-- 📈 Graphique de corrélation évolutive -->
+                {% if graphs_month.correlation_evolution %}
+                <h4 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution des Corrélations dans le Temps (Mensuelle)</h4>
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
-                            <div class="card-header bg-primary text-white">
-                                <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Conclusion de l'Analyse Mensuelle</h5>
+                            <div class="card-body">
+                                {{ graphs_month.correlation_evolution|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Distributions et Boxplots par mois -->
+                <h4 class="mb-4"><i class="bi bi-bar-chart-steps"></i> Distributions par Mois</h4>
+                
+                <!-- Histogramme unique avec dropdown -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Distribution par Mois (Violin Plot)</h5>
+                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                    {% if graphs_month.distribution_montant_by_month %}
+                                    <option value="montant">Montant</option>
+                                    {% endif %}
+                                    {% if graphs_month.distribution_pu_net_by_month %}
+                                    <option value="pu_net">PU Net</option>
+                                    {% endif %}
+                                    {% if graphs_month.distribution_quantite_by_month %}
+                                    <option value="quantite">Quantité</option>
+                                    {% endif %}
+                                </select>
                             </div>
                             <div class="card-body">
-                                {{ results_month.synthese_analyse|safe }}
-                                {% if not results_month.synthese_analyse %}
-                                <div class="alert alert-info">
-                                    <h6><strong>Points clés de l'analyse :</strong></h6>
-                                    <ul>
-                                        <li><strong>Distributions :</strong> Les données de ventes présentent généralement une distribution asymétrique avec quelques valeurs extrêmes, ce qui est normal dans le commerce.</li>
-                                        <li><strong>Corrélations :</strong> Les relations entre variables révèlent les comportements d'achat et peuvent guider la stratégie commerciale.</li>
-                                        <li><strong>Top Performers :</strong> La concentration du CA sur certains pays et familles de produits doit être surveillée pour équilibrer risque et opportunités.</li>
-                                        <li><strong>Valeurs aberrantes :</strong> Les outliers identifiés méritent une analyse au cas par cas pour comprendre s'ils représentent des opportunités ou des anomalies.</li>
-                                    </ul>
+                                {% if graphs_month.distribution_montant_by_month %}
+                                <div class="histogram-graph" data-variable="montant">
+                                    {{ graphs_month.distribution_montant_by_month|safe }}
+                                </div>
+                                {% endif %}
+                                {% if graphs_month.distribution_pu_net_by_month %}
+                                <div class="histogram-graph" data-variable="pu_net" style="display:none;">
+                                    {{ graphs_month.distribution_pu_net_by_month|safe }}
+                                </div>
+                                {% endif %}
+                                {% if graphs_month.distribution_quantite_by_month %}
+                                <div class="histogram-graph" data-variable="quantite" style="display:none;">
+                                    {{ graphs_month.distribution_quantite_by_month|safe }}
                                 </div>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <script>
+                // Gestion du dropdown pour les histogrammes
+                document.getElementById('histogramVariableSelector')?.addEventListener('change', function() {
+                    const selectedVar = this.value;
+                    document.querySelectorAll('.histogram-graph').forEach(graph => {
+                        graph.style.display = graph.dataset.variable === selectedVar ? 'block' : 'none';
+                    });
+                });
+                
+                // Gestion des dropdowns Top/Bottom pour les 3 granularités
+                document.getElementById('topBottomMonthSelector')?.addEventListener('change', function() {
+                    const isHigh = this.value === 'high';
+                    document.getElementById('topPeriodsMonthHigh').style.display = isHigh ? 'block' : 'none';
+                    document.getElementById('topPeriodsMonthLow').style.display = isHigh ? 'none' : 'block';
+                });
+                
+                document.getElementById('topBottomQuarterSelector')?.addEventListener('change', function() {
+                    const isHigh = this.value === 'high';
+                    document.getElementById('topPeriodsQuarterHigh').style.display = isHigh ? 'block' : 'none';
+                    document.getElementById('topPeriodsQuarterLow').style.display = isHigh ? 'none' : 'block';
+                });
+                
+                document.getElementById('topBottomFiscalSelector')?.addEventListener('change', function() {
+                    const isHigh = this.value === 'high';
+                    document.getElementById('topPeriodsFiscalHigh').style.display = isHigh ? 'block' : 'none';
+                    document.getElementById('topPeriodsFiscalLow').style.display = isHigh ? 'none' : 'block';
+                });
+                </script>
                 
                 <!-- ÉVOLUTION MENSUELLE -->
                 <h3 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution Mensuelle du Chiffre d'Affaires</h3>
-                {% if graphs_month.evolution_mensuelle %}
+                {% if graphs_month.evolution_mensuelle or graphs_month.variation_trimestrielle %}
                 <div class="row mb-4">
-                    <div class="col-12">
+                    {% if graphs_month.evolution_mensuelle %}
+                    <div class="col-md-6">
                         <div class="card">
                             <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-calendar-month"></i> Tendance Mensuelle</h5>
+                                <h5 class="mb-0"><i class="bi bi-calendar-month"></i> CA Mensuel</h5>
                             </div>
                             <div class="card-body">
                                 {{ graphs_month.evolution_mensuelle|safe }}
-                                <div class="alert alert-success mt-3">
-                                    <strong><i class="bi bi-lightbulb"></i> Analyse :</strong>
-                                    Ce graphique montre l'évolution mensuelle du chiffre d'affaires avec sa ligne de tendance. Les pics et creux peuvent révéler la saisonnalité de votre activité. Utilisez ces informations pour optimiser vos stocks et prévisions.
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_month.variation_trimestrielle %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Variation Mensuelle</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.variation_trimestrielle|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <!-- ANALYSES COMPLÉMENTAIRES CA -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-pie-chart"></i> Analyses Complémentaires du CA</h3>
+                
+                <!-- Répartition et Top 5 -->
+                <div class="row mb-4">
+                    {% if graphs_month.ca_repartition_pie %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> Répartition du CA</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.ca_repartition_pie|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_month.top_periods_high or graphs_month.top_periods_low %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-star-fill"></i> Top/Bottom 5 Mois</h5>
+                                <select class="form-select form-select-sm" id="topBottomMonthSelector" style="width: auto; max-width: 150px;">
+                                    <option value="high">Plus hauts</option>
+                                    <option value="low">Plus bas</option>
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                <div id="topPeriodsMonthHigh">
+                                    {{ graphs_month.top_periods_high|safe }}
+                                </div>
+                                <div id="topPeriodsMonthLow" style="display: none;">
+                                    {{ graphs_month.top_periods_low|safe }}
                                 </div>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 
+                <!-- CA Moyen et Stabilité -->
+                <div class="row">
+                    {% if graphs_month.ca_moyen_transaction %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-cash-stack"></i> CA Moyen par Transaction</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.ca_moyen_transaction|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if graphs_month.stability_chart %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-activity"></i> Stabilité des Ventes</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.stability_chart|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
             </div>
             <!-- FIN SOUS-ONGLET: MOIS -->
             
             <!-- SOUS-ONGLET: TRIMESTRE -->
             <div class="tab-pane fade" id="quarter-period" role="tabpanel" aria-labelledby="quarter-tab">
                 
-                <div class="alert alert-info" role="alert">
-                    <h4 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h4>
+                <div class="alert alert-info mb-4" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h5>
                     <p class="mb-0">Données agrégées par <strong>trimestre fiscal</strong> (Q1: Avr-Jun, Q2: Jul-Sep, Q3: Oct-Déc, Q4: Jan-Mar).</p>
                 </div>
-                
-                <!-- TRAITEMENT DES DONNÉES -->
-                <h3 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h3>
-                {% if results_quarter.rapport_nettoyage %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_quarter.rapport_nettoyage|safe }}
-                    </div>
-                </div>
-                {% endif %}
                 
                 <!-- STATISTIQUES DESCRIPTIVES -->
                 <h3 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h3>
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                                {% if results_quarter.available_months %}
+                                <select class="form-select form-select-sm w-auto" id="quarterStatsSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                    {% for month in results_quarter.available_months %}
+                                    <option value="{{ month }}">{{ month }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% endif %}
                             </div>
                             <div class="card-body">
-                                {{ results_quarter.stats_descriptives|safe }}
+                                <!-- Tableau global -->
+                                <div class="stats-table-container-quarter" data-month="all">
+                                    {{ results_quarter.stats_descriptives|safe }}
+                                </div>
+                                
+                                <!-- Tableaux par trimestre -->
+                                {% for month, table_html in results_quarter.stats_by_month.items %}
+                                <div class="stats-table-container-quarter" data-month="{{ month }}" style="display:none;">
+                                    {{ table_html|safe }}
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <script>
+                // Gestion du dropdown pour les statistiques descriptives trimestrielles
+                const quarterSelector = document.getElementById('quarterStatsSelector');
+                if (quarterSelector) {
+                    // Sélectionner le premier trimestre par défaut et afficher son tableau
+                    const firstQuarter = quarterSelector.options[0].value;
+                    document.querySelectorAll('.stats-table-container-quarter').forEach(container => {
+                        container.style.display = container.dataset.month === firstQuarter ? 'block' : 'none';
+                    });
+                    
+                    quarterSelector.addEventListener('change', function() {
+                        const selectedMonth = this.value;
+                        document.querySelectorAll('.stats-table-container-quarter').forEach(container => {
+                            container.style.display = container.dataset.month === selectedMonth ? 'block' : 'none';
+                        });
+                    });
+                }
+                </script>
                 
-                <h4 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h4>
+                <!-- 📈 Graphique de corrélation évolutive -->
+                {% if graphs_quarter.correlation_evolution %}
+                <h4 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution des Corrélations dans le Temps (Trimestrielle)</h4>
                 <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_quarter.correlation_evolution|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Distributions et Boxplots par trimestre -->
+                <h4 class="mb-4"><i class="bi bi-bar-chart-steps"></i> Distributions par Trimestre</h4>
+                
+                <!-- Histogramme unique avec dropdown -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Distribution par Trimestre (Violin Plot)</h5>
+                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelectorQuarter" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                    {% if graphs_quarter.distribution_montant_by_month %}
+                                    <option value="montant">Montant</option>
+                                    {% endif %}
+                                    {% if graphs_quarter.distribution_pu_net_by_month %}
+                                    <option value="pu_net">PU Net</option>
+                                    {% endif %}
+                                    {% if graphs_quarter.distribution_quantite_by_month %}
+                                    <option value="quantite">Quantité</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                {% if graphs_quarter.distribution_montant_by_month %}
+                                <div class="histogram-graph-quarter" data-variable="montant">
+                                    {{ graphs_quarter.distribution_montant_by_month|safe }}
+                                </div>
+                                {% endif %}
+                                {% if graphs_quarter.distribution_pu_net_by_month %}
+                                <div class="histogram-graph-quarter" data-variable="pu_net" style="display:none;">
+                                    {{ graphs_quarter.distribution_pu_net_by_month|safe }}
+                                </div>
+                                {% endif %}
+                                {% if graphs_quarter.distribution_quantite_by_month %}
+                                <div class="histogram-graph-quarter" data-variable="quantite" style="display:none;">
+                                    {{ graphs_quarter.distribution_quantite_by_month|safe }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                // Gestion du dropdown pour les histogrammes trimestriels
+                document.getElementById('histogramVariableSelectorQuarter')?.addEventListener('change', function() {
+                    const selectedVar = this.value;
+                    document.querySelectorAll('.histogram-graph-quarter').forEach(graph => {
+                        graph.style.display = graph.dataset.variable === selectedVar ? 'block' : 'none';
+                    });
+                });
+                </script>
+                
+                <!-- ÉVOLUTION TRIMESTRIELLE -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution Trimestrielle du Chiffre d'Affaires</h3>
+                {% if graphs_quarter.evolution_mensuelle or graphs_quarter.variation_trimestrielle %}
+                <div class="row mb-4">
+                    {% if graphs_quarter.evolution_mensuelle %}
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
+                                <h5 class="mb-0"><i class="bi bi-calendar3"></i> CA Trimestriel</h5>
                             </div>
                             <div class="card-body">
-                                {{ results_quarter.tests_normalite|safe }}
-                                <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ results_quarter.valeurs_aberrantes|safe }}
-                                <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h4>
-                <div class="row mb-4">
-                    {% if graphs_quarter.correlation_matrix %}
-                    <div class="col-md-7">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.correlation_matrix|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% if results_quarter.correlation_analysis %}
-                    <div class="col-md-5">
-                        <div class="card">
-                            <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
-                            </div>
-                            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                                {{ results_quarter.correlation_analysis|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h4>
-                
-                {% if graphs_quarter.dist_complete_montant %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.dist_complete_montant|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_quarter.dist_complete_quantite %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.dist_complete_quantite|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_quarter.dist_complete_pu_net %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.dist_complete_pu_net|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <h4 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h4>
-                <div class="row mb-4">
-                    {% if graphs_quarter.top_pays %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.top_pays|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if graphs_quarter.top_familles %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.top_familles|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h4>
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_quarter.synthese_analyse|safe }}
-                    </div>
-                </div>
-                
-                <!-- ANALYSES TEMPORELLES -->
-                <h3 class="mb-4 mt-5"><i class="bi bi-bar-chart"></i> Évolutions Trimestrielles</h3>
-                <div class="row mb-4">
-                    {% if graphs_quarter.ca_par_trimestre %}
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_quarter.ca_par_trimestre|safe }}
+                                {{ graphs_quarter.evolution_mensuelle|safe }}
                             </div>
                         </div>
                     </div>
@@ -809,6 +662,9 @@
                     {% if graphs_quarter.variation_trimestrielle %}
                     <div class="col-md-6">
                         <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Variation Trimestrielle</h5>
+                            </div>
                             <div class="card-body">
                                 {{ graphs_quarter.variation_trimestrielle|safe }}
                             </div>
@@ -816,203 +672,218 @@
                     </div>
                     {% endif %}
                 </div>
+                {% endif %}
                 
-                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution Mensuelle avec Tendance</h3>
-                {% if graphs_quarter.evolution_mensuelle %}
+                <!-- ANALYSES COMPLÉMENTAIRES CA -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-pie-chart"></i> Analyses Complémentaires du CA</h3>
+                
+                <!-- Répartition et Top 5 -->
                 <div class="row mb-4">
-                    <div class="col-12">
+                    {% if graphs_quarter.ca_repartition_pie %}
+                    <div class="col-md-6">
                         <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> Répartition du CA</h5>
+                            </div>
                             <div class="card-body">
-                                {{ graphs_quarter.evolution_mensuelle|safe }}
+                                {{ graphs_quarter.ca_repartition_pie|safe }}
                             </div>
                         </div>
                     </div>
-                </div>
-                {% endif %}
-                
-                <h3 class="mb-4"><i class="bi bi-fire"></i> Heatmap Temporelle</h3>
-                {% if graphs_quarter.heatmap_ca_mensuel %}
-                <div class="row mb-4">
-                    <div class="col-12">
+                    {% endif %}
+                    
+                    {% if graphs_quarter.top_periods_high or graphs_quarter.top_periods_low %}
+                    <div class="col-md-6">
                         <div class="card">
+                            <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-star-fill"></i> Top/Bottom 5 Trimestres</h5>
+                                <select class="form-select form-select-sm" id="topBottomQuarterSelector" style="width: auto; max-width: 150px;">
+                                    <option value="high">Plus hauts</option>
+                                    <option value="low">Plus bas</option>
+                                </select>
+                            </div>
                             <div class="card-body">
-                                {{ graphs_quarter.heatmap_ca_mensuel|safe }}
+                                <div id="topPeriodsQuarterHigh">
+                                    {{ graphs_quarter.top_periods_high|safe }}
+                                </div>
+                                <div id="topPeriodsQuarterLow" style="display: none;">
+                                    {{ graphs_quarter.top_periods_low|safe }}
+                                </div>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 
-                <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Temporelle</h3>
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_quarter.synthese_temporelle|safe }}
+                <!-- CA Moyen et Stabilité -->
+                <div class="row">
+                    {% if graphs_quarter.ca_moyen_transaction %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-cash-stack"></i> CA Moyen par Transaction</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_quarter.ca_moyen_transaction|safe }}
+                            </div>
+                        </div>
                     </div>
+                    {% endif %}
+                    
+                    {% if graphs_quarter.stability_chart %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-activity"></i> Stabilité des Ventes</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_quarter.stability_chart|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                
+
             </div>
             <!-- FIN SOUS-ONGLET: TRIMESTRE -->
             
             <!-- SOUS-ONGLET: ANNÉE FISCALE -->
             <div class="tab-pane fade" id="fiscal-period" role="tabpanel" aria-labelledby="fiscal-tab">
                 
-                <div class="alert alert-success" role="alert">
-                    <h4 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h4>
+                <div class="alert alert-success mb-4" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h5>
                     <p class="mb-0">Données agrégées par <strong>année fiscale complète</strong> (Avril → Mars de l'année suivante).</p>
                 </div>
-                
-                <!-- TRAITEMENT DES DONNÉES -->
-                <h3 class="mb-4 mt-4"><i class="bi bi-tools"></i> Traitement des Données</h3>
-                {% if results_fiscal.rapport_nettoyage %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_fiscal.rapport_nettoyage|safe }}
-                    </div>
-                </div>
-                {% endif %}
                 
                 <!-- STATISTIQUES DESCRIPTIVES -->
                 <h3 class="mb-4 mt-5"><i class="bi bi-table"></i> Statistiques Descriptives</h3>
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
-                            <div class="card-header bg-primary text-white">
+                            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
+                                {% if results_fiscal.available_months %}
+                                <select class="form-select form-select-sm w-auto" id="fiscalStatsSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                    {% for month in results_fiscal.available_months %}
+                                    <option value="{{ month }}">{{ month }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% endif %}
                             </div>
                             <div class="card-body">
-                                {{ results_fiscal.stats_descriptives|safe }}
+                                <!-- Tableau global -->
+                                <div class="stats-table-container-fiscal" data-month="all">
+                                    {{ results_fiscal.stats_descriptives|safe }}
+                                </div>
+                                
+                                <!-- Tableaux par année fiscale -->
+                                {% for month, table_html in results_fiscal.stats_by_month.items %}
+                                <div class="stats-table-container-fiscal" data-month="{{ month }}" style="display:none;">
+                                    {{ table_html|safe }}
+                                </div>
+                                {% endfor %}
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <script>
+                // Gestion du dropdown pour les statistiques descriptives par année fiscale
+                const fiscalSelector = document.getElementById('fiscalStatsSelector');
+                if (fiscalSelector) {
+                    // Sélectionner la première année par défaut et afficher son tableau
+                    const firstFiscal = fiscalSelector.options[0].value;
+                    document.querySelectorAll('.stats-table-container-fiscal').forEach(container => {
+                        container.style.display = container.dataset.month === firstFiscal ? 'block' : 'none';
+                    });
+                    
+                    fiscalSelector.addEventListener('change', function() {
+                        const selectedMonth = this.value;
+                        document.querySelectorAll('.stats-table-container-fiscal').forEach(container => {
+                            container.style.display = container.dataset.month === selectedMonth ? 'block' : 'none';
+                        });
+                    });
+                }
+                </script>
                 
-                <h4 class="mb-4"><i class="bi bi-clipboard-data"></i> Tests Statistiques</h4>
+                <!-- 📈 Graphique de corrélation évolutive -->
+                {% if graphs_fiscal.correlation_evolution %}
+                <h4 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution des Corrélations dans le Temps (Annuelle)</h4>
                 <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body">
+                                {{ graphs_fiscal.correlation_evolution|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Distributions et Boxplots par année fiscale -->
+                <h4 class="mb-4"><i class="bi bi-bar-chart-steps"></i> Distributions par Année Fiscale</h4>
+                
+                <!-- Histogramme unique avec dropdown -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Distribution par Année (Violin Plot)</h5>
+                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelectorFiscal" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                    {% if graphs_fiscal.distribution_montant_by_month %}
+                                    <option value="montant">Montant</option>
+                                    {% endif %}
+                                    {% if graphs_fiscal.distribution_pu_net_by_month %}
+                                    <option value="pu_net">PU Net</option>
+                                    {% endif %}
+                                    {% if graphs_fiscal.distribution_quantite_by_month %}
+                                    <option value="quantite">Quantité</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            <div class="card-body">
+                                {% if graphs_fiscal.distribution_montant_by_month %}
+                                <div class="histogram-graph-fiscal" data-variable="montant">
+                                    {{ graphs_fiscal.distribution_montant_by_month|safe }}
+                                </div>
+                                {% endif %}
+                                {% if graphs_fiscal.distribution_pu_net_by_month %}
+                                <div class="histogram-graph-fiscal" data-variable="pu_net" style="display:none;">
+                                    {{ graphs_fiscal.distribution_pu_net_by_month|safe }}
+                                </div>
+                                {% endif %}
+                                {% if graphs_fiscal.distribution_quantite_by_month %}
+                                <div class="histogram-graph-fiscal" data-variable="quantite" style="display:none;">
+                                    {{ graphs_fiscal.distribution_quantite_by_month|safe }}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <script>
+                // Gestion du dropdown pour les histogrammes par année fiscale
+                document.getElementById('histogramVariableSelectorFiscal')?.addEventListener('change', function() {
+                    const selectedVar = this.value;
+                    document.querySelectorAll('.histogram-graph-fiscal').forEach(graph => {
+                        graph.style.display = graph.dataset.variable === selectedVar ? 'block' : 'none';
+                    });
+                });
+                </script>
+                
+                <!-- ÉVOLUTION ANNUELLE -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Évolution Annuelle du Chiffre d'Affaires</h3>
+                {% if graphs_fiscal.evolution_mensuelle or graphs_fiscal.variation_trimestrielle %}
+                <div class="row mb-4">
+                    {% if graphs_fiscal.evolution_mensuelle %}
                     <div class="col-md-6">
                         <div class="card">
                             <div class="card-header bg-info text-white">
-                                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Tests de Normalité (Shapiro-Wilk)</h5>
+                                <h5 class="mb-0"><i class="bi bi-calendar-year"></i> CA Annuel</h5>
                             </div>
                             <div class="card-body">
-                                {{ results_fiscal.tests_normalite|safe }}
-                                <small class="text-muted">* p-value < 0.05 : distribution non normale</small>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header bg-warning text-white">
-                                <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Valeurs Aberrantes (IQR)</h5>
-                            </div>
-                            <div class="card-body">
-                                {{ results_fiscal.valeurs_aberrantes|safe }}
-                                <small class="text-muted">* Outliers = valeurs hors [Q1-1.5×IQR, Q3+1.5×IQR]</small>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-grid-3x3"></i> Matrice de Corrélation et Analyse</h4>
-                <div class="row mb-4">
-                    {% if graphs_fiscal.correlation_matrix %}
-                    <div class="col-md-7">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.correlation_matrix|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    {% if results_fiscal.correlation_analysis %}
-                    <div class="col-md-5">
-                        <div class="card">
-                            <div class="card-header bg-danger text-white">
-                                <h5 class="mb-0">🔍 Analyse des Corrélations</h5>
-                            </div>
-                            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                                {{ results_fiscal.correlation_analysis|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-graph-down"></i> Distributions Complètes des Variables</h4>
-                
-                {% if graphs_fiscal.dist_complete_montant %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.dist_complete_montant|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_fiscal.dist_complete_quantite %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.dist_complete_quantite|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                {% if graphs_fiscal.dist_complete_pu_net %}
-                <div class="row mb-4">
-                    <div class="col-12">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.dist_complete_pu_net|safe }}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-                
-                <h4 class="mb-4"><i class="bi bi-trophy"></i> Analyses Top Performers</h4>
-                <div class="row mb-4">
-                    {% if graphs_fiscal.top_pays %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.top_pays|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                    
-                    {% if graphs_fiscal.top_familles %}
-                    <div class="col-md-6 mb-3">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.top_familles|safe }}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                
-                <h4 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Statistique</h4>
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_fiscal.synthese_analyse|safe }}
-                    </div>
-                </div>
-                
-                <!-- ANALYSES TEMPORELLES -->
-                <h3 class="mb-4 mt-5"><i class="bi bi-bar-chart"></i> Évolutions Trimestrielles</h3>
-                <div class="row mb-4">
-                    {% if graphs_fiscal.ca_par_trimestre %}
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-body">
-                                {{ graphs_fiscal.ca_par_trimestre|safe }}
+                                {{ graphs_fiscal.evolution_mensuelle|safe }}
                             </div>
                         </div>
                     </div>
@@ -1021,6 +892,9 @@
                     {% if graphs_fiscal.variation_trimestrielle %}
                     <div class="col-md-6">
                         <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Variation Annuelle</h5>
+                            </div>
                             <div class="card-body">
                                 {{ graphs_fiscal.variation_trimestrielle|safe }}
                             </div>
@@ -1028,194 +902,1006 @@
                     </div>
                     {% endif %}
                 </div>
+                {% endif %}
                 
-                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution Mensuelle avec Tendance</h3>
-                {% if graphs_fiscal.evolution_mensuelle %}
+                <!-- ANALYSES COMPLÉMENTAIRES CA -->
+                <h3 class="mb-4 mt-5"><i class="bi bi-pie-chart"></i> Analyses Complémentaires du CA</h3>
+                
+                <!-- Répartition et Top 5 -->
                 <div class="row mb-4">
-                    <div class="col-12">
+                    {% if graphs_fiscal.ca_repartition_pie %}
+                    <div class="col-md-6">
                         <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-pie-chart-fill"></i> Répartition du CA</h5>
+                            </div>
                             <div class="card-body">
-                                {{ graphs_fiscal.evolution_mensuelle|safe }}
+                                {{ graphs_fiscal.ca_repartition_pie|safe }}
                             </div>
                         </div>
                     </div>
-                </div>
-                {% endif %}
-                
-                <h3 class="mb-4"><i class="bi bi-fire"></i> Heatmap Temporelle</h3>
-                {% if graphs_fiscal.heatmap_ca_mensuel %}
-                <div class="row mb-4">
-                    <div class="col-12">
+                    {% endif %}
+                    
+                    {% if graphs_fiscal.top_periods_high or graphs_fiscal.top_periods_low %}
+                    <div class="col-md-6">
                         <div class="card">
+                            <div class="card-header bg-warning text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-star-fill"></i> Top/Bottom 5 Années</h5>
+                                <select class="form-select form-select-sm" id="topBottomFiscalSelector" style="width: auto; max-width: 150px;">
+                                    <option value="high">Plus hauts</option>
+                                    <option value="low">Plus bas</option>
+                                </select>
+                            </div>
                             <div class="card-body">
-                                {{ graphs_fiscal.heatmap_ca_mensuel|safe }}
+                                <div id="topPeriodsFiscalHigh">
+                                    {{ graphs_fiscal.top_periods_high|safe }}
+                                </div>
+                                <div id="topPeriodsFiscalLow" style="display: none;">
+                                    {{ graphs_fiscal.top_periods_low|safe }}
+                                </div>
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 
-                <h3 class="mb-4"><i class="bi bi-file-text"></i> Synthèse de l'Analyse Temporelle</h3>
-                <div class="row mb-4">
-                    <div class="col-12">
-                        {{ results_fiscal.synthese_temporelle|safe }}
+                <!-- CA Moyen et Stabilité -->
+                <div class="row">
+                    {% if graphs_fiscal.ca_moyen_transaction %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0"><i class="bi bi-cash-stack"></i> CA Moyen par Transaction</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_fiscal.ca_moyen_transaction|safe }}
+                            </div>
+                        </div>
                     </div>
+                    {% endif %}
+                    
+                    {% if graphs_fiscal.stability_chart %}
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-activity"></i> Stabilité des Ventes</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_fiscal.stability_chart|safe }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
-                
+
             </div>
             <!-- FIN SOUS-ONGLET: ANNÉE FISCALE -->
             
         </div>
         <!-- FIN DES SOUS-ONGLETS PÉRIODES -->
         
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <!-- NOUVELLE SECTION: ANALYSE DES DÉLAIS DE LIVRAISON -->
-        <!-- ═══════════════════════════════════════════════════════════════ -->
-        <div class="mt-5 pt-4 border-top">
-            <h2 class="mb-4"><i class="bi bi-clock-history"></i> Analyse des Délais de Livraison (Analyse Mensuelle)</h2>
-            
-            <div class="alert alert-primary mb-4">
-                <i class="bi bi-info-circle"></i>
-                <strong>Note :</strong> Cette analyse est effectuée sur l'agrégation mensuelle des données.
-                Le délai est calculé comme : <strong>Date Expédition - Date Commande</strong> (ou Date Facturation - 60 jours si date commande absente).
-            </div>
-            
-            <!-- KPIs Lead Time -->
-            {% if lead_time_analysis and 'error' not in lead_time_analysis %}
-            <div class="row mb-4">
-                <div class="col-md-3">
-                    <div class="card bg-primary text-white">
-                        <div class="card-body text-center">
-                            <h6>Médiane</h6>
-                            <h3>{{ lead_time_analysis.median|floatformat:1 }} j</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-info text-white">
-                        <div class="card-body text-center">
-                            <h6>Moyenne</h6>
-                            <h3>{{ lead_time_analysis.mean|floatformat:1 }} j</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-warning text-white">
-                        <div class="card-body text-center">
-                            <h6>% Anomalies</h6>
-                            <h3>{{ lead_time_analysis.pct_anomalies|floatformat:1 }}%</h3>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card bg-danger text-white">
-                        <div class="card-body text-center">
-                            <h6>% Extrêmes</h6>
-                            <h3>{{ lead_time_analysis.pct_extremes|floatformat:1 }}%</h3>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Distribution des délais -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5><i class="bi bi-bar-chart-fill"></i> Distribution des Délais</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="leadTimeDistChart" style="max-height: 400px;"></canvas>
-                </div>
-            </div>
-            
-            <!-- Évolution médiane dans le temps -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5><i class="bi bi-graph-up"></i> Évolution de la Médiane des Délais</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="leadTimeSeriesChart" style="max-height: 300px;"></canvas>
-                </div>
-            </div>
-            
-            <!-- Bloc Interprétation -->
-            {{ lead_time_interpretation|safe }}
-            
-            {% else %}
-            <div class="alert alert-warning">
-                <i class="bi bi-exclamation-triangle"></i>
-                <strong>Analyse des délais indisponible.</strong>
-                {% if lead_time_analysis.error %}
-                <br>{{ lead_time_analysis.error }}
-                {% endif %}
-            </div>
-            {% endif %}
-        </div>
-        
     </div>
     
     <!-- ═══════════════════════════════════════════════════════════════ -->
     <!-- ONGLET 2: ANALYSE SÉRIE TEMPORELLE -->
     <!-- ═══════════════════════════════════════════════════════════════ -->
-    <div class="tab-pane fade" id="temporal" role="tabpanel">
+    <div class="tab-pane fade {% if active_tab == 'temporal' %}show active{% endif %}" id="temporal" role="tabpanel">
         
         <h2 class="mb-4 mt-4"><i class="bi bi-calendar3"></i> Analyse Série temporelle</h2>
-        
-        <!-- ANALYSES AVANCÉES -->
-        <h2 class="mb-4 mt-5"><i class="bi bi-graph-up-arrow"></i> Analyses Avancées (Séries Temporelles)</h2>
-        
-        <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
-        {% if graphs.stl_decomposition %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu</h5>
-                        {% if results.stl_trend_strength %}
-                        <small>Force de la tendance: {{ results.stl_trend_strength }} | Force de la saisonnalité: {{ results.stl_seasonal_strength }}</small>
-                        {% endif %}
-                    </div>
-                    <div class="card-body">
-                        {{ graphs.stl_decomposition|safe }}
+
+        <!-- Affichage selon le sélecteur global (granularity=month|quarter|year) -->
+        <div>
+            
+            <!-- SOUS-ONGLET: MOIS -->
+            <div id="temporal-month-period" class="{% if granularity == 'month' %}d-block{% else %}d-none{% endif %}">
+                
+                <div class="alert alert-primary mb-4" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
+                    <p class="mb-0">Analyses avancées de séries temporelles agrégées par <strong>mois</strong>.</p>
+                </div>
+                
+                <!-- ANALYSES AVANCÉES -->
+                <h2 class="mb-4 mt-5"><i class="bi bi-graph-up-arrow"></i> Analyses Avancées (Séries Temporelles)</h2>
+
+                {% if graphs_month.evolution_selector %}
+                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution (sélection de variable)</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">📈 Évolution CA / Quantité / Nb clients</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.evolution_selector|safe }}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <h3 class="mb-4"><i class="bi bi-clipboard-check"></i> Tests de Stationnarité</h3>
-        {% if results.stationarity_tests %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-warning text-white">
-                        <h5 class="mb-0">🧪 Tests ADF et KPSS</h5>
+                {% endif %}
+
+                {% if results_month.insights %}
+                <h3 class="mb-3"><i class="bi bi-lightbulb"></i> Synthèse approfondie</h3>
+                <div class="row mb-4">
+                    {% if results_month.insights.ca %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>CA</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_month.insights.ca.last_period }} — {{ results_month.insights.ca.last_value|floatformat:0 }} €</div>
+                                {% if results_month.insights.ca.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_month.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_month.insights.ca.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_month.insights.ca.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_month.insights.ca.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_month.insights.ca.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        {{ results.stationarity_tests|safe }}
+                    {% endif %}
+
+                    {% if results_month.insights.qty %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_month.insights.qty.last_period }} — {{ results_month.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_month.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_month.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_month.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_month.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_month.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_month.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if results_month.insights.clients %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_month.insights.clients.last_period }} — {{ results_month.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_month.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_month.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_month.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_month.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_month.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_month.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
+                {% if graphs_month.stl_decomposition %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                                {% if results_month.stl_trend_strength %}
+                                <small>Force de la tendance: {{ results_month.stl_trend_strength }} | Force de la saisonnalité: {{ results_month.stl_seasonal_strength }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_month.stl_decomposition|safe }}
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        {% endif %}
-        
-        <h3 class="mb-4"><i class="bi bi-crystal-ball"></i> Prévisions ARIMA</h3>
-        {% if graphs.arima_forecast %}
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">🔮 Modèle ARIMA(1,1,1)</h5>
-                        {% if results.arima_mape %}
-                        <small>MAPE: {{ results.arima_mape }} | RMSE: {{ results.arima_rmse }}</small>
-                        {% endif %}
-                    </div>
-                    <div class="card-body">
-                        {{ graphs.arima_forecast|safe }}
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Pas assez de données pour tracer l'évolution (minimum 2 périodes requis).
+                </div>
+                {% endif %}
+
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                {% if results_month.anomalies %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <span class="badge bg-primary">CA: {{ results_month.anomalies.by_metric.CA_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-primary">Quantité: {{ results_month.anomalies.by_metric.Qty_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-primary">Nb clients: {{ results_month.anomalies.by_metric.Nb_Clients.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-warning text-dark">Joint ≥ 2: {{ results_month.anomalies.joint.n_joint_ge_2|default:0 }}</span>
+                                </div>
+
+                                {% if graphs_month.anomaly_dashboard %}
+                                <div class="mb-3">
+                                    {{ graphs_month.anomaly_dashboard|safe }}
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle"></i> Dashboard anomalies indisponible (données insuffisantes ou série constante).
+                                </div>
+                                {% endif %}
+
+                                <h6 class="mt-3">Top anomalies (|z| décroissant)</h6>
+
+                                {% if results_month.anomalies.by_metric.CA_Total.top %}
+                                <div class="mt-2"><strong>CA</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_month.anomalies.by_metric.CA_Total.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_month.anomalies.by_metric.Qty_Total.top %}
+                                <div class="mt-3"><strong>Quantité</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_month.anomalies.by_metric.Qty_Total.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_month.anomalies.by_metric.Nb_Clients.top %}
+                                <div class="mt-3"><strong>Nb clients</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_month.anomalies.by_metric.Nb_Clients.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_month.anomalies.joint.top_joint %}
+                                <h6 class="mt-4">Top dates jointes (≥ 2 métriques)</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Joint score</th>
+                                                <th>Résumé</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_month.anomalies.joint.top_joint %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.joint_score }}</td>
+                                                <td>{{ it.summary }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Détection d’anomalies indisponible.
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-clipboard-check"></i> Tests de Stationnarité</h3>
+                {% if results_month.stationnarite %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0">🧪 Tests ADF et KPSS</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Test ADF (Dickey-Fuller Augmenté)</h6>
+                                        <p>Statistique: {{ results_month.stationnarite.adf_statistic|floatformat:4 }}</p>
+                                        <p>P-value: {{ results_month.stationnarite.adf_pvalue|floatformat:4 }}</p>
+                                        <p>Résultat: {% if results_month.stationnarite.adf_stationnaire %}<span class="badge bg-success">Stationnaire</span>{% else %}<span class="badge bg-danger">Non stationnaire</span>{% endif %}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Test KPSS</h6>
+                                        <p>Statistique: {{ results_month.stationnarite.kpss_statistic|floatformat:4 }}</p>
+                                        <p>P-value: {{ results_month.stationnarite.kpss_pvalue|floatformat:4 }}</p>
+                                        <p>Résultat: {% if results_month.stationnarite.kpss_stationnaire %}<span class="badge bg-success">Stationnaire</span>{% else %}<span class="badge bg-danger">Non stationnaire</span>{% endif %}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
             </div>
-        </div>
-        {% endif %}
+            
+            <!-- SOUS-ONGLET: TRIMESTRE -->
+            <div id="temporal-quarter-period" class="{% if granularity == 'quarter' %}d-block{% else %}d-none{% endif %}">
+                
+                <div class="alert alert-primary mb-4" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h5>
+                    <p class="mb-0">Analyses avancées de séries temporelles agrégées par <strong>trimestre</strong>.</p>
+                </div>
+                
+                <!-- ANALYSES AVANCÉES -->
+                <h2 class="mb-4 mt-5"><i class="bi bi-graph-up-arrow"></i> Analyses Avancées (Séries Temporelles)</h2>
+
+                {% if graphs_quarter.evolution_selector %}
+                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution (sélection de variable)</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">📈 Évolution CA / Quantité / Nb clients</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_quarter.evolution_selector|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if results_quarter.insights %}
+                <h3 class="mb-3"><i class="bi bi-lightbulb"></i> Synthèse approfondie</h3>
+                <div class="row mb-4">
+                    {% if results_quarter.insights.ca %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>CA</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.ca.last_period }} — {{ results_quarter.insights.ca.last_value|floatformat:0 }} €</div>
+                                {% if results_quarter.insights.ca.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_quarter.insights.ca.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.ca.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_quarter.insights.ca.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_quarter.insights.ca.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if results_quarter.insights.qty %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.qty.last_period }} — {{ results_quarter.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_quarter.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_quarter.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_quarter.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_quarter.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if results_quarter.insights.clients %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.clients.last_period }} — {{ results_quarter.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_quarter.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_quarter.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_quarter.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_quarter.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
+                {% if graphs_quarter.stl_decomposition %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu</h5>
+                                {% if results_quarter.stl_trend_strength %}
+                                <small>Force de la tendance: {{ results_quarter.stl_trend_strength }} | Force de la saisonnalité: {{ results_quarter.stl_seasonal_strength }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_quarter.stl_decomposition|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Pas assez de données pour la décomposition STL (minimum 12 périodes requis).
+                </div>
+                {% endif %}
+
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                {% if results_quarter.anomalies %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <span class="badge bg-primary">CA: {{ results_quarter.anomalies.by_metric.CA_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-primary">Quantité: {{ results_quarter.anomalies.by_metric.Qty_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-primary">Nb clients: {{ results_quarter.anomalies.by_metric.Nb_Clients.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-warning text-dark">Joint ≥ 2: {{ results_quarter.anomalies.joint.n_joint_ge_2|default:0 }}</span>
+                                </div>
+
+                                {% if graphs_quarter.anomaly_dashboard %}
+                                <div class="mb-3">
+                                    {{ graphs_quarter.anomaly_dashboard|safe }}
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle"></i> Dashboard anomalies indisponible (données insuffisantes ou série constante).
+                                </div>
+                                {% endif %}
+
+                                <h6 class="mt-3">Top anomalies (|z| décroissant)</h6>
+
+                                {% if results_quarter.anomalies.by_metric.CA_Total.top %}
+                                <div class="mt-2"><strong>CA</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_quarter.anomalies.by_metric.CA_Total.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_quarter.anomalies.by_metric.Qty_Total.top %}
+                                <div class="mt-3"><strong>Quantité</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_quarter.anomalies.by_metric.Qty_Total.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_quarter.anomalies.by_metric.Nb_Clients.top %}
+                                <div class="mt-3"><strong>Nb clients</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_quarter.anomalies.by_metric.Nb_Clients.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_quarter.anomalies.joint.top_joint %}
+                                <h6 class="mt-4">Top dates jointes (≥ 2 métriques)</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Joint score</th>
+                                                <th>Résumé</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_quarter.anomalies.joint.top_joint %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.joint_score }}</td>
+                                                <td>{{ it.summary }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Détection d’anomalies indisponible.
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-clipboard-check"></i> Tests de Stationnarité</h3>
+                {% if results_quarter.stationnarite %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0">🧪 Tests ADF et KPSS</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Test ADF (Dickey-Fuller Augmenté)</h6>
+                                        <p>Statistique: {{ results_quarter.stationnarite.adf_statistic|floatformat:4 }}</p>
+                                        <p>P-value: {{ results_quarter.stationnarite.adf_pvalue|floatformat:4 }}</p>
+                                        <p>Résultat: {% if results_quarter.stationnarite.adf_stationnaire %}<span class="badge bg-success">Stationnaire</span>{% else %}<span class="badge bg-danger">Non stationnaire</span>{% endif %}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Test KPSS</h6>
+                                        <p>Statistique: {{ results_quarter.stationnarite.kpss_statistic|floatformat:4 }}</p>
+                                        <p>P-value: {{ results_quarter.stationnarite.kpss_pvalue|floatformat:4 }}</p>
+                                        <p>Résultat: {% if results_quarter.stationnarite.kpss_stationnaire %}<span class="badge bg-success">Stationnaire</span>{% else %}<span class="badge bg-danger">Non stationnaire</span>{% endif %}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+            </div>
+            
+            <!-- SOUS-ONGLET: ANNÉE FISCALE -->
+            <div id="temporal-fiscal-period" class="{% if granularity == 'year' %}d-block{% else %}d-none{% endif %}">
+                
+                <div class="alert alert-primary mb-4" role="alert">
+                    <h5 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse Annuelle</h5>
+                    <p class="mb-0">Analyses avancées de séries temporelles agrégées par <strong>année fiscale</strong>.</p>
+                </div>
+                
+                <!-- ANALYSES AVANCÉES -->
+                <h2 class="mb-4 mt-5"><i class="bi bi-graph-up-arrow"></i> Analyses Avancées (Séries Temporelles)</h2>
+
+                {% if graphs_fiscal.evolution_selector %}
+                <h3 class="mb-4"><i class="bi bi-graph-up"></i> Évolution (sélection de variable)</h3>
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">📈 Évolution CA / Quantité / Nb clients</h5>
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_fiscal.evolution_selector|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if results_fiscal.insights %}
+                <h3 class="mb-3"><i class="bi bi-lightbulb"></i> Synthèse approfondie</h3>
+                <div class="row mb-4">
+                    {% if results_fiscal.insights.ca %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>CA</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.ca.last_period }} — {{ results_fiscal.insights.ca.last_value|floatformat:0 }} €</div>
+                                {% if results_fiscal.insights.ca.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_fiscal.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_fiscal.insights.ca.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_fiscal.insights.ca.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_fiscal.insights.ca.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_fiscal.insights.ca.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if results_fiscal.insights.qty %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.qty.last_period }} — {{ results_fiscal.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_fiscal.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_fiscal.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_fiscal.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_fiscal.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_fiscal.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_fiscal.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if results_fiscal.insights.clients %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.clients.last_period }} — {{ results_fiscal.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_fiscal.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_fiscal.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_fiscal.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_fiscal.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_fiscal.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_fiscal.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
+                {% if graphs_fiscal.stl_decomposition %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu</h5>
+                                {% if results_fiscal.stl_trend_strength %}
+                                <small>Force de la tendance: {{ results_fiscal.stl_trend_strength }} | Force de la saisonnalité: {{ results_fiscal.stl_seasonal_strength }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_fiscal.stl_decomposition|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Pas assez de données pour la décomposition STL (minimum 12 périodes requis).
+                </div>
+                {% endif %}
+
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                {% if results_fiscal.anomalies %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <span class="badge bg-primary">CA: {{ results_fiscal.anomalies.by_metric.CA_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-primary">Quantité: {{ results_fiscal.anomalies.by_metric.Qty_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-primary">Nb clients: {{ results_fiscal.anomalies.by_metric.Nb_Clients.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg-warning text-dark">Joint ≥ 2: {{ results_fiscal.anomalies.joint.n_joint_ge_2|default:0 }}</span>
+                                </div>
+
+                                {% if graphs_fiscal.anomaly_dashboard %}
+                                <div class="mb-3">
+                                    {{ graphs_fiscal.anomaly_dashboard|safe }}
+                                </div>
+                                {% else %}
+                                <div class="alert alert-info mb-3">
+                                    <i class="bi bi-info-circle"></i> Dashboard anomalies indisponible (données insuffisantes ou série constante).
+                                </div>
+                                {% endif %}
+
+                                <h6 class="mt-3">Top anomalies (|z| décroissant)</h6>
+
+                                {% if results_fiscal.anomalies.by_metric.CA_Total.top %}
+                                <div class="mt-2"><strong>CA</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_fiscal.anomalies.by_metric.CA_Total.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_fiscal.anomalies.by_metric.Qty_Total.top %}
+                                <div class="mt-3"><strong>Quantité</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_fiscal.anomalies.by_metric.Qty_Total.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_fiscal.anomalies.by_metric.Nb_Clients.top %}
+                                <div class="mt-3"><strong>Nb clients</strong></div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Observed</th>
+                                                <th class="text-end">Expected</th>
+                                                <th class="text-end">Resid</th>
+                                                <th class="text-end">z</th>
+                                                <th>Direction</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_fiscal.anomalies.by_metric.Nb_Clients.top %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.observed|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
+                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+
+                                {% if results_fiscal.anomalies.joint.top_joint %}
+                                <h6 class="mt-4">Top dates jointes (≥ 2 métriques)</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Date</th>
+                                                <th class="text-end">Joint score</th>
+                                                <th>Résumé</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for it in results_fiscal.anomalies.joint.top_joint %}
+                                            <tr>
+                                                <td>{{ it.date }}</td>
+                                                <td class="text-end">{{ it.joint_score }}</td>
+                                                <td>{{ it.summary }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Détection d’anomalies indisponible.
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-clipboard-check"></i> Tests de Stationnarité</h3>
+                {% if results_fiscal.stationnarite %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <h5 class="mb-0">🧪 Tests ADF et KPSS</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6>Test ADF (Dickey-Fuller Augmenté)</h6>
+                                        <p>Statistique: {{ results_fiscal.stationnarite.adf_statistic|floatformat:4 }}</p>
+                                        <p>P-value: {{ results_fiscal.stationnarite.adf_pvalue|floatformat:4 }}</p>
+                                        <p>Résultat: {% if results_fiscal.stationnarite.adf_stationnaire %}<span class="badge bg-success">Stationnaire</span>{% else %}<span class="badge bg-danger">Non stationnaire</span>{% endif %}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6>Test KPSS</h6>
+                                        <p>Statistique: {{ results_fiscal.stationnarite.kpss_statistic|floatformat:4 }}</p>
+                                        <p>P-value: {{ results_fiscal.stationnarite.kpss_pvalue|floatformat:4 }}</p>
+                                        <p>Résultat: {% if results_fiscal.stationnarite.kpss_stationnaire %}<span class="badge bg-success">Stationnaire</span>{% else %}<span class="badge bg-danger">Non stationnaire</span>{% endif %}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+            </div>
+            
+        </div> <!-- end tab-content -->
         
     </div>
     
@@ -1233,411 +1919,216 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- ONGLET 3: ANALYSE DES FAMILLES DE PRODUITS -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="products" role="tabpanel">
+<div class="tab-pane fade {% if active_tab == 'products' %}show active{% endif %}" id="products" role="tabpanel">
     
     <h2 class="mb-4 mt-4"><i class="bi bi-box-seam"></i> Analyse produits</h2>
-    
-    <!-- SOUS-ONGLETS: Mois / Trimestre / Année Fiscale -->
-    <ul class="nav nav-pills mb-4" role="tablist">
-        <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="products-month-tab" data-bs-toggle="pill" data-bs-target="#products-month-period" type="button" role="tab">
-                <i class="bi bi-calendar-month"></i> Mois
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="products-quarter-tab" data-bs-toggle="pill" data-bs-target="#products-quarter-period" type="button" role="tab">
-                <i class="bi bi-calendar3"></i> Trimestre
-            </button>
-        </li>
-        <li class="nav-item" role="presentation">
-            <button class="nav-link" id="products-fiscal-tab" data-bs-toggle="pill" data-bs-target="#products-fiscal-period" type="button" role="tab">
-                <i class="bi bi-calendar-year"></i> Année Fiscale
-            </button>
-        </li>
-    </ul>
-    
-    <!-- CONTENU DES SOUS-ONGLETS -->
-    <div class="tab-content">
-        
-        <!-- SOUS-ONGLET: MOIS -->
-        <div class="tab-pane fade show active" id="products-month-period" role="tabpanel">
-            
-            <div class="alert alert-primary mb-4" role="alert">
-                <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
-                <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
-            </div>
-    
-    {% with stats_famille=family_analysis_month.stats_famille abc_summary=family_analysis_month.abc_summary classe_a=family_analysis_month.classe_a classe_b=family_analysis_month.classe_b classe_c=family_analysis_month.classe_c classe_a_nb=family_analysis_month.classe_a_nb classe_a_ca=family_analysis_month.classe_a_ca classe_a_part=family_analysis_month.classe_a_part classe_b_nb=family_analysis_month.classe_b_nb classe_b_ca=family_analysis_month.classe_b_ca classe_b_part=family_analysis_month.classe_b_part classe_c_nb=family_analysis_month.classe_c_nb classe_c_ca=family_analysis_month.classe_c_ca classe_c_part=family_analysis_month.classe_c_part family_graphs=family_analysis_month.family_graphs %}
-    {% if stats_famille is not None %}
-    
-    <!-- CLASSIFICATION ABC - Vue synthétique -->
-    <div class="row mb-4">
-        {% if abc_summary is not None %}
-        <div class="col-md-4">
-            <div class="card border-success">
-                <div class="card-header bg-success text-white">
-                    <h6 class="mb-0"><i class="bi bi-trophy"></i> Classe A - Stratégiques</h6>
-                </div>
-                <div class="card-body">
-                    <h3 class="text-success">{{ classe_a_nb }} familles</h3>
-                    <p class="mb-1"><strong>{{ classe_a_ca|floatformat:0 }}€</strong></p>
-                    <p class="text-muted mb-0">{{ classe_a_part|floatformat:1 }}% du CA total</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-warning">
-                <div class="card-header bg-warning text-dark">
-                    <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Classe B - Intermédiaires</h6>
-                </div>
-                <div class="card-body">
-                    <h3 class="text-warning">{{ classe_b_nb }} familles</h3>
-                    <p class="mb-1"><strong>{{ classe_b_ca|floatformat:0 }}€</strong></p>
-                    <p class="text-muted mb-0">{{ classe_b_part|floatformat:1 }}% du CA total</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card border-secondary">
-                <div class="card-header bg-secondary text-white">
-                    <h6 class="mb-0"><i class="bi bi-moon"></i> Classe C - Marginales</h6>
-                </div>
-                <div class="card-body">
-                    <h3 class="text-secondary">{{ classe_c_nb }} familles</h3>
-                    <p class="mb-1"><strong>{{ classe_c_ca|floatformat:0 }}€</strong></p>
-                    <p class="text-muted mb-0">{{ classe_c_part|floatformat:1 }}% du CA total</p>
-                </div>
-            </div>
-        </div>
-        {% endif %}
-    </div>
-    
-    <!-- FAMILLES CLASSE A - TOP Performers -->
-    {% if classe_a is not None %}
-    <div class="card mb-4 border-success">
-        <div class="card-header bg-success text-white">
-            <h5 class="mb-0"><i class="bi bi-trophy"></i> TOP Familles Stratégiques (Classe A)</h5>
-            <small>Ces familles représentent 80% du chiffre d'affaires</small>
-        </div>
-        <div class="card-body">
-            <div class="row">
-                {% for idx, row in classe_a.iterrows %}
-                <div class="col-md-6 mb-3">
-                    <div class="card h-100 shadow-sm">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <h6 class="card-title mb-0">
-                                    <span class="badge bg-success me-2">#{{ row.Rang|floatformat:0 }}</span>
-                                    {{ row.Famille }}
-                                </h6>
-                                <span class="badge bg-light text-dark">{{ row.Part_Pct|floatformat:1 }}%</span>
-                            </div>
-                            <hr class="my-2">
-                            <div class="row g-2">
-                                <div class="col-6">
-                                    <small class="text-muted d-block">CA Total</small>
-                                    <strong class="text-success">{{ row.CA_Total|floatformat:0 }}€</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block">Nb Ventes</small>
-                                    <strong>{{ row.Nb_Ventes|floatformat:0 }}</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block">PU Moyen</small>
-                                    <strong>{{ row.PU_Moyen|floatformat:2 }}€</strong>
-                                </div>
-                                <div class="col-6">
-                                    <small class="text-muted d-block">Panier Moyen</small>
-                                    <strong>{{ row.Panier_Moyen|floatformat:0 }}€</strong>
-                                </div>
-                                <div class="col-12">
-                                    <small class="text-muted d-block">Clients</small>
-                                    <strong>{{ row.Nb_Clients|floatformat:0 }} clients</strong>
-                                    <small class="text-muted">({{ row.CA_par_Client|floatformat:0 }}€/client)</small>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- FAMILLES CLASSE B -->
-    {% if classe_b is not None %}
-    <div class="card mb-4 border-warning">
-        <div class="card-header bg-warning text-dark">
-            <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Familles Intermédiaires (Classe B)</h5>
-            <small>Potentiel de développement - 15% du CA</small>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-sm table-hover">
-                    <thead>
-                        <tr>
-                            <th>Rang</th>
-                            <th>Famille</th>
-                            <th class="text-end">CA Total</th>
-                            <th class="text-end">Part %</th>
-                            <th class="text-end">Nb Ventes</th>
-                            <th class="text-end">PU Moyen</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for idx, row in classe_b.iterrows %}
-                        <tr>
-                            <td><span class="badge bg-warning text-dark">#{{ row.Rang|floatformat:0 }}</span></td>
-                            <td><strong>{{ row.Famille }}</strong></td>
-                            <td class="text-end">{{ row.CA_Total|floatformat:0 }}€</td>
-                            <td class="text-end">{{ row.Part_Pct|floatformat:1 }}%</td>
-                            <td class="text-end">{{ row.Nb_Ventes|floatformat:0 }}</td>
-                            <td class="text-end">{{ row.PU_Moyen|floatformat:2 }}€</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- FAMILLES CLASSE C -->
-    {% if classe_c is not None %}
-    <div class="card mb-4 border-secondary">
-        <div class="card-header bg-secondary text-white">
-            <h5 class="mb-0"><i class="bi bi-moon"></i> Familles Marginales (Classe C)</h5>
-            <small>Contribution faible - 5% du CA</small>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-sm table-hover">
-                    <thead>
-                        <tr>
-                            <th>Rang</th>
-                            <th>Famille</th>
-                            <th class="text-end">CA Total</th>
-                            <th class="text-end">Part %</th>
-                            <th class="text-end">Nb Ventes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for idx, row in classe_c.iterrows %}
-                        <tr>
-                            <td><span class="badge bg-secondary">#{{ row.Rang|floatformat:0 }}</span></td>
-                            <td>{{ row.Famille }}</td>
-                            <td class="text-end">{{ row.CA_Total|floatformat:0 }}€</td>
-                            <td class="text-end">{{ row.Part_Pct|floatformat:1 }}%</td>
-                            <td class="text-end">{{ row.Nb_Ventes|floatformat:0 }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
-    <!-- VISUALISATIONS GRAPHIQUES -->
-    {% if family_graphs %}
-    <h3 class="mb-4 mt-5"><i class="bi bi-graph-up"></i> Visualisations Détaillées</h3>
-    
-    <!-- Ligne 1 : Top 15 CA + ABC Donut -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.top15_ca }}" class="img-fluid" alt="Top 15 Familles par CA">
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.abc_donut }}" class="img-fluid" alt="Classification ABC">
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Ligne 2 : Courbe de Pareto -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.pareto_curve }}" class="img-fluid" alt="Courbe de Pareto">
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Ligne 3 : Scatter Volume/Valeur + Top 10 PU -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.scatter_volume_valeur }}" class="img-fluid" alt="Segmentation Volume vs Valeur">
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.top10_pu }}" class="img-fluid" alt="Top 10 PU Moyen">
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Ligne 4 : Top 10 Clients + CA par Client -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.top10_clients }}" class="img-fluid" alt="Top 10 Nombre de Clients">
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.top10_ca_client }}" class="img-fluid" alt="Top 10 CA par Client">
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Ligne 5 : Panier Moyen -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.top10_panier }}" class="img-fluid" alt="Top 10 Panier Moyen">
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Ligne 6 : Radar Top 5 + Heatmap -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.radar_top5 }}" class="img-fluid" alt="Performance Multidimensionnelle Top 5">
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <img src="{{ family_graphs.heatmap_segment_abc }}" class="img-fluid" alt="Heatmap Ventes par Segment et Classe ABC">
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-    
-    {% else %}
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle"></i> Analyse des familles de produits en cours de chargement...
-    </div>
-    {% endif %}
-    {% endwith %}
-    
-        </div> <!-- end products-month-period -->
-        
-        <!-- SOUS-ONGLET: TRIMESTRE -->
-        <div class="tab-pane fade" id="products-quarter-period" role="tabpanel">
-            
+
+    <div class="mt-3">
+        {% if granularity == 'quarter' %}
             <div class="alert alert-info mb-4" role="alert">
                 <h4 class="alert-heading"><i class="bi bi-calendar3"></i> Analyse Trimestrielle</h4>
                 <p class="mb-0">Données agrégées par <strong>trimestre fiscal</strong> (Q1: Avr-Jun, Q2: Jul-Sep, Q3: Oct-Déc, Q4: Jan-Mar).</p>
             </div>
-    
-    {% with stats_famille=family_analysis_quarter.stats_famille abc_summary=family_analysis_quarter.abc_summary classe_a=family_analysis_quarter.classe_a classe_b=family_analysis_quarter.classe_b classe_c=family_analysis_quarter.classe_c classe_a_nb=family_analysis_quarter.classe_a_nb classe_a_ca=family_analysis_quarter.classe_a_ca classe_a_part=family_analysis_quarter.classe_a_part classe_b_nb=family_analysis_quarter.classe_b_nb classe_b_ca=family_analysis_quarter.classe_b_ca classe_b_part=family_analysis_quarter.classe_b_part classe_c_nb=family_analysis_quarter.classe_c_nb classe_c_ca=family_analysis_quarter.classe_c_ca classe_c_part=family_analysis_quarter.classe_c_part family_graphs=family_analysis_quarter.family_graphs %}
-    {% if stats_famille is not None %}
-    
-    <div class="alert alert-success">
-        <i class="bi bi-check-circle"></i> <strong>Analyse trimestrielle opérationnelle !</strong> La fonction <code>analyze_product_families()</code> agrège maintenant les données par <strong>trimestre fiscal</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
-    </div>
-    
-    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
-    
-    {% else %}
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle"></i> Analyse des familles de produits en cours de chargement...
-    </div>
-    {% endif %}
-    {% endwith %}
-    
-        </div> <!-- end products-quarter-period -->
-        
-        <!-- SOUS-ONGLET: ANNÉE FISCALE -->
-        <div class="tab-pane fade" id="products-fiscal-period" role="tabpanel">
-            
+            {% include 'client_analytics/partials/_products_block.html' with family_analysis=family_analysis_quarter %}
+        {% elif granularity == 'year' %}
             <div class="alert alert-success mb-4" role="alert">
                 <h4 class="alert-heading"><i class="bi bi-calendar-year"></i> Analyse par Année Fiscale</h4>
                 <p class="mb-0">Données agrégées par <strong>année fiscale complète</strong> (Avril → Mars de l'année suivante).</p>
             </div>
-    
-    {% with stats_famille=family_analysis_fiscal.stats_famille abc_summary=family_analysis_fiscal.abc_summary classe_a=family_analysis_fiscal.classe_a classe_b=family_analysis_fiscal.classe_b classe_c=family_analysis_fiscal.classe_c classe_a_nb=family_analysis_fiscal.classe_a_nb classe_a_ca=family_analysis_fiscal.classe_a_ca classe_a_part=family_analysis_fiscal.classe_a_part classe_b_nb=family_analysis_fiscal.classe_b_nb classe_b_ca=family_analysis_fiscal.classe_b_ca classe_b_part=family_analysis_fiscal.classe_b_part classe_c_nb=family_analysis_fiscal.classe_c_nb classe_c_ca=family_analysis_fiscal.classe_c_ca classe_c_part=family_analysis_fiscal.classe_c_part family_graphs=family_analysis_fiscal.family_graphs %}
-    {% if stats_famille is not None %}
-    
-    <div class="alert alert-success">
-        <i class="bi bi-check-circle"></i> <strong>Analyse annuelle opérationnelle !</strong> La fonction <code>analyze_product_families()</code> agrège maintenant les données par <strong>année fiscale</strong>. Les graphiques et tableaux ci-dessous reflètent cette granularité.
+            {% include 'client_analytics/partials/_products_block.html' with family_analysis=family_analysis_year %}
+        {% else %}
+            <div class="alert alert-primary mb-4" role="alert">
+                <h5 class="alert-heading"><i class="bi bi-calendar-month"></i> Analyse Mensuelle</h5>
+                <p class="mb-0">Données agrégées par <strong>mois</strong> sur toute la période disponible.</p>
+            </div>
+            {% include 'client_analytics/partials/_products_block.html' with family_analysis=family_analysis_month %}
+        {% endif %}
     </div>
-    
-    <p class="text-muted"><i class="bi bi-info-circle"></i> <em>Note : Le contenu détaillé sera affiché prochainement. Pour l'instant, consultez l'onglet <strong>Mois</strong> pour voir le format complet de l'analyse.</em></p>
-    
-    {% else %}
-    <div class="alert alert-warning">
-        <i class="bi bi-exclamation-triangle"></i> Analyse des familles de produits en cours de chargement...
-    </div>
-    {% endif %}
-    {% endwith %}
-    
-        </div> <!-- end products-fiscal-period -->
-        
-    </div> <!-- end tab-content for products -->
-    
+
     </div> <!-- end products -->
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- ONGLET 4: ANALYSES CLIENTS -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="clients" role="tabpanel">
+<div class="tab-pane fade {% if active_tab == 'clients' %}show active{% endif %}" id="clients" role="tabpanel">
     <h2 class="mb-4 mt-4"><i class="bi bi-people-fill"></i> Analyses clients</h2>
     
-    <div class="alert alert-info">
-        <i class="bi bi-info-circle"></i> Cette section est en cours de développement. 
-        Les analyses clients incluront : segmentation RFM, analyse de cohortes, valeur vie client (CLV), etc.
-    </div>
+    {% if client_analysis %}
     
     <div class="row mb-4">
-        <div class="col-md-4">
-            <div class="card text-center">
+        <div class="col-md-3">
+            <div class="card text-center bg-primary text-white">
                 <div class="card-body">
                     <h5 class="card-title"><i class="bi bi-people"></i> Total Clients</h5>
-                    <h2 class="text-primary">{{ kpis.nb_clients }}</h2>
+                    <h2>{{ client_analysis.kpis.nb_clients|default:"—" }}</h2>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card text-center">
+        <div class="col-md-3">
+            <div class="card text-center bg-success text-white">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-cash-coin"></i> CA Moyen / Client</h5>
-                    <h2 class="text-success">{{ kpis.ca_total|floatformat:0 }}</h2>
+                    <h5 class="card-title"><i class="bi bi-trophy"></i> Top 20% Clients</h5>
+                    <h2>{{ concentration_top20_pct|floatformat:1|default:"—" }}%</h2>
+                    <small>du CA total</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card text-center">
+        <div class="col-md-3">
+            <div class="card text-center bg-warning text-dark">
                 <div class="card-body">
-                    <h5 class="card-title"><i class="bi bi-cart"></i> Panier Moyen</h5>
-                    <h2 class="text-warning">{{ kpis.panier_moyen }}</h2>
+                    <h5 class="card-title"><i class="bi bi-star-fill"></i> Top 10 Clients</h5>
+                    <h2>{{ concentration_top10_pct|floatformat:1|default:"—" }}%</h2>
+                    <small>du CA total</small>
                 </div>
             </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cash-coin"></i> CA Moyen</h5>
+                    <h2>{{ client_analysis.kpis.ca_moyen_par_unite_freq|floatformat:0|default:"—" }}€</h2>
+                    <small>par {{ client_analysis.meta.period_unit|default:"commande" }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualisations Clients -->
+    {% if client_graphs %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="mb-3"><i class="bi bi-bar-chart-fill"></i> Visualisations Clients</h3>
+        </div>
+    </div>
+    
+    {% if client_graphs.concentration %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📊 Concentration Clients - Analyse de Pareto</h5>
+                </div>
+                <div class="card-body">
+                    {{ client_graphs.concentration|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="row mb-4">
+        {% if client_graphs.rfm_distribution %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🎯 Distribution des Segments RFM</h5>
+                </div>
+                <div class="card-body">
+                    {{ client_graphs.rfm_distribution|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if client_graphs.ca_distribution %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">💰 Distribution du CA par Client</h5>
+                </div>
+                <div class="card-body">
+                    {{ client_graphs.ca_distribution|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Top 10 Clients -->
+    {% if top10_clients is not None %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 Clients</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th class="text-end">CA Total</th>
+                                    <th class="text-end">Part %</th>
+                                    <th class="text-end">Nb {{ client_analysis.meta.period_unit|default:"commandes" }}</th>
+                                    <th class="text-end">CA moyen / {{ client_analysis.meta.period_unit|default:"commande" }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client_id, row in top10_clients.iterrows %}
+                                <tr>
+                                    <td><strong>{{ client_id }}</strong></td>
+                                    <td class="text-end">{{ row.CA_Total|floatformat:0 }}€</td>
+                                    <td class="text-end">{{ row.Part_CA_Pct|floatformat:2 }}%</td>
+                                    <td class="text-end">{{ row.Nb_Commandes|floatformat:0 }}</td>
+                                    <td class="text-end">{{ row.Panier_Moyen|floatformat:0 }}€</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Analyse clients en cours de chargement...
+    </div>
+    {% endif %}
+
+    <!-- Portefeuille client complet (Client 360) - après les visualisations globales -->
+    <div class="card border-primary mb-4 mt-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-person-badge"></i> Portefeuille client complet (Client 360)</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="tab" value="clients">
+                <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
+                <div class="col-lg-8">
+                    <label class="form-label">Sélectionner un client</label>
+                    <select class="form-select" name="client">
+                        <option value="">— Choisir —</option>
+                        {% for opt in client_options %}
+                            <option value="{{ opt.value }}" {% if selected_client and opt.value == selected_client %}selected{% endif %}>
+                                {{ opt.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Rechargement via GET (pas d’AJAX).</div>
+                </div>
+                <div class="col-lg-4">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-search"></i> Afficher
+                    </button>
+                </div>
+            </form>
+
+            {% if selected_client %}
+            <div class="mt-4">
+                {% if granularity == 'quarter' %}
+                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_quarter %}
+                {% elif granularity == 'year' %}
+                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_fiscal %}
+                {% else %}
+                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_month %}
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
     
@@ -1646,7 +2137,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- ONGLET 5: ANALYSE GÉOGRAPHIQUE -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="geography" role="tabpanel">
+<div class="tab-pane fade {% if active_tab == 'geographic' %}show active{% endif %}" id="geography" role="tabpanel">
     <h2 class="mb-4 mt-4"><i class="bi bi-globe"></i> Analyses géographique</h2>
     
     <!-- SOUS-ONGLETS: Mois / Trimestre / Année Fiscale -->
@@ -1837,18 +2328,66 @@
     {% if geo_graphs %}
     <div class="row mb-4">
         <div class="col-12">
-            <h3 class="mb-3"><i class="bi bi-bar-chart-fill"></i> Tableau de Bord Géographique</h3>
+            <h3 class="mb-3"><i class="bi bi-bar-chart-fill"></i> Visualisations Géographiques</h3>
         </div>
     </div>
     
+    {% if geo_graphs.ca_by_country %}
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">🌍 Top 15 Pays par Chiffre d'Affaires</h5>
+                </div>
                 <div class="card-body">
-                    <img src="{{ geo_graphs.dashboard_complet }}" class="img-fluid" alt="Tableau de Bord Géographique Complet">
+                    {{ geo_graphs.ca_by_country|safe }}
                 </div>
             </div>
         </div>
+    </div>
+    {% endif %}
+    
+    {% if geo_graphs.zone_performance %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">📊 Performance par Zone Géographique</h5>
+                </div>
+                <div class="card-body">
+                    {{ geo_graphs.zone_performance|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="row mb-4">
+        {% if geo_graphs.classification %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">🎯 Répartition par Classification</h5>
+                </div>
+                <div class="card-body">
+                    {{ geo_graphs.classification|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if geo_graphs.score_distribution %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📈 Distribution des Scores</h5>
+                </div>
+                <div class="card-body">
+                    {{ geo_graphs.score_distribution|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
     
@@ -1903,7 +2442,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <!-- ONGLET 6: ANALYSE DE LA DÉPENDANCE AUX DEVISES -->
 <!-- ═══════════════════════════════════════════════════════════════ -->
-<div class="tab-pane fade" id="currency" role="tabpanel">
+<div class="tab-pane fade {% if active_tab == 'currency' %}show active{% endif %}" id="currency" role="tabpanel">
     
     <h2 class="mb-4 mt-4"><i class="bi bi-currency-exchange"></i> Dépendance aux devises</h2>
     
@@ -2158,15 +2697,17 @@
 
 <script>
 // Bootstrap tabs activation
-var triggerTabList = [].slice.call(document.querySelectorAll('#analysisTabs button'))
-triggerTabList.forEach(function (triggerEl) {
-  var tabTrigger = new bootstrap.Tab(triggerEl)
+if (typeof bootstrap !== 'undefined') {
+  var triggerTabList = [].slice.call(document.querySelectorAll('#analysisTabs button'))
+  triggerTabList.forEach(function (triggerEl) {
+    var tabTrigger = new bootstrap.Tab(triggerEl)
 
-  triggerEl.addEventListener('click', function (event) {
-    event.preventDefault()
-    tabTrigger.show()
+    triggerEl.addEventListener('click', function (event) {
+      event.preventDefault()
+      tabTrigger.show()
+    })
   })
-})
+}
 </script>
 
 <!-- CHART.JS : Graphiques Lead Time -->
@@ -2177,8 +2718,10 @@ const leadTimeDistData = {{ lead_time_dist_json|safe }};
 const leadTimeSeriesData = {{ lead_time_series_json|safe }};
 
 // === GRAPHIQUE 1 : Distribution des délais ===
-const ctxDist = document.getElementById('leadTimeDistChart').getContext('2d');
-new Chart(ctxDist, {
+const distCanvas = document.getElementById('leadTimeDistChart');
+if (distCanvas) {
+  const ctxDist = distCanvas.getContext('2d');
+  new Chart(ctxDist, {
     type: 'bar',
     data: {
         labels: leadTimeDistData.map(d => d.label),
@@ -2214,11 +2757,14 @@ new Chart(ctxDist, {
             }
         }
     }
-});
+  });
+}
 
 // === GRAPHIQUE 2 : Évolution médiane lead time ===
-const ctxSeries = document.getElementById('leadTimeSeriesChart').getContext('2d');
-new Chart(ctxSeries, {
+const seriesCanvas = document.getElementById('leadTimeSeriesChart');
+if (seriesCanvas) {
+  const ctxSeries = seriesCanvas.getContext('2d');
+  new Chart(ctxSeries, {
     type: 'line',
     data: {
         labels: leadTimeSeriesData.map(d => d.label),
@@ -2254,7 +2800,8 @@ new Chart(ctxSeries, {
             }
         }
     }
-});
+  });
+}
 </script>
 {% endif %}
 

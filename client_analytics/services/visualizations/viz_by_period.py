@@ -9,6 +9,27 @@ import plotly.graph_objects as go
 from scipy import stats
 
 
+def _make_responsive(fig):
+    """
+    Helper pour rendre un graphique Plotly responsive et éviter les overflows.
+    Applique les paramètres standards pour tous les graphiques.
+    """
+    fig.update_layout(
+        autosize=True,
+        width=None,
+        margin=dict(l=40, r=20, t=60, b=40)
+    )
+    return fig
+
+
+def _to_html_responsive(fig):
+    """
+    Convertit une figure Plotly en HTML avec config responsive.
+    """
+    fig = _make_responsive(fig)
+    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'responsive': True})
+
+
 def create_correlation_matrix(df, variables):
     """Crée une matrice de corrélation interactive"""
     try:
@@ -29,7 +50,7 @@ def create_correlation_matrix(df, variables):
             paper_bgcolor='rgba(20, 30, 50, 1)',
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur matrice corrélation: {e}")
         return None
@@ -55,7 +76,7 @@ def create_distribution_plot(df, variable, title=None):
             paper_bgcolor='rgba(20, 30, 50, 1)',
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur distribution {variable}: {e}")
         return None
@@ -83,7 +104,7 @@ def create_top_categories_plot(df, category_col, value_col, n_top=10, title=None
             paper_bgcolor='rgba(20, 30, 50, 1)',
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur top {category_col}: {e}")
         return None
@@ -122,7 +143,7 @@ def create_temporal_aggregation_plot(df, time_col, value_col, granularity='month
             paper_bgcolor='rgba(20, 30, 50, 1)',
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur agrégation temporelle: {e}")
         return None
@@ -130,7 +151,7 @@ def create_temporal_aggregation_plot(df, time_col, value_col, granularity='month
 
 def create_temporal_evolution_plot(df, time_col, value_col, granularity='month'):
     """
-    Crée un graphique d'évolution temporelle (ligne) selon la granularité
+    Crée un graphique d'évolution temporelle (barres) selon la granularité
     
     Args:
         df: DataFrame
@@ -147,21 +168,39 @@ def create_temporal_evolution_plot(df, time_col, value_col, granularity='month')
         
         agg_data = df.groupby(time_col)[value_col].sum().sort_index()
         
-        fig = px.line(
-            x=agg_data.index,
-            y=agg_data.values,
-            title=titles.get(granularity, 'Évolution du CA'),
-            labels={'x': 'Période', 'y': 'CA (€)'},
-            template='plotly_dark',
-            markers=True
-        )
+        # Créer un graphique en barres au lieu d'une ligne
+        fig = go.Figure(data=[
+            go.Bar(
+                x=agg_data.index,
+                y=agg_data.values,
+                marker_color='rgb(99, 110, 250)',
+                text=agg_data.values.round(0),
+                texttemplate='%{text:,.0f}€',
+                textposition='outside',
+                hovertemplate='<b>%{x}</b><br>CA: %{y:,.0f}€<extra></extra>'
+            )
+        ])
+        
         fig.update_layout(
+            title=titles.get(granularity, 'Évolution du CA'),
+            xaxis_title='Période',
+            yaxis_title='CA (€)',
             height=400,
             showlegend=False,
+            template='plotly_dark',
             paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickangle=-45,
+                tickfont=dict(size=10, color='white')
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='white'),
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            )
         )
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur évolution temporelle: {e}")
         return None
@@ -210,9 +249,278 @@ def create_variation_plot(df, time_col, value_col, granularity='month'):
             paper_bgcolor='rgba(20, 30, 50, 1)',
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur variation: {e}")
+        return None
+
+
+def create_ca_repartition_pie(df, time_col, value_col, granularity='month'):
+    """
+    Crée un pie chart de répartition du CA par période
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle
+        value_col: Colonne à agréger (Montant)
+        granularity: 'month', 'quarter', 'year'
+    """
+    try:
+        titles = {
+            'month': 'Répartition du CA par Mois',
+            'quarter': 'Répartition du CA par Trimestre',
+            'year': 'Répartition du CA par Année Fiscale'
+        }
+        
+        agg_data = df.groupby(time_col)[value_col].sum().sort_index()
+        
+        fig = go.Figure(data=[go.Pie(
+            labels=agg_data.index,
+            values=agg_data.values,
+            hole=0.3,
+            textinfo='label+percent',
+            textposition='auto',
+            marker=dict(
+                colors=px.colors.sequential.Blues,
+                line=dict(color='#000000', width=2)
+            ),
+            hovertemplate='<b>%{label}</b><br>CA: %{value:,.0f}€<br>Part: %{percent}<extra></extra>'
+        )])
+        
+        fig.update_layout(
+            title=titles.get(granularity, 'Répartition du CA'),
+            height=450,
+            template='plotly_dark',
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            showlegend=True,
+            legend=dict(
+                orientation="v",
+                yanchor="middle",
+                y=0.5,
+                xanchor="left",
+                x=1.05
+            )
+        )
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur répartition CA: {e}")
+        return None
+
+
+def create_top_periods_bar(df, time_col, value_col, granularity='month', n_top=5, direction='top'):
+    """
+    Crée un graphique en barres des top/bottom N périodes par CA, triées chronologiquement
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle
+        value_col: Colonne à agréger (Montant)
+        granularity: 'month', 'quarter', 'year'
+        n_top: Nombre de périodes à afficher
+        direction: 'top' pour les plus hauts, 'bottom' pour les plus bas
+    """
+    try:
+        granularity_labels = {
+            'month': 'Mois',
+            'quarter': 'Trimestres',
+            'year': 'Années'
+        }
+        
+        granularity_label = granularity_labels.get(granularity, 'Périodes')
+        
+        if direction == 'top':
+            titles = {
+                'month': f'Top {n_top} Mois par CA',
+                'quarter': f'Top {n_top} Trimestres par CA',
+                'year': f'Top {n_top} Années par CA'
+            }
+            color = 'rgb(40, 167, 69)'  # Vert
+        else:
+            titles = {
+                'month': f'Bottom {n_top} Mois par CA',
+                'quarter': f'Bottom {n_top} Trimestres par CA',
+                'year': f'Bottom {n_top} Années par CA'
+            }
+            color = 'rgb(220, 53, 69)'  # Rouge
+        
+        # Agréger par période
+        agg_data = df.groupby(time_col)[value_col].sum()
+        
+        # Sélectionner top ou bottom
+        if direction == 'top':
+            selected = agg_data.nlargest(n_top)
+        else:
+            selected = agg_data.nsmallest(n_top)
+        
+        # Trier par index (ordre chronologique) au lieu de par valeur
+        selected = selected.sort_index()
+        
+        fig = go.Figure(data=[go.Bar(
+            y=selected.index,
+            x=selected.values,
+            orientation='h',
+            marker_color=color,
+            text=selected.values.round(0),
+            texttemplate='%{text:,.0f}€',
+            textposition='outside',
+            hovertemplate='<b>%{y}</b><br>CA: %{x:,.0f}€<extra></extra>'
+        )])
+        
+        fig.update_layout(
+            title=titles.get(granularity, f'{direction.capitalize()} {n_top} Périodes par CA'),
+            xaxis_title='CA (€)',
+            yaxis_title='Période',
+            height=350,
+            template='plotly_dark',
+            showlegend=False,
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickfont=dict(size=10, color='white'),
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            ),
+            yaxis=dict(
+                tickfont=dict(size=10, color='white')
+            )
+        )
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur top périodes: {e}")
+        return None
+
+
+def create_ca_moyen_per_transaction(df, time_col, value_col, granularity='month'):
+    """
+    Crée un histogramme du CA moyen par transaction pour chaque période
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle
+        value_col: Colonne à agréger (Montant)
+        granularity: 'month', 'quarter', 'year'
+    """
+    try:
+        titles = {
+            'month': 'CA Moyen par Transaction (Mensuel)',
+            'quarter': 'CA Moyen par Transaction (Trimestriel)',
+            'year': 'CA Moyen par Transaction (Annuel)'
+        }
+        
+        # Calculer le CA moyen par transaction = CA total / nombre de transactions
+        agg_data = df.groupby(time_col).agg({
+            value_col: ['sum', 'count']
+        })
+        agg_data.columns = ['ca_total', 'nb_transactions']
+        agg_data['ca_moyen'] = agg_data['ca_total'] / agg_data['nb_transactions']
+        agg_data = agg_data.sort_index()
+        
+        fig = go.Figure(data=[go.Bar(
+            x=agg_data.index,
+            y=agg_data['ca_moyen'],
+            marker_color='rgb(76, 175, 80)',
+            text=agg_data['ca_moyen'].round(2),
+            texttemplate='%{text:.2f}€',
+            textposition='outside',
+            hovertemplate='<b>%{x}</b><br>CA Moyen: %{y:.2f}€<br>Transactions: ' + 
+                         agg_data['nb_transactions'].astype(str) + '<extra></extra>'
+        )])
+        
+        fig.update_layout(
+            title=titles.get(granularity, 'CA Moyen par Transaction'),
+            xaxis_title='Période',
+            yaxis_title='CA Moyen (€)',
+            height=400,
+            template='plotly_dark',
+            showlegend=False,
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickangle=-45,
+                tickfont=dict(size=10, color='white')
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='white'),
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            )
+        )
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur CA moyen par transaction: {e}")
+        return None
+
+
+def create_stability_chart(df, time_col, value_col, granularity='month'):
+    """
+    Crée un histogramme de stabilité des ventes (écart-type du CA par période)
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle
+        value_col: Colonne à agréger (Montant)
+        granularity: 'month', 'quarter', 'year'
+    """
+    try:
+        titles = {
+            'month': 'Stabilité des Ventes par Mois (Écart-type)',
+            'quarter': 'Stabilité des Ventes par Trimestre (Écart-type)',
+            'year': 'Stabilité des Ventes par Année (Écart-type)'
+        }
+        
+        # Calculer l'écart-type du CA par période
+        stability_data = df.groupby(time_col)[value_col].std().sort_index()
+        
+        # Identifier les périodes stables (faible écart-type) vs volatiles (fort écart-type)
+        median_std = stability_data.median()
+        colors = ['green' if v < median_std else 'orange' for v in stability_data.values]
+        
+        fig = go.Figure(data=[go.Bar(
+            x=stability_data.index,
+            y=stability_data.values,
+            marker_color=colors,
+            text=stability_data.values.round(2),
+            texttemplate='%{text:.2f}',
+            textposition='outside',
+            hovertemplate='<b>%{x}</b><br>Écart-type: %{y:.2f}€<extra></extra>'
+        )])
+        
+        fig.update_layout(
+            title=titles.get(granularity, 'Stabilité des Ventes'),
+            xaxis_title='Période',
+            yaxis_title='Écart-type (€)',
+            height=400,
+            template='plotly_dark',
+            showlegend=False,
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickangle=-45,
+                tickfont=dict(size=10, color='white')
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='white'),
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            ),
+            annotations=[
+                dict(
+                    x=0.5,
+                    y=1.05,
+                    xref='paper',
+                    yref='paper',
+                    text='🟢 Vert = Stable (faible variation) | 🟠 Orange = Volatile (forte variation)',
+                    showarrow=False,
+                    font=dict(size=10, color='white'),
+                    xanchor='center'
+                )
+            ]
+        )
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur stabilité des ventes: {e}")
         return None
 
 
@@ -269,7 +577,7 @@ def create_qq_plot(df, variable):
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
         
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur QQ-plot pour {variable}: {e}")
         return None
@@ -331,7 +639,7 @@ def create_normality_test_plot(df, variable):
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
         
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur test normalité pour {variable}: {e}")
         return None
@@ -372,7 +680,7 @@ def create_outliers_boxplot(df, variables):
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
         
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur boxplot outliers: {e}")
         return None
@@ -421,8 +729,226 @@ def create_correlation_heatmap_enhanced(df, variables):
             plot_bgcolor='rgba(30, 40, 60, 1)'
         )
         
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return _to_html_responsive(fig)
     except Exception as e:
         print(f"   ⚠️ Erreur matrice corrélation enrichie: {e}")
+        return None
+
+
+def create_monthly_evolution_plot(df, time_col, value_col, stat_type='mean', title=None):
+    """
+    Crée un graphique d'évolution mensuelle avec mois sur l'axe X
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle (ex: 'Month')
+        value_col: Variable à analyser (ex: 'Montant', 'PU Net')
+        stat_type: Type de statistique - 'mean', 'median', 'sum'
+        title: Titre personnalisé du graphique
+    
+    Returns:
+        HTML du graphique Plotly
+    """
+    try:
+        # Déterminer la fonction d'agrégation
+        agg_funcs = {
+            'mean': 'mean',
+            'median': 'median',
+            'sum': 'sum'
+        }
+        agg_func = agg_funcs.get(stat_type, 'mean')
+        
+        # Agréger par période
+        if stat_type == 'median':
+            agg_data = df.groupby(time_col)[value_col].median().sort_index()
+        elif stat_type == 'sum':
+            agg_data = df.groupby(time_col)[value_col].sum().sort_index()
+        else:
+            agg_data = df.groupby(time_col)[value_col].mean().sort_index()
+        
+        # Titre par défaut
+        if title is None:
+            stat_labels = {
+                'mean': 'Moyenne',
+                'median': 'Médiane',
+                'sum': 'Total'
+            }
+            title = f"{stat_labels.get(stat_type, 'Évolution')} de {value_col} par Période"
+        
+        # Créer le graphique
+        fig = go.Figure()
+        
+        fig.add_trace(go.Scatter(
+            x=agg_data.index,
+            y=agg_data.values,
+            mode='lines+markers',
+            name=value_col,
+            line=dict(color='rgb(99, 110, 250)', width=3),
+            marker=dict(size=8, color='rgb(99, 110, 250)')
+        ))
+        
+        fig.update_layout(
+            title=title,
+            xaxis_title='Période (Mois)',
+            yaxis_title=f'{value_col} (€)' if 'Montant' in value_col or 'PU' in value_col else value_col,
+            height=450,
+            template='plotly_dark',
+            showlegend=False,
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickangle=-45,
+                tickmode='auto',
+                tickfont=dict(size=11, color='white'),
+                showgrid=True,
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='white'),
+                showgrid=True,
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            ),
+            hovermode='x unified',
+            font=dict(color='white')
+        )
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur évolution mensuelle {value_col}: {e}")
+        return None
+
+
+def create_distribution_by_month(df, time_col, value_col, title=None, granularity='month'):
+    """
+    Crée des violin plots élégants pour montrer la distribution par période
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle (ex: 'Month', 'Quarter', 'Fiscal_Year')
+        value_col: Variable à analyser (ex: 'Montant', 'PU Net')
+        title: Titre personnalisé du graphique
+        granularity: 'month', 'quarter', ou 'year' pour adapter les labels
+    
+    Returns:
+        HTML du graphique Plotly
+    """
+    try:
+        # Déterminer les labels selon la granularité
+        granularity_labels = {
+            'month': 'Mois',
+            'quarter': 'Trimestre',
+            'year': 'Année Fiscale'
+        }
+        period_label = granularity_labels.get(granularity, 'Mois')
+        
+        if title is None:
+            title = f"Distribution de {value_col} par {period_label}"
+        
+        # Trier les données par période
+        df_sorted = df.sort_values(time_col)
+        
+        # Créer un violin plot élégant
+        fig = go.Figure()
+        
+        # Grouper par période et créer un violin plot pour chaque
+        periods = sorted(df[time_col].unique())
+        colors = px.colors.sequential.Blues_r  # Palette de bleus
+        
+        for i, period in enumerate(periods):
+            period_data = df[df[time_col] == period][value_col].dropna()
+            if len(period_data) > 0:
+                color_idx = int((i / len(periods)) * (len(colors) - 1))
+                fig.add_trace(go.Violin(
+                    y=period_data,
+                    x=[str(period)] * len(period_data),
+                    name=str(period),
+                    box_visible=True,
+                    meanline_visible=True,
+                    fillcolor=colors[color_idx],
+                    opacity=0.7,
+                    line_color='rgba(0, 217, 255, 0.8)',
+                    showlegend=False
+                ))
+        
+        fig.update_layout(
+            title=title,
+            xaxis_title=f'Période ({period_label})',
+            yaxis_title=f'{value_col} (€)' if 'Montant' in value_col or 'PU' in value_col else value_col,
+            height=500,
+            template='plotly_dark',
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickangle=-45,
+                tickfont=dict(size=10, color='white'),
+                showgrid=False
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='white'),
+                showgrid=True,
+                gridcolor='rgba(128, 128, 128, 0.2)'
+            ),
+            font=dict(color='white'),
+            violinmode='group'
+        )
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur distribution par période {value_col}: {e}")
+        return None
+
+
+def create_boxplot_by_month(df, time_col, value_col, title=None):
+    """
+    Crée des boxplots par mois pour voir l'évolution de la distribution
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle (ex: 'Month')
+        value_col: Variable à analyser (ex: 'Montant', 'PU Net')
+        title: Titre personnalisé du graphique
+    
+    Returns:
+        HTML du graphique Plotly
+    """
+    try:
+        if title is None:
+            title = f"Distribution de {value_col} par Mois (Boxplot)"
+        
+        # Trier les périodes
+        df_sorted = df.sort_values(time_col)
+        
+        fig = px.box(
+            df_sorted,
+            x=time_col,
+            y=value_col,
+            title=title,
+            template='plotly_dark',
+            points='outliers'  # Afficher uniquement les outliers
+        )
+        
+        fig.update_layout(
+            height=450,
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)',
+            xaxis=dict(
+                tickangle=-45,
+                tickfont=dict(size=11, color='white'),
+                title='Période (Mois)',
+                title_font=dict(color='white')
+            ),
+            yaxis=dict(
+                tickfont=dict(size=11, color='white'),
+                title=f'{value_col} (€)' if 'Montant' in value_col or 'PU' in value_col else value_col,
+                title_font=dict(color='white')
+            ),
+            font=dict(color='white')
+        )
+        
+        fig.update_traces(marker_color='rgb(99, 110, 250)')
+        
+        return _to_html_responsive(fig)
+    except Exception as e:
+        print(f"   ⚠️ Erreur boxplot par mois {value_col}: {e}")
         return None
 

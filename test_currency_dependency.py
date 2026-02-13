@@ -4,12 +4,22 @@ Script de validation rapide pour l'analyse de dépendance à la devise
 Crée un DataFrame de test et vérifie que toutes les fonctions s'exécutent correctement.
 """
 
+import sys
+
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 
+
+# Assure un affichage UTF-8 (évite UnicodeEncodeError sous Windows/cp1252)
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+    sys.stderr.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 # Test d'import
-print("📦 Test d'import des modules...")
+print("Test d'import des modules...")
 try:
     from client_analytics.services.currency_dependency import (
         analyze_currency_dependency,
@@ -17,13 +27,13 @@ try:
         compute_kpi,
         clean_dataframe
     )
-    print("   ✅ Import currency_dependency: OK")
+    print("   OK: Import currency_dependency")
 except ImportError as e:
-    print(f"   ❌ Erreur d'import: {e}")
+    print(f"   ERREUR import: {e}")
     exit(1)
 
 # Créer un DataFrame de test
-print("\n📊 Création d'un DataFrame de test...")
+print("\nCréation d'un DataFrame de test...")
 
 np.random.seed(42)
 n_rows = 1000
@@ -59,77 +69,77 @@ df_test = pd.DataFrame({
     'Famille': familles
 })
 
-print(f"   ✅ DataFrame créé: {len(df_test):,} lignes × {len(df_test.columns)} colonnes")
+print(f"   OK: DataFrame créé: {len(df_test):,} lignes x {len(df_test.columns)} colonnes")
 
 # Test 1: Nettoyage
-print("\n🧹 Test 1: Nettoyage du DataFrame...")
+print("\nTest 1: Nettoyage du DataFrame...")
 try:
     df_clean = clean_dataframe(df_test)
-    print(f"   ✅ Nettoyage: OK ({len(df_clean):,} lignes après nettoyage)")
+    print(f"   OK: Nettoyage ({len(df_clean):,} lignes après nettoyage)")
 except Exception as e:
-    print(f"   ❌ Erreur: {e}")
+    print(f"   ERREUR: {e}")
     exit(1)
 
 # Test 2: Calcul KPI
-print("\n📈 Test 2: Calcul des KPI...")
+print("\nTest 2: Calcul des KPI...")
 try:
     kpi = compute_kpi(df_clean)
     
     if 'error' in kpi:
-        print(f"   ❌ Erreur dans KPI: {kpi['error']}")
+        print(f"   ERREUR KPI: {kpi['error']}")
         exit(1)
     
-    print(f"   ✅ CA total: {kpi['total_revenue']:,.2f} €")
-    print(f"   ✅ Part non-EUR: {kpi['non_eur_pct']:.2f}%")
-    print(f"   ✅ Devises détectées: {len(kpi['currencies_detected'])}")
-    print(f"   ✅ HHI: {kpi['hhi_currency']:.2f}")
+    print(f"   OK: CA total: {kpi['total_revenue']:,.2f} €")
+    print(f"   OK: Part non-EUR: {kpi['non_eur_pct']:.2f}%")
+    print(f"   OK: Devises détectées: {len(kpi['currencies_detected'])}")
+    print(f"   OK: HHI: {kpi['hhi_currency']:.2f}")
     
 except Exception as e:
-    print(f"   ❌ Erreur: {e}")
+    print(f"   ERREUR: {e}")
     import traceback
     traceback.print_exc()
     exit(1)
 
 # Test 3: Analyse complète (sans sauvegarde)
-print("\n🔬 Test 3: Analyse complète...")
+print("\nTest 3: Analyse complète...")
 try:
     report = analyze_currency_dependency(df_clean, output_dir=None)
     
     kpi = report['kpi']
     charts = report['charts']
     
-    print(f"   ✅ KPI générés: {len(kpi)} entrées")
-    print(f"   ✅ Graphiques générés: {len(charts)}")
+    print(f"   OK: KPI générés: {len(kpi)} entrées")
+    print(f"   OK: Graphiques générés: {len(charts)}")
     
     # Détail des graphiques
     for chart_name in charts.keys():
         print(f"      - {chart_name}")
     
 except Exception as e:
-    print(f"   ❌ Erreur: {e}")
+    print(f"   ERREUR: {e}")
     import traceback
     traceback.print_exc()
     exit(1)
 
 # Test 4: Analyse avec sauvegarde
-print("\n💾 Test 4: Analyse avec sauvegarde des graphiques...")
+print("\nTest 4: Analyse avec sauvegarde des graphiques...")
 try:
     report = analyze_currency_dependency(df_clean, output_dir="outputs/test_currency")
     
     chart_paths = report['chart_paths']
     
-    print(f"   ✅ Graphiques sauvegardés: {len(chart_paths)}")
+    print(f"   OK: Graphiques sauvegardés: {len(chart_paths)}")
     for name, path in chart_paths.items():
         print(f"      - {name}: {path}")
     
 except Exception as e:
-    print(f"   ❌ Erreur: {e}")
+    print(f"   ERREUR: {e}")
     import traceback
     traceback.print_exc()
     exit(1)
 
 # Test 5: Robustesse (colonnes manquantes)
-print("\n🛡️ Test 5: Robustesse avec colonnes manquantes...")
+print("\nTest 5: Robustesse avec colonnes manquantes...")
 try:
     df_minimal = df_test[['Montant']].copy()
     
@@ -137,19 +147,19 @@ try:
     kpi = report['kpi']
     
     if 'error' in kpi:
-        print(f"   ⚠️ Erreur attendue: {kpi['error']}")
+        print(f"   ATTENDU: {kpi['error']}")
     else:
-        print(f"   ✅ Module robuste: {kpi['total_revenue']:,.2f} € calculés")
-        print(f"   ✅ Devises: {kpi['currencies_detected']}")
-        print(f"   ✅ Graphiques: {len(report['charts'])} générés")
+        print(f"   OK: Module robuste: {kpi['total_revenue']:,.2f} € calculés")
+        print(f"   OK: Devises: {kpi['currencies_detected']}")
+        print(f"   OK: Graphiques: {len(report['charts'])} générés")
     
 except Exception as e:
-    print(f"   ❌ Erreur inattendue: {e}")
+    print(f"   ERREUR inattendue: {e}")
     exit(1)
 
 print("\n" + "=" * 80)
-print("   ✅ TOUS LES TESTS SONT PASSÉS AVEC SUCCÈS!")
+print("   OK: TOUS LES TESTS SONT PASSÉS AVEC SUCCÈS!")
 print("=" * 80)
-print("\nℹ️  Le module currency_dependency est prêt à être utilisé.")
-print("ℹ️  Consultez example_currency_usage.py pour des exemples d'utilisation.")
-print("ℹ️  Consultez CURRENCY_DEPENDENCY_README.md pour la documentation complète.")
+print("\nINFO: Le module currency_dependency est prêt à être utilisé.")
+print("INFO: Consultez example_currency_usage.py pour des exemples d'utilisation.")
+print("INFO: Consultez CURRENCY_DEPENDENCY_README.md pour la documentation complète.")

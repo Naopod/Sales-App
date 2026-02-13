@@ -19,9 +19,13 @@ def analyze_geographic_data(df_final: pd.DataFrame, granularity: str = 'month') 
         dict contenant les statistiques géographiques
     """
     
-    print("="*100)
-    print(f"                    🌍 ANALYSE GÉOGRAPHIQUE APPROFONDIE (granularité: {granularity})")
-    print("="*100)
+    # AFFICHAGE DATAFRAME FILTRÉ
+    print("\n" + "="*80)
+    print(f"ANALYSE GÉOGRAPHIQUE - DataFrame filtré (granularité: {granularity})")
+    print("="*80)
+    print(f"Shape: {df_final.shape[0]:,} lignes × {df_final.shape[1]} colonnes\n")
+    print(df_final.head(10))
+    print("="*80 + "\n")
     
     # Mapping des colonnes temporelles selon la granularité
     time_columns = {
@@ -34,13 +38,7 @@ def analyze_geographic_data(df_final: pd.DataFrame, granularity: str = 'month') 
     # Note: Pour l'analyse géographique, on agrège toujours sur toute la période
     # La granularité est surtout informative pour le contexte d'utilisation
     
-    # ─────────────────────────────────────────────────────────────────────
     # 1. PERFORMANCE PAR PAYS
-    # ─────────────────────────────────────────────────────────────────────
-    
-    print("\n" + "─"*100)
-    print("📊 1. STATISTIQUES PAR PAYS")
-    print("─"*100)
     
     stats_pays = df_final.groupby('Country').agg({
         'Montant': ['sum', 'mean', 'median', 'std', 'count'],
@@ -63,13 +61,7 @@ def analyze_geographic_data(df_final: pd.DataFrame, granularity: str = 'month') 
     stats_pays['Panier_Moyen'] = (stats_pays['CA_Total'] / stats_pays['Nb_Commandes']).round(2)
     stats_pays['Tx_Penetration_Pct'] = (stats_pays['Nb_Clients'] / stats_pays['Nb_Clients'].sum() * 100).round(1)
     
-    # ─────────────────────────────────────────────────────────────────────
     # 2. ZONES GÉOGRAPHIQUES
-    # ─────────────────────────────────────────────────────────────────────
-    
-    print("\n" + "─"*100)
-    print("📊 2. REGROUPEMENT PAR ZONES GÉOGRAPHIQUES")
-    print("─"*100)
     
     zones_geo = {
         'Europe Ouest': ['FR', 'BE', 'DE', 'NL', 'LU'],
@@ -106,9 +98,7 @@ def analyze_geographic_data(df_final: pd.DataFrame, granularity: str = 'month') 
     # 3. SCORING PAYS
     # ─────────────────────────────────────────────────────────────────────
     
-    print("\n" + "─"*100)
-    print("📊 3. SCORING DE PERFORMANCE PAR PAYS")
-    print("─"*100)
+    # 3. SCORING DE PERFORMANCE PAR PAYS
     
     # Normalisation des indicateurs (0-100)
     stats_pays['Score_CA'] = (stats_pays['CA_Total'] / stats_pays['CA_Total'].max() * 100).round(1)
@@ -123,8 +113,7 @@ def analyze_geographic_data(df_final: pd.DataFrame, granularity: str = 'month') 
     ).round(1)
     
     stats_pays = stats_pays.sort_values('Score_Global', ascending=False)
-    
-    print("\n🏆 TOP 10 PAYS PAR SCORE GLOBAL :")
+
     top10_score = stats_pays.head(10)
     
     # Classification des pays
@@ -151,19 +140,32 @@ def analyze_geographic_data(df_final: pd.DataFrame, granularity: str = 'month') 
     score_moyens = stats_pays.groupby('Classification')['Score_Global'].mean().round(1)
     classif_summary['Score_Moyen'] = classif_summary.index.map(score_moyens).fillna(0)
     
-    # ─────────────────────────────────────────────────────────────────────
     # 4. GÉNÉRATION DES VISUALISATIONS
-    # ─────────────────────────────────────────────────────────────────────
     
-    print("\n" + "─"*100)
-    print("📊 4. GÉNÉRATION DES VISUALISATIONS")
-    print("─"*100)
-    
-    # Version simplifiée - graphiques minimaux
+    # Génération des graphiques Plotly
     geo_graphs = {}
-    print("   ✓ Génération des visualisations géographiques (version simplifiée)")
     
-    print("\n" + "="*100)
+    from .visualizations import viz_geographic
+    
+    # Graphique CA par pays
+    ca_chart = viz_geographic.create_geographic_ca_chart(stats_pays)
+    if ca_chart:
+        geo_graphs['ca_by_country'] = ca_chart
+    
+    # Graphique performance par zone
+    zone_chart = viz_geographic.create_zone_performance_chart(stats_zone)
+    if zone_chart:
+        geo_graphs['zone_performance'] = zone_chart
+    
+    # Graphique de classification
+    classif_chart = viz_geographic.create_classification_chart(stats_pays)
+    if classif_chart:
+        geo_graphs['classification'] = classif_chart
+    
+    # Distribution des scores
+    score_chart = viz_geographic.create_score_distribution_chart(stats_pays)
+    if score_chart:
+        geo_graphs['score_distribution'] = score_chart
     
     return {
         'stats_pays': stats_pays,

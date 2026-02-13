@@ -11,6 +11,8 @@
     
     <!-- Chart.js pour graphiques interactifs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Plotly: chargé via les snippets HTML des graphiques (include_plotlyjs='cdn') -->
     
     {% load static %}
     <link rel="stylesheet" href="{% static 'client_analytics/app.css' %}">
@@ -48,7 +50,7 @@
     </main>
 
     <!-- Footer romantique -->
-    <footer class="romantic-footer text-center py-4 mt-5">
+    <footer class="romantic-footer text-center py-4 mt-3">
         <div class="container">
             <p class="footer-text mb-0">
                 © {% now "Y" %} Client Analytics Portal • 

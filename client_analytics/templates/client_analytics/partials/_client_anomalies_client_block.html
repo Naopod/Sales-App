@@ -1,0 +1,258 @@
+{% if not selected_client %}
+<div class="alert alert-info mb-0">
+    Choisissez un client pour voir ses anomalies (CA, fréquence de commande, prix, quantité).
+</div>
+{% elif anom_client.error %}
+<div class="alert alert-warning mb-0">
+    <strong>Impossible de calculer les anomalies</strong>
+    {% if anom_client.client.id %} pour le client <code>{{ anom_client.client.id }}</code>{% endif %}.
+    <div class="mt-2 small">{{ anom_client.error }}</div>
+</div>
+{% else %}
+<div class="mb-3">
+    <div class="d-flex flex-wrap gap-3">
+        <div><strong>Client :</strong> {{ selected_client }}</div>
+        <div><strong>Dernière période :</strong> {{ anom_client.kpis.latest_period|default:"—" }}</div>
+        <div><strong>Nb périodes :</strong> {{ anom_client.kpis.n_periods|default:"—" }}</div>
+    </div>
+</div>
+
+{% if anom_client.graphs and anom_client.graphs.timeline %}
+<div class="mb-3">
+    <img
+        class="img-fluid"
+        alt="Graphique timeline anomalies client"
+        src="data:image/png;base64,{{ anom_client.graphs.timeline }}"
+    />
+</div>
+{% endif %}
+
+<div class="row">
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><strong>CA</strong> (anomalies: {{ anom_client.kpis.n_anomalies_ca|default:0 }})</div>
+            <div class="card-body">
+                {% if anom_client.anomalies_by_metric.CA %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Période</th>
+                                <th class="text-end">Valeur</th>
+                                <th class="text-end">Z</th>
+                                <th>Sens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in anom_client.anomalies_by_metric.CA %}
+                            <tr>
+                                <td>{{ r.period }}</td>
+                                <td class="text-end">{{ r.value|floatformat:2 }}</td>
+                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td>{{ r.direction|default:"" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-muted">Aucune anomalie détectée sur le CA.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><strong>Fréquence</strong> (anomalies: {{ anom_client.kpis.n_anomalies_freq|default:0 }})</div>
+            <div class="card-body">
+                {% if anom_client.anomalies_by_metric.Freq %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Période</th>
+                                <th class="text-end">Valeur</th>
+                                <th class="text-end">Z</th>
+                                <th>Sens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in anom_client.anomalies_by_metric.Freq %}
+                            <tr>
+                                <td>{{ r.period }}</td>
+                                <td class="text-end">{{ r.value|floatformat:0 }}</td>
+                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td>{{ r.direction|default:"" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-muted">Aucune anomalie détectée sur la fréquence.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><strong>Quantité</strong> (anomalies: {{ anom_client.kpis.n_anomalies_qty|default:0 }})</div>
+            <div class="card-body">
+                {% if anom_client.anomalies_by_metric.Qty %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Période</th>
+                                <th class="text-end">Valeur</th>
+                                <th class="text-end">Z</th>
+                                <th>Sens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in anom_client.anomalies_by_metric.Qty %}
+                            <tr>
+                                <td>{{ r.period }}</td>
+                                <td class="text-end">{{ r.value|floatformat:2 }}</td>
+                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td>{{ r.direction|default:"" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-muted">Aucune anomalie détectée sur la quantité.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6 mb-3">
+        <div class="card h-100">
+            <div class="card-header"><strong>Prix</strong> (anomalies: {{ anom_client.kpis.n_anomalies_price|default:0 }})</div>
+            <div class="card-body">
+                {% if anom_client.anomalies_by_metric.Price %}
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>Période</th>
+                                <th class="text-end">Valeur</th>
+                                <th class="text-end">Z</th>
+                                <th>Sens</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in anom_client.anomalies_by_metric.Price %}
+                            <tr>
+                                <td>{{ r.period }}</td>
+                                <td class="text-end">{{ r.value|floatformat:2 }}</td>
+                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td>{{ r.direction|default:"" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-muted">Aucune anomalie détectée sur le prix.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if show_timeline|default:True %}
+<div class="card mt-2">
+    <div class="card-header">
+        <strong>Timeline</strong> — toutes les périodes (valeurs & z-scores)
+    </div>
+    <div class="card-body">
+        {% if anom_client.series %}
+        <div class="table-responsive">
+            <table class="table table-sm table-striped align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th>Période</th>
+                        <th class="text-end">CA</th>
+                        <th class="text-end">Z</th>
+                        <th class="text-end">Fréq.</th>
+                        <th class="text-end">Z</th>
+                        <th class="text-end">Qté</th>
+                        <th class="text-end">Z</th>
+                        <th class="text-end">Prix</th>
+                        <th class="text-end">Z</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in anom_client.series %}
+                    <tr>
+                        <td>{{ r.period }}</td>
+
+                        <td class="text-end {% if r.is_anomaly_ca %}text-danger fw-semibold{% endif %}">
+                            {{ r.ca|floatformat:2 }}
+                            {% if r.is_anomaly_ca %}<span class="badge bg-danger ms-1">A</span>{% endif %}
+                        </td>
+                        <td class="text-end {% if r.is_anomaly_ca %}text-danger fw-semibold{% endif %}">
+                            {% if r.z_ca is not None and r.z_ca >= 900 or r.z_ca is not None and r.z_ca <= -900 %}
+                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
+                                <span class="text-muted" title="Valeur technique">({{ r.z_ca|floatformat:0 }})</span>
+                            {% else %}
+                                {{ r.z_ca|floatformat:2 }}
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end {% if r.is_anomaly_freq %}text-danger fw-semibold{% endif %}">
+                            {{ r.freq|floatformat:0 }}
+                            {% if r.is_anomaly_freq %}<span class="badge bg-danger ms-1">A</span>{% endif %}
+                        </td>
+                        <td class="text-end {% if r.is_anomaly_freq %}text-danger fw-semibold{% endif %}">
+                            {% if r.z_freq is not None and r.z_freq >= 900 or r.z_freq is not None and r.z_freq <= -900 %}
+                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
+                                <span class="text-muted" title="Valeur technique">({{ r.z_freq|floatformat:0 }})</span>
+                            {% else %}
+                                {{ r.z_freq|floatformat:2 }}
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end {% if r.is_anomaly_qty %}text-danger fw-semibold{% endif %}">
+                            {{ r.qty|floatformat:2 }}
+                            {% if r.is_anomaly_qty %}<span class="badge bg-danger ms-1">A</span>{% endif %}
+                        </td>
+                        <td class="text-end {% if r.is_anomaly_qty %}text-danger fw-semibold{% endif %}">
+                            {% if r.z_qty is not None and r.z_qty >= 900 or r.z_qty is not None and r.z_qty <= -900 %}
+                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
+                                <span class="text-muted" title="Valeur technique">({{ r.z_qty|floatformat:0 }})</span>
+                            {% else %}
+                                {{ r.z_qty|floatformat:2 }}
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end {% if r.is_anomaly_price %}text-danger fw-semibold{% endif %}">
+                            {{ r.price|floatformat:2 }}
+                            {% if r.is_anomaly_price %}<span class="badge bg-danger ms-1">A</span>{% endif %}
+                        </td>
+                        <td class="text-end {% if r.is_anomaly_price %}text-danger fw-semibold{% endif %}">
+                            {% if r.z_price is not None and r.z_price >= 900 or r.z_price is not None and r.z_price <= -900 %}
+                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
+                                <span class="text-muted" title="Valeur technique">({{ r.z_price|floatformat:0 }})</span>
+                            {% else %}
+                                {{ r.z_price|floatformat:2 }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="form-text mt-2">A = période marquée anormale (|z| ≥ {{ anom_client.meta.z_thresh|default:3.5 }}).</div>
+        {% else %}
+        <div class="text-muted">Aucune série disponible.</div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endif %}

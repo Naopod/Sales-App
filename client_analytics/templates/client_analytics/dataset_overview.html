@@ -39,6 +39,15 @@
                     <span class="tab-subtitle">Segmentation K-Means</span>
                 </div>
             </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:anomalies' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Détection d'Anomalies</span>
+                    <span class="tab-subtitle">Portefeuille client</span>
+                </div>
+            </a>
         </div>
         <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
             <i class="bi bi-arrow-left-circle"></i>

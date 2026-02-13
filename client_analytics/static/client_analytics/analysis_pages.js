@@ -366,29 +366,57 @@
             'year': 'fiscal-tab'
         };
         
+        // Lire la granularité depuis l'URL au chargement
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentGranularity = urlParams.get('granularity') || 'month';
+        
+        // Activer le bon bouton au chargement
+        periodButtons.forEach(btn => {
+            const period = btn.getAttribute('data-period');
+            if (period === currentGranularity) {
+                btn.classList.add('active');
+                // Activer aussi l'onglet correspondant
+                const tabId = periodMapping[period];
+                const tabElement = document.getElementById(tabId);
+                if (tabElement) {
+                    const tab = new bootstrap.Tab(tabElement);
+                    tab.show();
+                }
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
         periodButtons.forEach(btn => {
             btn.addEventListener('click', function() {
                 const period = this.getAttribute('data-period');
                 
-                // Retirer la classe active de tous les boutons
-                periodButtons.forEach(b => b.classList.remove('active'));
-                
-                // Ajouter la classe active au bouton cliqué
-                this.classList.add('active');
-                
-                // Activer l'onglet correspondant
-                const tabId = periodMapping[period];
-                const tabElement = document.getElementById(tabId);
-                
-                if (tabElement) {
-                    // Utiliser Bootstrap pour changer d'onglet
-                    const tab = new bootstrap.Tab(tabElement);
-                    tab.show();
+                // Mettre à jour l'URL avec les paramètres granularity ET tab
+                const url = new URL(window.location.href);
+                url.searchParams.set('granularity', period);
+
+                // Conserver l'onglet courant (si présent dans l'URL), sinon le déduire de l'onglet actif
+                const tabFromUrl = url.searchParams.get('tab');
+                if (!tabFromUrl) {
+                    const activeMainTab = document.querySelector('ul.nav-tabs .nav-link.active[data-bs-target]');
+                    const target = activeMainTab ? activeMainTab.getAttribute('data-bs-target') : null;
+                    const tabMapping = {
+                        '#stats': 'statistics',
+                        '#temporal': 'temporal',
+                        '#products': 'products',
+                        '#clients': 'clients',
+                        '#geography': 'geographic',
+                        '#currency': 'currency'
+                    };
+                    url.searchParams.set('tab', tabMapping[target] || 'statistics');
                 }
+                
+                // Forcer le rechargement avec la nouvelle URL
+                window.location.href = url.toString();
             });
         });
         
-        // Synchroniser les onglets avec les boutons
+        // Synchroniser les onglets avec les boutons (optionnel, mais garde la cohérence visuelle)
         periodTabs.forEach(tab => {
             tab.addEventListener('shown.bs.tab', function(e) {
                 const tabId = e.target.id;
@@ -403,7 +431,7 @@
                 }
                 
                 if (period) {
-                    // Mettre à jour les boutons
+                    // Mettre à jour les boutons visuellement
                     periodButtons.forEach(btn => {
                         if (btn.getAttribute('data-period') === period) {
                             btn.classList.add('active');
@@ -415,7 +443,7 @@
             });
         });
         
-        console.log('📅 Period selector initialized');
+        console.log('📅 Period selector initialized (granularity: ' + currentGranularity + ')');
     }
     
     // Initialiser quand le DOM est prêt
@@ -423,5 +451,227 @@
         document.addEventListener('DOMContentLoaded', initPeriodSelector);
     } else {
         initPeriodSelector();
+    }
+})();
+
+// ==========================================
+// PLOTLY RESPONSIVE RESIZE HANDLER
+// Redimensionne les graphiques Plotly lors des changements d'onglets et de fenêtre
+// ==========================================
+
+(function() {
+    'use strict';
+    
+    /**
+     * Redimensionne tous les graphiques Plotly dans un conteneur donné
+     * @param {HTMLElement|Document} container - Le conteneur à rechercher (ou document)
+     */
+    function resizePlotlyIn(container) {
+        if (!window.Plotly) return;
+        
+        const plotlyDivs = container.querySelectorAll('.plotly-graph-div');
+        
+        if (plotlyDivs.length === 0) return;
+        
+        // Utiliser requestAnimationFrame pour éviter les problèmes de layout
+        requestAnimationFrame(() => {
+            // Petit délai pour laisser le layout se stabiliser
+            setTimeout(() => {
+                plotlyDivs.forEach(div => {
+                    try {
+                        if (Plotly.Plots && Plotly.Plots.resize) {
+                            Plotly.Plots.resize(div);
+                        }
+                    } catch (e) {
+                        // Ignore silencieusement les erreurs (graph pas encore initialisé, etc.)
+                    }
+                });
+            }, 100);
+        });
+    }
+    
+    /**
+     * Debounce helper pour éviter trop d'appels
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    /**
+     * Initialise les event listeners pour le resize
+     */
+    function initPlotlyResize() {
+        // 1. Resize initial au chargement de la page
+        resizePlotlyIn(document);
+        
+        // 2. Resize lors du changement de taille de fenêtre (debounced)
+        const debouncedResize = debounce(() => {
+            resizePlotlyIn(document);
+        }, 200);
+        
+        window.addEventListener('resize', debouncedResize, { passive: true });
+        
+        // 3. Resize lors du changement d'onglet Bootstrap (onglets principaux)
+        const mainTabButtons = document.querySelectorAll('#analysisTabs [data-bs-toggle="tab"]');
+        mainTabButtons.forEach(button => {
+            button.addEventListener('shown.bs.tab', (event) => {
+                const targetId = event.target.getAttribute('data-bs-target');
+                if (targetId) {
+                    const targetPane = document.querySelector(targetId);
+                    if (targetPane) {
+                        resizePlotlyIn(targetPane);
+                    }
+                }
+            });
+        });
+        
+        // 4. Resize lors du changement de sous-onglets période (pills)
+        const periodTabButtons = document.querySelectorAll('#periodTabs [data-bs-toggle="pill"]');
+        periodTabButtons.forEach(button => {
+            button.addEventListener('shown.bs.tab', (event) => {
+                const targetId = event.target.getAttribute('data-bs-target');
+                if (targetId) {
+                    const targetPane = document.querySelector(targetId);
+                    if (targetPane) {
+                        resizePlotlyIn(targetPane);
+                    }
+                }
+            });
+        });
+
+        // 4b. Resize lors du changement de sous-onglets Série temporelle (pills)
+        // (Mois / Trimestre / Année fiscale) : ces panes sont masqués au load.
+        const temporalPillButtons = document.querySelectorAll('#temporal [data-bs-toggle="pill"]');
+        temporalPillButtons.forEach(button => {
+            button.addEventListener('shown.bs.tab', (event) => {
+                const targetId = event.target.getAttribute('data-bs-target');
+                if (targetId) {
+                    const targetPane = document.querySelector(targetId);
+                    if (targetPane) {
+                        resizePlotlyIn(targetPane);
+                    }
+                }
+            });
+        });
+        
+        // 5. Observer pour les sections qui deviennent visibles (display: none -> block)
+        // Utile pour les sections "Analyse avancée" qui sont toggles
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                    const target = mutation.target;
+                    // Si l'élément devient visible
+                    if (target.style.display !== 'none' && target.offsetParent !== null) {
+                        const plotlyDivs = target.querySelectorAll('.plotly-graph-div');
+                        if (plotlyDivs.length > 0) {
+                            resizePlotlyIn(target);
+                        }
+                    }
+                }
+            });
+        });
+        
+        // Observer les changements de style sur les sections potentielles
+        const sections = document.querySelectorAll('.collapse, [class*="advanced"]');
+        sections.forEach(section => {
+            observer.observe(section, { 
+                attributes: true, 
+                attributeFilter: ['style', 'class'] 
+            });
+        });
+        
+        console.log('📊 Plotly responsive resize handler initialized');
+    }
+    
+    // Initialiser quand le DOM est prêt
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPlotlyResize);
+    } else {
+        initPlotlyResize();
+    }
+})();
+
+// ==========================================
+// GESTION DES ONGLETS PRINCIPAUX
+// ==========================================
+(function() {
+    'use strict';
+    
+    function initTabTracking() {
+        const tabButtons = document.querySelectorAll('#analysisTabs button[data-bs-toggle="tab"]');
+        
+        if (tabButtons.length === 0) return;
+        
+        // Mapping entre les ID d'onglets et les noms de tabs
+        const tabMapping = {
+            'stats-tab': 'statistics',
+            'temporal-tab': 'temporal',
+            'products-tab': 'products',
+            'clients-tab': 'clients',
+            'geography-tab': 'geographic',
+            'currency-tab': 'currency'
+        };
+        
+        // Écouter les changements d'onglets
+        tabButtons.forEach(btn => {
+            btn.addEventListener('shown.bs.tab', function(e) {
+                const tabId = e.target.id;
+                const tabName = tabMapping[tabId];
+                
+                if (tabName) {
+                    // Mettre à jour l'URL avec le paramètre tab
+                    const currentUrl = new URL(window.location.href);
+                    const currentTab = currentUrl.searchParams.get('tab');
+
+                    // Si on est déjà sur le bon onglet côté serveur, ne pas recharger.
+                    if (currentTab === tabName) {
+                        console.log('📑 Onglet déjà actif (pas de reload):', tabName);
+                        return;
+                    }
+
+                    currentUrl.searchParams.set('tab', tabName);
+
+                    // IMPORTANT : les analyses sont calculées côté serveur selon ?tab=...
+                    // Un simple switch Bootstrap (sans reload) affiche donc du contenu vide.
+                    // On force la navigation pour obtenir le contexte correct.
+                    window.location.assign(currentUrl.toString());
+                }
+            });
+        });
+        
+        // Au chargement, activer l'onglet correspondant au paramètre tab
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentTab = urlParams.get('tab');
+        
+        if (currentTab) {
+            // Trouver le bouton d'onglet correspondant
+            for (const [btnId, tabName] of Object.entries(tabMapping)) {
+                if (tabName === currentTab) {
+                    const tabElement = document.getElementById(btnId);
+                    if (tabElement) {
+                        const tab = new bootstrap.Tab(tabElement);
+                        tab.show();
+                    }
+                    break;
+                }
+            }
+        }
+        
+        console.log('📑 Tab tracking initialized');
+    }
+    
+    // Initialiser quand le DOM est prêt
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initTabTracking);
+    } else {
+        initTabTracking();
     }
 })();

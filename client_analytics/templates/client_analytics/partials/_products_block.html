@@ -1,0 +1,437 @@
+{% load custom_filters %}
+
+{#
+  Partial réutilisable pour l'onglet "Analyse produits".
+  Attendu: family_analysis (dict) avec des listes de dicts (pas de DataFrames).
+#}
+
+{% if not family_analysis or family_analysis.error %}
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    {% if family_analysis and family_analysis.error %}
+        {{ family_analysis.error }}
+    {% else %}
+        Analyse des familles indisponible.
+    {% endif %}
+</div>
+{% endif %}
+
+{% with stats_famille=family_analysis.stats_famille abc_summary=family_analysis.abc_summary classe_a=family_analysis.classe_a classe_b=family_analysis.classe_b classe_c=family_analysis.classe_c family_graphs=family_analysis.family_graphs segment_summary=family_analysis.segment_summary top20_score=family_analysis.top20_score corr_matrix=family_analysis.corr_matrix insights=family_analysis.insights %}
+
+{% if not stats_famille %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Pas de données suffisantes pour générer l'analyse produits.
+</div>
+{% else %}
+
+<!-- Synthèse ABC -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card border-success h-100">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0"><i class="bi bi-trophy"></i> Classe A</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span>Familles</span>
+                    <strong>{{ family_analysis.classe_a_nb|default:0 }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>CA</span>
+                    <strong>{{ family_analysis.classe_a_ca|floatformat:0 }}€</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Part</span>
+                    <strong>{{ family_analysis.classe_a_part|floatformat:1 }}%</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-warning h-100">
+            <div class="card-header bg-warning text-dark">
+                <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Classe B</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span>Familles</span>
+                    <strong>{{ family_analysis.classe_b_nb|default:0 }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>CA</span>
+                    <strong>{{ family_analysis.classe_b_ca|floatformat:0 }}€</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Part</span>
+                    <strong>{{ family_analysis.classe_b_part|floatformat:1 }}%</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-secondary h-100">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-moon"></i> Classe C</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <span>Familles</span>
+                    <strong>{{ family_analysis.classe_c_nb|default:0 }}</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>CA</span>
+                    <strong>{{ family_analysis.classe_c_ca|floatformat:0 }}€</strong>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span>Part</span>
+                    <strong>{{ family_analysis.classe_c_part|floatformat:1 }}%</strong>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Insights rapides -->
+{% if insights %}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-lightbulb"></i> Points clés</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4"><strong>Top CA:</strong> {{ insights.top_ca|default:"—" }}</div>
+            <div class="col-md-4"><strong>Top Quantité:</strong> {{ insights.top_qty|default:"—" }}</div>
+            <div class="col-md-4"><strong>Top PU:</strong> {{ insights.top_pu|default:"—" }}</div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-md-6"><strong>Pire retard (P90):</strong> {{ insights.worst_delay|default:"—" }}</div>
+            <div class="col-md-6"><strong>Pays dominant:</strong> {{ insights.dominant_country|default:"—" }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Tableau Top familles -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-table"></i> Top familles (triées par CA)</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Rang</th>
+                        <th>Famille</th>
+                        <th class="text-end">CA</th>
+                        <th class="text-end">Part</th>
+                        <th class="text-center">ABC</th>
+                        <th class="text-end">Qté</th>
+                        <th class="text-end">PU pondéré</th>
+                        <th class="text-end">Commandes</th>
+                        <th class="text-end">Clients</th>
+                        <th class="text-end">LeadTime (med)</th>
+                        <th class="text-end">Déviation (P90)</th>
+                        <th class="text-end">Late rate</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in stats_famille|slice:":20" %}
+                    <tr>
+                        <td><span class="badge bg-light text-dark">#{{ row.Rang|default:"—" }}</span></td>
+                        <td><strong>{{ row.Famille|default:"—" }}</strong></td>
+                        <td class="text-end">{{ row.CA_Total|floatformat:0|default:"—" }}{% if row.CA_Total %}€{% endif %}</td>
+                        <td class="text-end">{{ row.Part_Pct|floatformat:1|default:"—" }}{% if row.Part_Pct %}%{% endif %}</td>
+                        <td class="text-center">
+                            {% if row.Classe_ABC == 'A' %}
+                                <span class="badge bg-success">A</span>
+                            {% elif row.Classe_ABC == 'B' %}
+                                <span class="badge bg-warning text-dark">B</span>
+                            {% else %}
+                                <span class="badge bg-secondary">C</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">{{ row.Qty_Total|floatformat:0|default:"—" }}</td>
+                        <td class="text-end">{{ row.PU_Pondere|floatformat:2|default:"—" }}{% if row.PU_Pondere %}€{% endif %}</td>
+                        <td class="text-end">{{ row.Nb_Commandes|floatformat:0|default:"—" }}</td>
+                        <td class="text-end">{{ row.Nb_Clients|floatformat:0|default:"—" }}</td>
+                        <td class="text-end">{{ row.LeadTime_Median|floatformat:1|default:"—" }}</td>
+                        <td class="text-end">{{ row.Deviation_P90|floatformat:1|default:"—" }}</td>
+                        <td class="text-end">{{ row.Late_Rate_Pct|floatformat:1|default:"—" }}{% if row.Late_Rate_Pct %}%{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Graphiques Plotly (HTML) -->
+{% if family_graphs %}
+<div class="products-plotly">
+
+    {% if family_graphs.pareto_abc %}
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white"><h5 class="mb-0">Pareto / ABC</h5></div>
+        <div class="card-body">{{ family_graphs.pareto_abc|safe }}</div>
+    </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        {% if family_graphs.top_ca %}
+        <div class="col-lg-6 mb-3 mb-lg-0">
+            <div class="card h-100"><div class="card-header"><h6 class="mb-0">Top CA</h6></div><div class="card-body">{{ family_graphs.top_ca|safe }}</div></div>
+        </div>
+        {% endif %}
+        {% if family_graphs.top_qty %}
+        <div class="col-lg-6">
+            <div class="card h-100"><div class="card-header"><h6 class="mb-0">Top Quantité</h6></div><div class="card-body">{{ family_graphs.top_qty|safe }}</div></div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row mb-4">
+        {% if family_graphs.top_pu %}
+        <div class="col-lg-6 mb-3 mb-lg-0">
+            <div class="card h-100"><div class="card-header"><h6 class="mb-0">Top PU pondéré</h6></div><div class="card-body">{{ family_graphs.top_pu|safe }}</div></div>
+        </div>
+        {% endif %}
+        {% if family_graphs.bubble_value_volume %}
+        <div class="col-lg-6">
+            <div class="card h-100"><div class="card-header"><h6 class="mb-0">Volume / Valeur</h6></div><div class="card-body">{{ family_graphs.bubble_value_volume|safe }}</div></div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if family_graphs.heatmap_family_country %}
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0">Familles x Pays (CA)</h6></div>
+        <div class="card-body">{{ family_graphs.heatmap_family_country|safe }}</div>
+    </div>
+    {% endif %}
+
+    <div class="row mb-4">
+        {% if family_graphs.evolution_ca_top %}
+        <div class="col-lg-6 mb-3 mb-lg-0">
+            <div class="card h-100"><div class="card-header"><h6 class="mb-0">Évolution CA</h6></div><div class="card-body">{{ family_graphs.evolution_ca_top|safe }}</div></div>
+        </div>
+        {% endif %}
+        {% if family_graphs.evolution_pu_top %}
+        <div class="col-lg-6">
+            <div class="card h-100"><div class="card-header"><h6 class="mb-0">Évolution PU</h6></div><div class="card-body">{{ family_graphs.evolution_pu_top|safe }}</div></div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if family_graphs.delay_by_family %}
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0">Délais</h6></div>
+        <div class="card-body">{{ family_graphs.delay_by_family|safe }}</div>
+    </div>
+    {% endif %}
+
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0">Corrélation ciblée (Produit ou famille) — Spearman</h6></div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="tab" value="products">
+                <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
+                {% if selected_client %}
+                    <input type="hidden" name="client" value="{{ selected_client }}">
+                {% endif %}
+                <div class="col-lg-4">
+                    <label class="form-label">Produit</label>
+                    <select class="form-select" name="product">
+                        <option value="">— (optionnel) —</option>
+                        {% for opt in family_analysis.product_options %}
+                            <option value="{{ opt.value }}" {% if family_analysis.selected_product and opt.value == family_analysis.selected_product %}selected{% endif %}>
+                                {{ opt.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-4">
+                    <label class="form-label">Famille</label>
+                    <select class="form-select" name="family">
+                        <option value="">— (optionnel) —</option>
+                        {% for opt in family_analysis.family_options %}
+                            <option value="{{ opt.value }}" {% if family_analysis.selected_family and opt.value == family_analysis.selected_family %}selected{% endif %}>
+                                {{ opt.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Choisir un produit OU une famille (si les deux sont renseignés, le produit est prioritaire). Corrélations calculées sur l’évolution par période ({{ granularity|default:'month' }}).
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-search"></i> Afficher
+                    </button>
+                </div>
+            </form>
+
+            {% if family_analysis.selected_product or family_analysis.selected_family %}
+                {% if family_analysis.selected_product %}
+                    {% if family_graphs.product_corr_heatmap %}
+                        <div class="mt-3">{{ family_graphs.product_corr_heatmap|safe }}</div>
+                    {% else %}
+                        <div class="alert alert-info mt-3 mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Pas assez de périodes / données pour calculer une corrélation fiable pour ce produit.
+                        </div>
+                    {% endif %}
+                {% elif family_analysis.selected_family %}
+                    {% if family_graphs.family_corr_heatmap %}
+                        <div class="mt-3">{{ family_graphs.family_corr_heatmap|safe }}</div>
+                    {% else %}
+                        <div class="alert alert-info mt-3 mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            Pas assez de périodes / données pour calculer une corrélation fiable pour cette famille.
+                        </div>
+                    {% endif %}
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0">Comparaison produits</h6></div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="tab" value="products">
+                <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
+                {% if selected_client %}
+                    <input type="hidden" name="client" value="{{ selected_client }}">
+                {% endif %}
+                {% if family_analysis.selected_product %}
+                    <input type="hidden" name="product" value="{{ family_analysis.selected_product }}">
+                {% endif %}
+                {% if family_analysis.selected_family %}
+                    <input type="hidden" name="family" value="{{ family_analysis.selected_family }}">
+                {% endif %}
+
+                <div class="col-lg-6">
+                    <label class="form-label">Produits (max 5)</label>
+                    <select class="form-select" name="compare_products" multiple size="7">
+                        {% for opt in family_analysis.product_options %}
+                            <option value="{{ opt.value }}" {% if family_analysis.compare_selected_products and opt.value in family_analysis.compare_selected_products %}selected{% endif %}>
+                                {{ opt.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label">Métrique</label>
+                    <select class="form-select" name="compare_products_metric">
+                        <option value="CA_Total" {% if family_analysis.compare_products_metric == 'CA_Total' %}selected{% endif %}>CA_Total</option>
+                        <option value="Qty_Total" {% if family_analysis.compare_products_metric == 'Qty_Total' %}selected{% endif %}>Qty_Total</option>
+                        <option value="PU_Pondere" {% if family_analysis.compare_products_metric == 'PU_Pondere' %}selected{% endif %}>PU_Pondere</option>
+                        <option value="Late_Rate_Pct" {% if family_analysis.compare_products_metric == 'Late_Rate_Pct' %}selected{% endif %}>Late_Rate_Pct</option>
+                        <option value="LeadTime_Median" {% if family_analysis.compare_products_metric == 'LeadTime_Median' %}selected{% endif %}>LeadTime_Median</option>
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-graph-up"></i> Comparer
+                    </button>
+                </div>
+            </form>
+
+            {% if family_graphs.compare_products_timeseries %}
+                <div class="mt-3">{{ family_graphs.compare_products_timeseries|safe }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h6 class="mb-0">Comparaison familles</h6></div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="tab" value="products">
+                <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
+                {% if selected_client %}
+                    <input type="hidden" name="client" value="{{ selected_client }}">
+                {% endif %}
+                {% if family_analysis.selected_product %}
+                    <input type="hidden" name="product" value="{{ family_analysis.selected_product }}">
+                {% endif %}
+                {% if family_analysis.selected_family %}
+                    <input type="hidden" name="family" value="{{ family_analysis.selected_family }}">
+                {% endif %}
+
+                <div class="col-lg-6">
+                    <label class="form-label">Familles (max 5)</label>
+                    <select class="form-select" name="compare_families" multiple size="7">
+                        {% for opt in family_analysis.family_options %}
+                            <option value="{{ opt.value }}" {% if family_analysis.compare_selected_families and opt.value in family_analysis.compare_selected_families %}selected{% endif %}>
+                                {{ opt.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <label class="form-label">Métrique</label>
+                    <select class="form-select" name="compare_families_metric">
+                        <option value="CA_Total" {% if family_analysis.compare_families_metric == 'CA_Total' %}selected{% endif %}>CA_Total</option>
+                        <option value="Qty_Total" {% if family_analysis.compare_families_metric == 'Qty_Total' %}selected{% endif %}>Qty_Total</option>
+                        <option value="PU_Pondere" {% if family_analysis.compare_families_metric == 'PU_Pondere' %}selected{% endif %}>PU_Pondere</option>
+                        <option value="Late_Rate_Pct" {% if family_analysis.compare_families_metric == 'Late_Rate_Pct' %}selected{% endif %}>Late_Rate_Pct</option>
+                        <option value="LeadTime_Median" {% if family_analysis.compare_families_metric == 'LeadTime_Median' %}selected{% endif %}>LeadTime_Median</option>
+                    </select>
+                </div>
+                <div class="col-lg-3">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-graph-up"></i> Comparer
+                    </button>
+                </div>
+            </form>
+
+            {% if family_graphs.compare_families_timeseries %}
+                <div class="mt-3">{{ family_graphs.compare_families_timeseries|safe }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endif %}
+
+
+
+<!-- Scoring -->
+{% if top20_score %}
+<div class="card mb-4">
+    <div class="card-header"><h5 class="mb-0"><i class="bi bi-award"></i> Top 20 score global</h5></div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Famille</th>
+                        <th class="text-end">Score (0-100)</th>
+                        <th class="text-end">CA</th>
+                        <th class="text-end">Qté</th>
+                        <th class="text-end">PU pondéré</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in top20_score %}
+                    <tr>
+                        <td><span class="badge bg-light text-dark">{{ row.Rank_Score|default:"—" }}</span></td>
+                        <td><strong>{{ row.Famille|default:"—" }}</strong></td>
+                        <td class="text-end">{{ row.Score_Global|floatformat:2|default:"—" }}</td>
+                        <td class="text-end">{{ row.CA_Total|floatformat:0|default:"—" }}{% if row.CA_Total %}€{% endif %}</td>
+                        <td class="text-end">{{ row.Qty_Total|floatformat:0|default:"—" }}</td>
+                        <td class="text-end">{{ row.PU_Pondere|floatformat:2|default:"—" }}{% if row.PU_Pondere %}€{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+{% endwith %}

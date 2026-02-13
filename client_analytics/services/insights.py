@@ -32,33 +32,26 @@ def explain_pareto(pareto_dict: Dict[str, Any]) -> str:
                 <strong>{top_20pct:.1f}% du CA</strong>.</li>
             <li>Les <strong>top 10 clients</strong> représentent <strong>{top_10:.1f}% du CA</strong>.</li>
         </ul>
-        
-        <p><strong>Recommandation :</strong></p>
-        <ul>
     """
     
     if top_20pct > 85:
         html += """
-            <li class="text-warning"><i class="bi bi-exclamation-triangle"></i> 
-            <strong>Concentration très élevée</strong> : Vous êtes fortement dépendant d'un petit 
-            nombre de clients. Risque élevé en cas de perte d'un client majeur.</li>
-            <li>Diversifiez votre portefeuille client pour réduire le risque.</li>
+            <p class="text-warning"><i class="bi bi-exclamation-triangle"></i> 
+            <strong>Concentration très élevée</strong> : Dépendance forte d'un petit 
+            nombre de clients. Risque élevé en cas de perte d'un client majeur.</p>
         """
     elif top_20pct > 70:
         html += """
-            <li class="text-info"><i class="bi bi-info-circle"></i> 
-            <strong>Concentration modérée</strong> : Bonne concentration avec marge de sécurité.</li>
-            <li>Maintenez la relation avec vos clients clés tout en développant de nouveaux comptes.</li>
+            <p class="text-info"><i class="bi bi-info-circle"></i> 
+            <strong>Concentration modérée</strong> : Bonne concentration avec marge de sécurité.</p>
         """
     else:
         html += """
-            <li class="text-success"><i class="bi bi-check-circle"></i> 
-            <strong>Bonne diversification</strong> : Votre CA est bien réparti entre vos clients.</li>
-            <li>Continuez à entretenir votre base client diversifiée.</li>
+            <p class="text-success"><i class="bi bi-check-circle"></i> 
+            <strong>Bonne diversification</strong> : CA bien réparti entre les clients.</p>
         """
     
     html += """
-        </ul>
     </div>
     """
     
@@ -210,28 +203,6 @@ def explain_currency_concentration(currency_data: Dict[str, Any]) -> str:
             <li class="text-success"><i class="bi bi-check-circle"></i> 
             <strong>Bonne diversification</strong> (HHI < 2500) : Votre CA est bien réparti 
             entre plusieurs marchés/devises.</li>
-        """
-    
-    html += """
-        </ul>
-        
-        <p><strong>Recommandation :</strong></p>
-        <ul>
-    """
-    
-    if non_eur_pct > 50:
-        html += """
-            <li>Plus de la moitié de votre activité se fait hors zone Euro. 
-            Assurez-vous d'avoir une stratégie de couverture adaptée.</li>
-        """
-    elif non_eur_pct > 20:
-        html += """
-            <li>Exposition significative aux marchés hors zone Euro. 
-            Surveillez l'évolution de ces marchés.</li>
-        """
-    else:
-        html += """
-            <li>Activité principalement en zone Euro avec exposition limitée aux autres marchés.</li>
         """
     
     html += """

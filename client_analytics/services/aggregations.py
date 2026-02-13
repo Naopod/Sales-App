@@ -182,11 +182,9 @@ def lead_time_pack(df: pd.DataFrame, period: Literal['month', 'quarter', 'year']
     
     # 🆕 PRIORITÉ 1 : Si Lead_Time_Days existe déjà, l'utiliser directement
     if 'Lead_Time_Days' in df_work.columns:
-        print("✅ Utilisation de la colonne Lead_Time_Days pré-calculée")
         df_work['lead_time_days'] = pd.to_numeric(df_work['Lead_Time_Days'], errors='coerce')
     else:
         # 🔄 PRIORITÉ 2 : Calculer depuis les dates brutes
-        print("🔄 Lead_Time_Days absent, calcul depuis dates brutes...")
         
         # Détecter colonnes de dates (avec recherche insensible à la casse et accents)
         all_cols = [c.upper() for c in df.columns]
@@ -215,13 +213,6 @@ def lead_time_pack(df: pd.DataFrame, period: Literal['month', 'quarter', 'year']
                 date_fact_col = col
                 break
         
-        # Debug : afficher les colonnes trouvées
-        print(f"🔍 DEBUG Lead Time - Colonnes trouvées :")
-        print(f"   Date Expédition: {date_exp_col}")
-        print(f"   Date Commande: {date_cmd_col}")
-        print(f"   Date Facturation: {date_fact_col}")
-        print(f"   Colonnes disponibles: {list(df.columns[:10])}...")
-        
         # Vérifier si on peut calculer le lead time
         if not date_exp_col and not date_fact_col:
             return {
@@ -244,15 +235,12 @@ def lead_time_pack(df: pd.DataFrame, period: Literal['month', 'quarter', 'year']
         if date_exp_col and date_cmd_col and date_exp_col in df_work.columns and date_cmd_col in df_work.columns:
             # Cas idéal : Date Expédition - Date Commande
             df_work['lead_time_days'] = (df_work[date_exp_col] - df_work[date_cmd_col]).dt.days
-            print("✅ Calcul lead time : Date Expédition - Date Commande")
         elif date_exp_col and date_fact_col and date_exp_col in df_work.columns and date_fact_col in df_work.columns:
             # Cas avec estimation : Date Expédition - (Date Facturation - 60 jours)
             df_work['lead_time_days'] = (df_work[date_exp_col] - (df_work[date_fact_col] - pd.Timedelta(days=60))).dt.days
-            print("✅ Calcul lead time : Date Expédition - (Date Facturation - 60j)")
         elif date_cmd_col and date_fact_col and date_cmd_col in df_work.columns and date_fact_col in df_work.columns:
             # Alternative : Date Facturation - Date Commande
             df_work['lead_time_days'] = (df_work[date_fact_col] - df_work[date_cmd_col]).dt.days
-            print("✅ Calcul lead time : Date Facturation - Date Commande")
         else:
             # Pas assez de données
             return {

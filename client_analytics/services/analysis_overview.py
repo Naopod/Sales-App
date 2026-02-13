@@ -125,7 +125,6 @@ def generate_overview_analysis(df):
     Returns:
         dict avec toutes les analyses pour l'onglet Overview
     """
-    print("📊 Génération de l'analyse Overview...")
     
     return {
         'info': get_dataset_info(df),

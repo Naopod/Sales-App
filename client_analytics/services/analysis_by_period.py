@@ -53,19 +53,33 @@ def analyze_correlations_detailed(df, variables):
                         # Interprétations business spécifiques
                         if var1 == "Montant" and var2 == "Quantité":
                             if corr_value > 0.5:
-                                interpretation = "Les commandes avec plus d'unités génèrent des montants plus élevés, suggérant une stratégie de volume efficace."
+                                interpretation = "Les commandes avec plus d'unités génèrent des montants plus élevés."
                             else:
                                 interpretation = "Corrélation faible : certains produits à forte valeur unitaire génèrent du CA même avec peu d'unités."
                         elif var1 == "Montant" and var2 == "PU Net":
                             if corr_value > 0.5:
-                                interpretation = "Les produits à prix élevé contribuent significativement au CA, suggérant une clientèle premium."
+                                interpretation = "Les produits à prix élevé contribuent significativement au CA."
                             else:
                                 interpretation = "Le CA n'est pas uniquement dû aux prix élevés, le volume joue aussi un rôle important."
                         elif var1 == "Quantité" and var2 == "PU Net":
                             if corr_value < -0.3:
-                                interpretation = "Les produits à bas prix sont achetés en plus grande quantité (stratégie volume)."
+                                interpretation = "Les produits à bas prix sont achetés en plus grande quantité."
                             else:
                                 interpretation = "Pas de relation claire entre prix et quantité commandée."
+                        elif "Lead_Time_Days" in [var1, var2] and "Montant" in [var1, var2]:
+                            if abs(corr_value) > 0.3:
+                                interpretation = f"Lien {'positif' if corr_value > 0 else 'négatif'} entre délai de livraison et montant des commandes."
+                        elif "Lead_Time_Days" in [var1, var2] and "Quantité" in [var1, var2]:
+                            if abs(corr_value) > 0.3:
+                                interpretation = f"Lien {'positif' if corr_value > 0 else 'négatif'} entre délai de livraison et volume commandé."
+                        elif "Delai_Prev_Days" in [var1, var2] and "Lead_Time_Days" in [var1, var2]:
+                            if corr_value > 0.5:
+                                interpretation = "Les délais prévisionnels correspondent bien aux délais réels."
+                            elif corr_value < 0:
+                                interpretation = "Les délais prévisionnels ne correspondent pas aux délais réels."
+                        elif "Lead_Time_Deviation_Days" in [var1, var2]:
+                            if abs(corr_value) > 0.3:
+                                interpretation = f"L'écart aux délais prévisionnels est corrélé avec {var1 if var1 != 'Lead_Time_Deviation_Days' else var2}."
                         
                         html += f"<li><span class='badge bg-{color}'>{var1} ↔ {var2}</span>: "
                         html += f"Corrélation <strong>{direction} {strength}</strong> (r = {corr_value:.3f})<br>"
@@ -74,29 +88,10 @@ def analyze_correlations_detailed(df, variables):
                         html += "</li>"
         
         html += "</ul>"
-        
-        # Recommandations basées sur les corrélations
-        html += "<h6 class='mt-3'><strong>💡 Recommandations :</strong></h6>"
-        html += "<ul class='text-muted'>"
-        
-        montant_quantite = corr_matrix.loc['Montant', 'Quantité'] if 'Montant' in corr_matrix.index and 'Quantité' in corr_matrix.columns else 0
-        montant_pu = corr_matrix.loc['Montant', 'PU Net'] if 'Montant' in corr_matrix.index and 'PU Net' in corr_matrix.columns else 0
-        
-        if montant_quantite > 0.6:
-            html += "<li>🎯 Stratégie volume : Encouragez les achats en grande quantité avec des remises progressives.</li>"
-        
-        if montant_pu > 0.6:
-            html += "<li>💎 Clientèle premium : Développez votre gamme de produits haut de gamme.</li>"
-        
-        if abs(montant_quantite - montant_pu) < 0.2:
-            html += "<li>⚖️ Mix équilibré : Votre CA est équilibré entre volume et valeur unitaire, maintenez cette diversification.</li>"
-        
-        html += "</ul>"
         html += "</div>"
         
         return html
     except Exception as e:
-        print(f"   ⚠️ Erreur analyse corrélations: {e}")
         return "<p class='text-danger'>Erreur lors de l'analyse des corrélations</p>"
 
 
@@ -219,29 +214,14 @@ def generate_deep_synthesis(df, kpis, variables_num):
             html += f"<li><strong>Concentration géographique</strong> : Le pays principal représente {top_country_pct:.1f}% du CA. "
             
             if top_country_pct > 50:
-                html += "⚠️ Forte dépendance à un seul marché, considérez la diversification géographique.</li>"
+                html += "⚠️ Forte dépendance à un seul marché.</li>"
             else:
                 html += "✓ Bonne diversification géographique.</li>"
         
         html += "</ul>"
         html += "</div>"
         
-        # 4. Recommandations stratégiques
-        html += "<h6 class='mt-4'><strong>🎯 Recommandations Stratégiques</strong></h6>"
-        html += "<div class='alert alert-warning border'>"
-        html += "<ol>"
-        html += "<li><strong>Gestion des outliers</strong> : Identifiez manuellement les transactions exceptionnelles (très élevées ou très basses) pour comprendre leur origine et les reproduire ou les éviter.</li>"
-        html += "<li><strong>Segmentation client</strong> : Utilisez l'analyse de clustering pour identifier des segments de clients homogènes et adapter votre stratégie commerciale.</li>"
-        html += "<li><strong>Prévisions</strong> : En raison de la distribution non normale, privilégiez les méthodes de prévision robustes (médiane, quantiles) plutôt que les moyennes.</li>"
-        
-        if 'Month' in df.columns:
-            html += "<li><strong>Analyse de saisonnalité</strong> : Examinez l'évolution mensuelle pour détecter des patterns saisonniers et optimiser vos stocks et campagnes marketing.</li>"
-        
-        html += "<li><strong>Optimisation du mix produit</strong> : Basé sur les corrélations, ajustez votre stratégie entre produits à fort volume/faible marge et produits premium/faible volume.</li>"
-        html += "</ol>"
-        html += "</div>"
-        
-        # 5. Points d'attention
+        # 4. Points d'attention
         html += "<h6 class='mt-4'><strong>⚠️ Points d'Attention</strong></h6>"
         html += "<div class='alert alert-danger border'>"
         html += "<ul>"
@@ -262,7 +242,7 @@ def generate_deep_synthesis(df, kpis, variables_num):
                 if neg_count > 0:
                     html += f"<li><strong>Valeurs négatives dans {var}</strong> : {neg_count} valeurs négatives détectées. Vérifiez s'il s'agit d'avoirs ou d'erreurs de saisie.</li>"
         
-        html += "<li><strong>Qualité des analyses</strong> : Les distributions non normales impliquent que certains tests statistiques classiques (t-test, ANOVA) ne sont pas appropriés. Privilégiez les tests non-paramétriques (Mann-Whitney, Kruskal-Wallis).</li>"
+        html += "<li><strong>Qualité des analyses</strong> : Les distributions non normales indiquent que certains tests statistiques classiques (t-test, ANOVA) ne sont pas appropriés. Les tests non-paramétriques (Mann-Whitney, Kruskal-Wallis) sont plus adaptés.</li>"
         html += "</ul>"
         html += "</div>"
         
@@ -270,7 +250,6 @@ def generate_deep_synthesis(df, kpis, variables_num):
         
         return html
     except Exception as e:
-        print(f"   ⚠️ Erreur génération synthèse: {e}")
         import traceback
         traceback.print_exc()
         return "<p class='text-danger'>Erreur lors de la génération de la synthèse</p>"
@@ -297,10 +276,6 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
     graphs = {}
     kpis = {}
     
-    print(f"📊 Génération de l'analyse par période (granularité: {granularity})...")
-    if skip_preprocessing:
-        print("   ⚠️ Mode skip_preprocessing=True : conservation des données exactes")
-    
     # Mapping des colonnes temporelles selon la granularité
     time_columns = {
         'month': 'Month',
@@ -311,6 +286,11 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
     
     lignes_initiales = len(df)
     variables_num = ['Montant', 'Quantité', 'PU Net']
+    
+    # Option A (matrice simple et lisible) :
+    # conserver uniquement une variable "délai" compréhensible.
+    if 'Lead_Time_Days' in df.columns:
+        variables_num.append('Lead_Time_Days')
     
     # Utiliser les données telles quelles en mode skip
     df_clean = df.copy()
@@ -338,7 +318,81 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
     kpis['nb_familles'] = f"{families_count:,}"
     kpis['nb_pays'] = f"{countries_count:,}"
     
-    # Statistiques descriptives
+    # ═══════════════════════════════════════════════════════════════════
+    # AGRÉGATION PAR PÉRIODE SELON LA GRANULARITÉ
+    # ═══════════════════════════════════════════════════════════════════
+    # Créer df_agg pour les analyses de corrélation/distributions
+    # au lieu d'utiliser les transactions brutes
+    df_agg = df_clean  # Fallback par défaut
+    use_aggregated = False
+    
+    if time_col in df_clean.columns:
+        try:
+            # Définir les colonnes à agréger qui existent
+            agg_dict = {}
+            if 'Montant' in df_clean.columns:
+                agg_dict['Montant'] = 'sum'
+            if 'Quantité' in df_clean.columns:
+                agg_dict['Quantité'] = 'sum'
+            if 'PU Net' in df_clean.columns:
+                agg_dict['PU Net'] = 'mean'
+            
+            # Ajouter les variables de délai si elles existent
+            if 'Lead_Time_Days' in df_clean.columns:
+                agg_dict['Lead_Time_Days'] = 'mean'
+            if 'Delai_Prev_Days' in df_clean.columns:
+                agg_dict['Delai_Prev_Days'] = 'mean'
+            if 'Lead_Time_Deviation_Days' in df_clean.columns:
+                agg_dict['Lead_Time_Deviation_Days'] = 'mean'
+            
+            if agg_dict:
+                df_agg = df_clean.groupby(time_col, as_index=False).agg(agg_dict)
+                
+                # Vérifier que df_agg est suffisamment grand pour les analyses
+                if len(df_agg) >= 3:  # Minimum pour des analyses statistiques
+                    use_aggregated = True
+                else:
+                    df_agg = df_clean
+            else:
+                pass
+        except Exception as e:
+            df_agg = df_clean
+    else:
+        pass
+    
+    # Sélection du DataFrame pour les analyses statistiques (corrélations, distributions)
+    df_stats = df_agg if use_aggregated else df_clean
+    
+    # Statistiques descriptives PAR MOIS
+    stats_by_month = {}
+    if time_col in df_clean.columns:
+        months = sorted(df_clean[time_col].unique())
+        for month in months:
+            month_data = df_clean[df_clean[time_col] == month]
+            stats_table = []
+            for var in variables_num:
+                if var in month_data.columns:
+                    stats_table.append({
+                        'Variable': var,
+                        'Moyenne': f"{month_data[var].mean():.2f}",
+                        'Médiane': f"{month_data[var].median():.2f}",
+                        'Écart-type': f"{month_data[var].std():.2f}",
+                        'Min': f"{month_data[var].min():.2f}",
+                        'Max': f"{month_data[var].max():.2f}",
+                        'Count': f"{month_data[var].count()}"
+                    })
+            
+            stats_by_month[str(month)] = pd.DataFrame(stats_table).to_html(
+                classes='stats-table',
+                index=False,
+                border=0,
+                justify='left'
+            )
+        
+        # Stocker les mois disponibles
+        results['available_months'] = [str(m) for m in months]
+    
+    # Statistiques descriptives globales (toute la période)
     stats_table = []
     for var in variables_num:
         if var in df_clean.columns:
@@ -348,47 +402,171 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
                 'Médiane': f"{df_clean[var].median():.2f}",
                 'Écart-type': f"{df_clean[var].std():.2f}",
                 'Min': f"{df_clean[var].min():.2f}",
-                'Max': f"{df_clean[var].max():.2f}"
+                'Max': f"{df_clean[var].max():.2f}",
+                'Count': f"{df_clean[var].count()}"
             })
     
     results['stats_descriptives'] = pd.DataFrame(stats_table).to_html(
-        classes='table table-striped',
-        index=False
+        classes='stats-table',
+        index=False,
+        border=0,
+        justify='left'
     )
+    results['stats_by_month'] = stats_by_month
     
     # ═══════════════════════════════════════════════════════════════════
     # GÉNÉRATION DES GRAPHIQUES
     # ═══════════════════════════════════════════════════════════════════
-    print("📊 Génération des graphiques...")
     
-    # 1. Matrice de corrélation
-    if all(col in df_clean.columns for col in variables_num):
-        graphs['correlation_matrix'] = viz_by_period.create_correlation_matrix(df_clean, variables_num)
-        # Analyse détaillée des corrélations
-        results['correlation_analysis'] = analyze_correlations_detailed(df_clean, variables_num)
+    # 1. Matrice de corrélation évolutive dans le temps (uniquement)
+    if all(col in df_stats.columns for col in variables_num):
+        # Matrice de corrélation évolutive dans le temps
+        if time_col in df_clean.columns and use_aggregated:
+            try:
+                # Calculer les corrélations pour chaque période
+                periods = sorted(df_clean[time_col].unique())
+                correlation_evolution = []
+                
+                for period in periods:
+                    period_data = df_clean[df_clean[time_col] == period]
+                    if len(period_data) >= 3:  # Minimum pour calculer une corrélation
+                        # Calculer la corrélation si on a assez de colonnes
+                        if len([col for col in variables_num if col in period_data.columns]) >= 2:
+                            corr = period_data[variables_num].corr()
+                            
+                            # Extraire les paires de corrélation
+                            for i, var1 in enumerate(variables_num):
+                                for j, var2 in enumerate(variables_num):
+                                    if i < j and var1 in corr.index and var2 in corr.columns:
+                                        correlation_evolution.append({
+                                            'Period': str(period),
+                                            'Pair': f"{var1} vs {var2}",
+                                            'Correlation': corr.loc[var1, var2]
+                                        })
+                
+                # Créer le graphique d'évolution sous forme de heatmap
+                if correlation_evolution:
+                    import plotly.graph_objects as go
+                    
+                    df_corr_evol = pd.DataFrame(correlation_evolution)
+                    
+                    # Créer une matrice pivot : lignes = paires, colonnes = périodes
+                    pivot_matrix = df_corr_evol.pivot(
+                        index='Pair',
+                        columns='Period',
+                        values='Correlation'
+                    )
+                    
+                    # Filtrer les colonnes qui contiennent des NaN
+                    pivot_matrix = pivot_matrix.dropna(axis=1, how='any')
+                    
+                    # Vérifier qu'il reste des données après filtrage
+                    if not pivot_matrix.empty:
+                        # Créer la heatmap
+                        fig = go.Figure(data=go.Heatmap(
+                            z=pivot_matrix.values,
+                            x=pivot_matrix.columns.tolist(),
+                            y=pivot_matrix.index.tolist(),
+                            colorscale='RdBu',  # Rouge-Blanc-Bleu (négatif-neutre-positif)
+                            zmid=0,  # Centre de l'échelle à 0
+                            zmin=-1,
+                            zmax=1,
+                            text=pivot_matrix.values.round(3),
+                            texttemplate='%{text}',
+                            textfont={"size": 10},
+                            colorbar=dict(
+                                title="Corrélation",
+                                tickvals=[-1, -0.5, 0, 0.5, 1],
+                                ticktext=['-1.0', '-0.5', '0.0', '+0.5', '+1.0']
+                            ),
+                            hovertemplate='<b>%{y}</b><br>Période: %{x}<br>Corrélation: %{z:.3f}<extra></extra>'
+                        ))
+                        
+                        fig.update_layout(
+                            title=f"📊 Matrice d'Évolution des Corrélations ({granularity.title()})",
+                            xaxis_title="Période",
+                            yaxis_title="Paire de Variables",
+                            height=max(400, len(pivot_matrix) * 50),  # Hauteur adaptative
+                            template='plotly_dark',
+                            paper_bgcolor='rgba(20, 30, 50, 1)',
+                            plot_bgcolor='rgba(30, 40, 60, 1)',
+                            xaxis=dict(tickangle=-45)
+                        )
+                        
+                        graphs['correlation_evolution'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
+                    else:
+                        pass
+                else:
+                    pass
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
     
-    # 2. Tests de normalité avec visualisations
-    print("   → Génération des graphiques de test de normalité...")
-    for var in variables_num:
-        if var in df_clean.columns:
-            # QQ-Plot
-            qq_key = f'qq_plot_{var.lower().replace(" ", "_")}'
-            graphs[qq_key] = viz_by_period.create_qq_plot(df_clean, var)
-            
-            # Histogramme avec courbe normale
-            norm_key = f'normality_test_{var.lower().replace(" ", "_")}'
-            graphs[norm_key] = viz_by_period.create_normality_test_plot(df_clean, var)
+    # 2. Graphiques d'évolution mensuelle pour Montant et PU Net
+    if time_col in df_clean.columns:
+        # Évolution moyenne du Montant par mois
+        if 'Montant' in df_clean.columns:
+            graphs['monthly_evolution_montant_mean'] = viz_by_period.create_monthly_evolution_plot(
+                df_clean, time_col, 'Montant', stat_type='mean',
+                title='📈 Évolution du Montant Moyen par Mois'
+            )
+            graphs['monthly_evolution_montant_median'] = viz_by_period.create_monthly_evolution_plot(
+                df_clean, time_col, 'Montant', stat_type='median',
+                title='📈 Évolution du Montant Médian par Mois'
+            )
+            # Distribution par mois
+            graphs['distribution_montant_by_month'] = viz_by_period.create_distribution_by_month(
+                df_clean, time_col, 'Montant',
+                title='📊 Distribution du Montant par Mois',
+                granularity=granularity
+            )
+            graphs['boxplot_montant_by_month'] = viz_by_period.create_boxplot_by_month(
+                df_clean, time_col, 'Montant',
+                title='📦 Boxplot du Montant par Mois'
+            )
+        
+        # Évolution du PU Net par mois
+        if 'PU Net' in df_clean.columns:
+            graphs['monthly_evolution_pu_net_mean'] = viz_by_period.create_monthly_evolution_plot(
+                df_clean, time_col, 'PU Net', stat_type='mean',
+                title='📈 Évolution du PU Net Moyen par Mois'
+            )
+            graphs['monthly_evolution_pu_net_median'] = viz_by_period.create_monthly_evolution_plot(
+                df_clean, time_col, 'PU Net', stat_type='median',
+                title='📈 Évolution du PU Net Médian par Mois'
+            )
+            # Distribution par mois
+            graphs['distribution_pu_net_by_month'] = viz_by_period.create_distribution_by_month(
+                df_clean, time_col, 'PU Net',
+                title='📊 Distribution du PU Net par Mois',
+                granularity=granularity
+            )
+            graphs['boxplot_pu_net_by_month'] = viz_by_period.create_boxplot_by_month(
+                df_clean, time_col, 'PU Net',
+                title='📦 Boxplot du PU Net par Mois'
+            )
+        
+        # Quantité par mois (si disponible)
+        if 'Quantité' in df_clean.columns:
+            graphs['distribution_quantite_by_month'] = viz_by_period.create_distribution_by_month(
+                df_clean, time_col, 'Quantité',
+                title='📊 Distribution de la Quantité par Mois',
+                granularity=granularity
+            )
+            graphs['boxplot_quantite_by_month'] = viz_by_period.create_boxplot_by_month(
+                df_clean, time_col, 'Quantité',
+                title='📦 Boxplot de la Quantité par Mois'
+            )
     
-    # 3. Boxplot pour les valeurs aberrantes
-    if all(col in df_clean.columns for col in variables_num):
-        print("   → Génération du boxplot des valeurs aberrantes...")
-        graphs['outliers_boxplot'] = viz_by_period.create_outliers_boxplot(df_clean, variables_num)
+    # 3. Boxplot pour les valeurs aberrantes (sur données agrégées)
+    if all(col in df_agg.columns for col in variables_num):
+        graphs['outliers_boxplot'] = viz_by_period.create_outliers_boxplot(df_agg, variables_num)
     
-    # 4. Distributions des variables
+    # 4. Distributions des variables (sur données agrégées)
     for var in ['Montant', 'Quantité', 'PU Net']:
-        if var in df_clean.columns:
+        if var in df_stats.columns:
             graph_key = f'dist_complete_{var.lower().replace(" ", "_")}'
-            graphs[graph_key] = viz_by_period.create_distribution_plot(df_clean, var)
+            graphs[graph_key] = viz_by_period.create_distribution_plot(df_stats, var)
     
     # 5. Top pays
     if 'Country' in df_clean.columns and 'Montant' in df_clean.columns:
@@ -409,7 +587,7 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
             df_clean, time_col, 'Montant', granularity
         )
         
-        # Graphique d'évolution (ligne)
+        # Graphique d'évolution (barres)
         graphs['evolution_mensuelle'] = viz_by_period.create_temporal_evolution_plot(
             df_clean, time_col, 'Montant', granularity
         )
@@ -418,16 +596,36 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
         graphs['variation_trimestrielle'] = viz_by_period.create_variation_plot(
             df_clean, time_col, 'Montant', granularity
         )
+        
+        # Nouveaux graphiques d'analyse CA
+        
+        # Pie chart répartition du CA
+        graphs['ca_repartition_pie'] = viz_by_period.create_ca_repartition_pie(
+            df_clean, time_col, 'Montant', granularity
+        )
+        
+        # Top 5 et Bottom 5 périodes par CA
+        graphs['top_periods_high'] = viz_by_period.create_top_periods_bar(
+            df_clean, time_col, 'Montant', granularity, n_top=5, direction='top'
+        )
+        graphs['top_periods_low'] = viz_by_period.create_top_periods_bar(
+            df_clean, time_col, 'Montant', granularity, n_top=5, direction='bottom'
+        )
+        
+        # CA moyen par transaction
+        graphs['ca_moyen_transaction'] = viz_by_period.create_ca_moyen_per_transaction(
+            df_clean, time_col, 'Montant', granularity
+        )
+        
+        # Stabilité des ventes
+        graphs['stability_chart'] = viz_by_period.create_stability_chart(
+            df_clean, time_col, 'Montant', granularity
+        )
     
     # ═══════════════════════════════════════════════════════════════════
     # SYNTHÈSE APPROFONDIE
     # ═══════════════════════════════════════════════════════════════════
-    print("📝 Génération de la synthèse approfondie...")
     results['synthese_analyse'] = generate_deep_synthesis(df_clean, kpis, variables_num)
-    
-    print(f"✅ {len(graphs)} graphiques générés")
-    
-    print("✅ Analyse par période générée !")
     
     return {
         'results': results,

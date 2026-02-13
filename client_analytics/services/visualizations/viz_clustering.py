@@ -6,6 +6,22 @@ import plotly.express as px
 from sklearn.decomposition import PCA
 
 
+def _make_responsive(fig):
+    """Helper pour rendre un graphique Plotly responsive."""
+    fig.update_layout(
+        autosize=True,
+        width=None,
+        margin=dict(l=40, r=20, t=60, b=40)
+    )
+    return fig
+
+
+def _to_html_responsive(fig):
+    """Convertit une figure Plotly en HTML avec config responsive."""
+    fig = _make_responsive(fig)
+    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'responsive': True})
+
+
 def create_clustering_pca_plot(df_client, X, title="Clustering K-Means (PCA 2D)"):
     """
     Crée le graphique de clustering en 2D avec réduction PCA
@@ -69,7 +85,7 @@ def create_clustering_pca_plot(df_client, X, title="Clustering K-Means (PCA 2D)"
         
         fig.update_traces(marker=dict(line=dict(width=0.5, color='DarkSlateGrey')))
         
-        return fig.to_html(full_html=False)
+        return _to_html_responsive(fig)
         
     except Exception as e:
         print(f"Erreur lors de la création du graphique de clustering: {e}")
