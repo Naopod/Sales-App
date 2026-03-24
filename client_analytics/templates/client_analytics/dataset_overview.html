@@ -9,9 +9,12 @@
 {% endblock %}
 
 {% block dataset_nav %}
-<nav class="analysis-nav">
+<nav class="analysis-nav" id="analysisNav">
     <div class="container-fluid">
-        <div class="analysis-tabs">
+        <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
+            <i class="bi bi-chevron-up"></i>
+        </button>
+        <div class="analysis-tabs" id="analysisTabs">
             <a class="analysis-tab active" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
                 <div class="tab-icon">
                     <i class="bi bi-info-circle-fill"></i>
@@ -49,17 +52,31 @@
                 </div>
             </a>
         </div>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Changer le thème">
+            <i class="bi bi-moon-fill"></i>
+        </button>
         <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
             <i class="bi bi-arrow-left-circle"></i>
             <span>Accueil</span>
         </a>
     </div>
 </nav>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const navToggleBtn = document.getElementById('navToggleBtn');
+    const analysisNav = document.getElementById('analysisNav');
+    const isCollapsed = localStorage.getItem('navCollapsed') === 'true';
+    if (isCollapsed) analysisNav.classList.add('collapsed');
+    navToggleBtn?.addEventListener('click', function() {
+        analysisNav.classList.toggle('collapsed');
+        localStorage.setItem('navCollapsed', analysisNav.classList.contains('collapsed'));
+    });
+});
+</script>
 {% endblock %}
 
 {% block content %}
-<!-- Canvas Particules Scientifiques -->
-<canvas id="scientificParticles"></canvas>
 
 <script>
     document.body.classList.add('analysis-page');

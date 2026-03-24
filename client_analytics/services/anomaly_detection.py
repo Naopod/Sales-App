@@ -1,14 +1,14 @@
 """Détection d’anomalies robustes pour séries temporelles.
 
-Méthode: STL (robust=True) + score robuste via MAD.
+Méthode: Machine Learning avec Isolation Forest (détection multivariée).
 
-- Entrée principale: série journalière (DatetimeIndex) idéalement continue.
-- Sortie: DataFrame par métrique avec observed/expected/resid/z/is_anomaly/direction.
+- Entrée principale: DataFrame journalier (DatetimeIndex) avec métriques CA_Total, Qty_Total, Nb_Clients.
+- Sortie: DataFrame par métrique avec observed/anomaly_score/is_anomaly/direction.
 
-Cette implémentation est conçue pour être:
-- robuste aux outliers
-- sans dépendances lourdes supplémentaires
-- tolérante aux cas limites (série courte, constante, NaN, MAD=0)
+Cette implémentation utilise:
+- Isolation Forest: algorithme state-of-the-art pour la détection d'anomalies
+- Approche multivariée: analyse simultanée de plusieurs métriques
+- Robustesse aux outliers et aux cas limites
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler
 
 try:
     from statsmodels.tsa.seasonal import STL
@@ -27,18 +29,10 @@ except Exception:  # pragma: no cover
 
 @dataclass(frozen=True)
 class AnomalyParams:
-    method: str = "stl+mad"
-    z_thresh: float = 3.5
+    method: str = "isolation_forest"
+    contamination: float = 0.1
     basis: str = "daily"
-    stl_period: int = 7
     min_points: int = 30
-
-
-def _resolve_stl_period(n_points: int, stl_period: int | None) -> int:
-    if stl_period is not None:
-        return int(stl_period)
-    # Règle métier demandée
-    return 365 if n_points >= 2 * 365 else 7
 
 
 def _safe_datetime_index(index: pd.Index) -> pd.DatetimeIndex:
@@ -46,6 +40,165 @@ def _safe_datetime_index(index: pd.Index) -> pd.DatetimeIndex:
         return index
     dt = pd.to_datetime(index, errors="coerce")
     return pd.DatetimeIndex(dt)
+
+
+def _resolve_stl_period(n_points: int, stl_period: int | None) -> int:
+    """Détermine la période STL selon le nombre de points."""
+    if stl_period is not None:
+        return int(stl_period)
+    # Règle métier demandée
+    return 365 if n_points >= 2 * 365 else 7
+
+
+def detect_anomalies_ml(
+    df: pd.DataFrame,
+    value_cols: list[str],
+    contamination: float = 0.1,
+    min_points: int = 30,
+) -> dict[str, pd.DataFrame]:
+    """Détecte les anomalies multivariées avec Isolation Forest.
+
+    Args:
+        df: DataFrame avec DatetimeIndex et colonnes de métriques
+        value_cols: Liste des colonnes à analyser (CA_Total, Qty_Total, Nb_Clients)
+        contamination: Proportion attendue d'anomalies (0.05 à 0.15)
+        min_points: Nombre minimum de points requis
+
+    Returns:
+        Dict {col_name: DataFrame avec observed/anomaly_score/is_anomaly/direction}
+    """
+    if df is None or df.empty or len(df) < min_points:
+        return {
+            col: pd.DataFrame(
+                {"observed": [], "anomaly_score": [], "is_anomaly": [], "direction": []}
+            )
+            for col in value_cols
+        }
+
+    df_work = df.copy()
+    if not isinstance(df_work.index, pd.DatetimeIndex):
+        df_work.index = pd.to_datetime(df_work.index, errors="coerce")
+    df_work = df_work.sort_index()
+
+    # Filtrer les colonnes disponibles
+    available_cols = [
+        col
+        for col in value_cols
+        if col in df_work.columns and df_work[col].notna().sum() > 0
+    ]
+
+    if len(available_cols) < 2:
+        # Pas assez de métriques pour ML multivariée, fallback
+        return {
+            col: pd.DataFrame(
+                {
+                    "observed": df_work[col] if col in df_work.columns else [],
+                    "anomaly_score": 0.0,
+                    "is_anomaly": False,
+                    "direction": "",
+                },
+                index=df_work.index,
+            )
+            for col in value_cols
+        }
+
+    # Préparer les features
+    X = df_work[available_cols].copy()
+
+    # Remplir les NaN avec la médiane
+    for col in available_cols:
+        X[col] = pd.to_numeric(X[col], errors="coerce")
+        median_val = X[col].median()
+        X[col] = X[col].fillna(median_val if pd.notna(median_val) else 0)
+
+    # Vérifier qu'il reste des données exploitables
+    if X.isnull().all().all() or len(X.dropna()) < min_points:
+        return {
+            col: pd.DataFrame(
+                {
+                    "observed": df_work[col] if col in df_work.columns else [],
+                    "anomaly_score": 0.0,
+                    "is_anomaly": False,
+                    "direction": "",
+                },
+                index=df_work.index,
+            )
+            for col in value_cols
+        }
+
+    # Normalisation
+    scaler = StandardScaler()
+    try:
+        X_scaled = scaler.fit_transform(X)
+    except Exception:
+        return {
+            col: pd.DataFrame(
+                {
+                    "observed": df_work[col] if col in df_work.columns else [],
+                    "anomaly_score": 0.0,
+                    "is_anomaly": False,
+                    "direction": "",
+                },
+                index=df_work.index,
+            )
+            for col in value_cols
+        }
+
+    # Isolation Forest
+    iso_forest = IsolationForest(
+        contamination=contamination,
+        random_state=42,
+        n_estimators=100,
+        max_samples="auto",
+        bootstrap=False,
+    )
+
+    try:
+        # Prédiction: -1 pour anomalies, 1 pour normaux
+        predictions = iso_forest.fit_predict(X_scaled)
+
+        # Score d'anomalie (plus négatif = plus anormal)
+        scores = iso_forest.score_samples(X_scaled)
+
+        # Convertir en booléen et normaliser le score
+        is_anomaly = pd.Series(predictions == -1, index=df_work.index)
+        anomaly_score = pd.Series(
+            -scores, index=df_work.index
+        )  # Scores positifs pour anomalies
+
+    except Exception:
+        is_anomaly = pd.Series(False, index=df_work.index)
+        anomaly_score = pd.Series(0.0, index=df_work.index)
+
+    # Créer les résultats par métrique
+    results = {}
+    for col in value_cols:
+        if col not in df_work.columns:
+            results[col] = pd.DataFrame(
+                {"observed": [], "anomaly_score": [], "is_anomaly": [], "direction": []}
+            )
+            continue
+
+        obs = df_work[col].copy()
+
+        # Direction basée sur déviation par rapport à la médiane mobile
+        rolling_median = obs.rolling(window=min(30, len(obs)), min_periods=1).median()
+        deviation = obs - rolling_median
+        direction = pd.Series("", index=df_work.index, dtype=str)
+        direction.loc[is_anomaly & (deviation >= 0)] = "spike"
+        direction.loc[is_anomaly & (deviation < 0)] = "drop"
+
+        results[col] = pd.DataFrame(
+            {
+                "observed": obs,
+                "anomaly_score": anomaly_score,
+                "is_anomaly": is_anomaly,
+                "direction": direction,
+            },
+            index=df_work.index,
+        )
+
+    return results
 
 
 def detect_anomalies_stl_mad(
@@ -122,7 +275,11 @@ def detect_anomalies_stl_mad(
     out["expected"] = expected
     out["resid"] = resid
 
-    resid_valid = pd.to_numeric(out["resid"], errors="coerce").replace([np.inf, -np.inf], np.nan).dropna()
+    resid_valid = (
+        pd.to_numeric(out["resid"], errors="coerce")
+        .replace([np.inf, -np.inf], np.nan)
+        .dropna()
+    )
     med = float(resid_valid.median())
     mad = float((resid_valid.sub(med).abs()).median())
 
@@ -150,7 +307,7 @@ def detect_anomalies_stl_mad(
 def build_anomaly_report(
     df_daily: pd.DataFrame,
     value_cols: list[str] | None = None,
-    z_thresh: float = 3.5,
+    contamination: float = 0.1,
 ) -> dict[str, Any]:
     """Construit un rapport multi-métriques + score joint (>=2 métriques anormales).
 
@@ -159,7 +316,7 @@ def build_anomaly_report(
     Args:
         df_daily: DataFrame journalier (DatetimeIndex) avec colonnes métriques.
         value_cols: Colonnes à analyser.
-        z_thresh: Seuil |z|.
+        contamination: Proportion attendue d'anomalies (0.05 à 0.15).
 
     Returns:
         dict conforme à la structure demandée (params/by_metric/joint),
@@ -169,12 +326,11 @@ def build_anomaly_report(
         value_cols = ["CA_Total", "Qty_Total", "Nb_Clients"]
 
     if df_daily is None or df_daily.empty:
-        params = AnomalyParams(z_thresh=float(z_thresh), stl_period=7)
+        params = AnomalyParams(contamination=float(contamination))
         return {
             "params": {
                 "method": params.method,
-                "z_thresh": params.z_thresh,
-                "stl_period": params.stl_period,
+                "contamination": params.contamination,
                 "basis": params.basis,
             },
             "by_metric": {},
@@ -187,28 +343,35 @@ def build_anomaly_report(
         df.index = pd.to_datetime(df.index, errors="coerce")
     df = df.sort_index()
 
-    stl_period_resolved = _resolve_stl_period(len(df), None)
-    params = AnomalyParams(z_thresh=float(z_thresh), stl_period=int(stl_period_resolved))
+    # Adapter le contamination rate selon la taille de l'échantillon
+    adaptive_contamination = min(0.15, max(0.05, contamination))
+    params = AnomalyParams(contamination=float(adaptive_contamination))
 
     by_metric: dict[str, Any] = {}
     anom_map: dict[str, pd.DataFrame] = {}
 
+    # Détection ML multivariée
+    ml_results = detect_anomalies_ml(
+        df,
+        value_cols=value_cols,
+        contamination=adaptive_contamination,
+        min_points=params.min_points,
+    )
+
     for col in value_cols:
-        if col not in df.columns:
+        if col not in ml_results:
             continue
 
-        anom_df = detect_anomalies_stl_mad(
-            df[col],
-            stl_period=params.stl_period,
-            z_thresh=params.z_thresh,
-            min_points=params.min_points,
-        )
+        anom_df = ml_results[col]
         anom_map[col] = anom_df
 
+        if anom_df.empty:
+            by_metric[col] = {"n_anomalies": 0, "top": []}
+            continue
+
         anoms_only = anom_df.loc[anom_df["is_anomaly"]].copy()
-        if not anoms_only.empty:
-            anoms_only["abs_z"] = anoms_only["z"].abs()
-            anoms_only = anoms_only.sort_values("abs_z", ascending=False)
+        if not anoms_only.empty and "anomaly_score" in anoms_only.columns:
+            anoms_only = anoms_only.sort_values("anomaly_score", ascending=False)
 
         top = []
         for idx, row in anoms_only.head(10).iterrows():
@@ -216,16 +379,26 @@ def build_anomaly_report(
             top.append(
                 {
                     "date": date_str,
-                    "observed": float(row.get("observed", np.nan)) if pd.notna(row.get("observed", np.nan)) else None,
-                    "expected": float(row.get("expected", np.nan)) if pd.notna(row.get("expected", np.nan)) else None,
-                    "resid": float(row.get("resid", np.nan)) if pd.notna(row.get("resid", np.nan)) else None,
-                    "z": float(row.get("z", np.nan)) if pd.notna(row.get("z", np.nan)) else None,
+                    "observed": (
+                        float(row.get("observed", np.nan))
+                        if pd.notna(row.get("observed", np.nan))
+                        else None
+                    ),
+                    "anomaly_score": (
+                        float(row.get("anomaly_score", np.nan))
+                        if pd.notna(row.get("anomaly_score", np.nan))
+                        else None
+                    ),
                     "direction": str(row.get("direction", "")),
                 }
             )
 
         by_metric[col] = {
-            "n_anomalies": int(anom_df["is_anomaly"].sum()) if "is_anomaly" in anom_df.columns else 0,
+            "n_anomalies": (
+                int(anom_df["is_anomaly"].sum())
+                if "is_anomaly" in anom_df.columns
+                else 0
+            ),
             "top": top,
         }
 
@@ -244,11 +417,20 @@ def build_anomaly_report(
 
         if int(joint_mask.sum()) > 0:
             rows = []
-            for dt, score in joint_score.loc[joint_mask].sort_values(ascending=False).head(10).items():
+            for dt, score in (
+                joint_score.loc[joint_mask]
+                .sort_values(ascending=False)
+                .head(10)
+                .items()
+            ):
                 metrics_hit = [m for m in flags.columns if int(flags.loc[dt, m]) == 1]
                 parts = []
                 for m in metrics_hit:
-                    d = anom_map[m].loc[dt, "direction"] if dt in anom_map[m].index else ""
+                    d = (
+                        anom_map[m].loc[dt, "direction"]
+                        if dt in anom_map[m].index
+                        else ""
+                    )
                     if d:
                         parts.append(f"{m}: {d}")
                     else:
@@ -266,8 +448,7 @@ def build_anomaly_report(
     return {
         "params": {
             "method": params.method,
-            "z_thresh": params.z_thresh,
-            "stl_period": params.stl_period,
+            "contamination": params.contamination,
             "basis": params.basis,
         },
         "by_metric": by_metric,

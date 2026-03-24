@@ -18,12 +18,12 @@
             connectionOpacity: 0.3,
             connectionWidth: 2,
             colors: [
-                { r: 240, g: 147, b: 251 }, // Rose
-                { r: 102, g: 126, b: 234 }, // Bleu violet
-                { r: 79, g: 172, b: 254 },  // Bleu clair
-                { r: 0, g: 242, b: 254 },   // Cyan
-                { r: 255, g: 255, b: 255 }, // Blanc
-                { r: 118, g: 75, b: 162 }   // Violet foncé
+                { r: 96, g: 165, b: 250 },  // Blue
+                { r: 129, g: 140, b: 248 }, // Indigo
+                { r: 148, g: 163, b: 184 }, // Slate
+                { r: 255, g: 255, b: 255 }, // White
+                { r: 59, g: 130, b: 246 },  // Blue darker
+                { r: 199, g: 210, b: 254 }  // Light indigo
             ]
         },
         parallax: {

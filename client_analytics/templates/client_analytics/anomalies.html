@@ -43,6 +43,9 @@
                 </div>
             </a>
         </div>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Changer le thème">
+            <i class="bi bi-moon-fill"></i>
+        </button>
         <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
             <i class="bi bi-arrow-left-circle"></i>
             <span>Accueil</span>
@@ -68,7 +71,6 @@ document.addEventListener('DOMContentLoaded', function() {
 {% endblock %}
 
 {% block content %}
-<canvas id="scientificParticles"></canvas>
 
 <script>
     document.body.classList.add('analysis-page');

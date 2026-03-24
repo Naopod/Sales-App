@@ -19,11 +19,27 @@
 
 {% if anom_client.graphs and anom_client.graphs.timeline %}
 <div class="mb-3">
+    <h6 class="text-primary"><i class="bi bi-graph-up"></i> Évolution des métriques avec anomalies ML</h6>
     <img
         class="img-fluid"
         alt="Graphique timeline anomalies client"
         src="data:image/png;base64,{{ anom_client.graphs.timeline }}"
     />
+</div>
+{% endif %}
+
+{% if anom_client.graphs and anom_client.graphs.scores_ml %}
+<div class="mb-3">
+    <h6 class="text-danger"><i class="bi bi-bar-chart-fill"></i> Scores d'anomalie ML (Isolation Forest)</h6>
+    <img
+        class="img-fluid"
+        alt="Graphique scores anomalie ML"
+        src="data:image/png;base64,{{ anom_client.graphs.scores_ml }}"
+    />
+    <div class="alert alert-info mt-2 small">
+        <strong><i class="bi bi-info-circle"></i> Méthode de détection :</strong> Isolation Forest (Machine Learning).<br>
+        Cette approche multivarié analyse simultanément <strong>Montant, Quantité et Fréquence</strong> pour identifier les comportements atypiques du client.
+    </div>
 </div>
 {% endif %}
 
@@ -39,7 +55,7 @@
                             <tr>
                                 <th>Période</th>
                                 <th class="text-end">Valeur</th>
-                                <th class="text-end">Z</th>
+                                <th class="text-end">Score ML</th>
                                 <th>Sens</th>
                             </tr>
                         </thead>
@@ -48,7 +64,7 @@
                             <tr>
                                 <td>{{ r.period }}</td>
                                 <td class="text-end">{{ r.value|floatformat:2 }}</td>
-                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td class="text-end">{{ r.anomaly_score|floatformat:3 }}</td>
                                 <td>{{ r.direction|default:"" }}</td>
                             </tr>
                             {% endfor %}
@@ -73,7 +89,7 @@
                             <tr>
                                 <th>Période</th>
                                 <th class="text-end">Valeur</th>
-                                <th class="text-end">Z</th>
+                                <th class="text-end">Score ML</th>
                                 <th>Sens</th>
                             </tr>
                         </thead>
@@ -82,7 +98,7 @@
                             <tr>
                                 <td>{{ r.period }}</td>
                                 <td class="text-end">{{ r.value|floatformat:0 }}</td>
-                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td class="text-end">{{ r.anomaly_score|floatformat:3 }}</td>
                                 <td>{{ r.direction|default:"" }}</td>
                             </tr>
                             {% endfor %}
@@ -107,7 +123,7 @@
                             <tr>
                                 <th>Période</th>
                                 <th class="text-end">Valeur</th>
-                                <th class="text-end">Z</th>
+                                <th class="text-end">Score ML</th>
                                 <th>Sens</th>
                             </tr>
                         </thead>
@@ -116,7 +132,7 @@
                             <tr>
                                 <td>{{ r.period }}</td>
                                 <td class="text-end">{{ r.value|floatformat:2 }}</td>
-                                <td class="text-end">{{ r.z|floatformat:2 }}</td>
+                                <td class="text-end">{{ r.anomaly_score|floatformat:3 }}</td>
                                 <td>{{ r.direction|default:"" }}</td>
                             </tr>
                             {% endfor %}
@@ -168,7 +184,7 @@
 {% if show_timeline|default:True %}
 <div class="card mt-2">
     <div class="card-header">
-        <strong>Timeline</strong> — toutes les périodes (valeurs & z-scores)
+        <strong>Timeline</strong> — toutes les périodes (valeurs & scores ML)
     </div>
     <div class="card-body">
         {% if anom_client.series %}
@@ -178,11 +194,11 @@
                     <tr>
                         <th>Période</th>
                         <th class="text-end">CA</th>
-                        <th class="text-end">Z</th>
+                        <th class="text-end">Score</th>
                         <th class="text-end">Fréq.</th>
-                        <th class="text-end">Z</th>
+                        <th class="text-end">Score</th>
                         <th class="text-end">Qté</th>
-                        <th class="text-end">Z</th>
+                        <th class="text-end">Score</th>
                         <th class="text-end">Prix</th>
                         <th class="text-end">Z</th>
                     </tr>
@@ -197,12 +213,7 @@
                             {% if r.is_anomaly_ca %}<span class="badge bg-danger ms-1">A</span>{% endif %}
                         </td>
                         <td class="text-end {% if r.is_anomaly_ca %}text-danger fw-semibold{% endif %}">
-                            {% if r.z_ca is not None and r.z_ca >= 900 or r.z_ca is not None and r.z_ca <= -900 %}
-                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
-                                <span class="text-muted" title="Valeur technique">({{ r.z_ca|floatformat:0 }})</span>
-                            {% else %}
-                                {{ r.z_ca|floatformat:2 }}
-                            {% endif %}
+                            {{ r.anomaly_score_ca|floatformat:3 }}
                         </td>
 
                         <td class="text-end {% if r.is_anomaly_freq %}text-danger fw-semibold{% endif %}">
@@ -210,12 +221,7 @@
                             {% if r.is_anomaly_freq %}<span class="badge bg-danger ms-1">A</span>{% endif %}
                         </td>
                         <td class="text-end {% if r.is_anomaly_freq %}text-danger fw-semibold{% endif %}">
-                            {% if r.z_freq is not None and r.z_freq >= 900 or r.z_freq is not None and r.z_freq <= -900 %}
-                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
-                                <span class="text-muted" title="Valeur technique">({{ r.z_freq|floatformat:0 }})</span>
-                            {% else %}
-                                {{ r.z_freq|floatformat:2 }}
-                            {% endif %}
+                            {{ r.anomaly_score_freq|floatformat:3 }}
                         </td>
 
                         <td class="text-end {% if r.is_anomaly_qty %}text-danger fw-semibold{% endif %}">
@@ -223,12 +229,7 @@
                             {% if r.is_anomaly_qty %}<span class="badge bg-danger ms-1">A</span>{% endif %}
                         </td>
                         <td class="text-end {% if r.is_anomaly_qty %}text-danger fw-semibold{% endif %}">
-                            {% if r.z_qty is not None and r.z_qty >= 900 or r.z_qty is not None and r.z_qty <= -900 %}
-                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
-                                <span class="text-muted" title="Valeur technique">({{ r.z_qty|floatformat:0 }})</span>
-                            {% else %}
-                                {{ r.z_qty|floatformat:2 }}
-                            {% endif %}
+                            {{ r.anomaly_score_qty|floatformat:3 }}
                         </td>
 
                         <td class="text-end {% if r.is_anomaly_price %}text-danger fw-semibold{% endif %}">
@@ -236,19 +237,17 @@
                             {% if r.is_anomaly_price %}<span class="badge bg-danger ms-1">A</span>{% endif %}
                         </td>
                         <td class="text-end {% if r.is_anomaly_price %}text-danger fw-semibold{% endif %}">
-                            {% if r.z_price is not None and r.z_price >= 900 or r.z_price is not None and r.z_price <= -900 %}
-                                <span class="badge bg-secondary" title="MAD=0 : historique quasi-constant, rupture détectée">MAD=0</span>
-                                <span class="text-muted" title="Valeur technique">({{ r.z_price|floatformat:0 }})</span>
-                            {% else %}
-                                {{ r.z_price|floatformat:2 }}
-                            {% endif %}
+                            {{ r.anomaly_score_price|floatformat:3 }}
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        <div class="form-text mt-2">A = période marquée anormale (|z| ≥ {{ anom_client.meta.z_thresh|default:3.5 }}).</div>
+        <div class="form-text mt-2">
+            <strong>A</strong> = période marquée anormale par Isolation Forest (algorithme ML).<br>
+            <strong>Score</strong> = score d'anomalie (plus élevé = plus anormal).
+        </div>
         {% else %}
         <div class="text-muted">Aucune série disponible.</div>
         {% endif %}
