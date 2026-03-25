@@ -119,9 +119,9 @@ def create_correlation_matrix(df, variables):
         fig.update_layout(
             title='Matrice de corrélation',
             height=400,
-            template='plotly_dark',
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            template='plotly_white',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         return _to_html_responsive(fig)
     except Exception as e:
@@ -141,13 +141,13 @@ def create_distribution_plot(df, variable, title=None):
             nbins=50,
             title=title,
             labels={variable: variable},
-            template='plotly_dark'
+            template='plotly_white'
         )
         fig.update_layout(
             height=350,
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         return _to_html_responsive(fig)
     except Exception as e:
@@ -169,13 +169,13 @@ def create_top_categories_plot(df, category_col, value_col, n_top=10, title=None
             orientation='h',
             title=title,
             labels={'x': f'{value_col} (€)', 'y': category_col},
-            template='plotly_dark'
+            template='plotly_white'
         )
         fig.update_layout(
             height=400,
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         return _to_html_responsive(fig)
     except Exception as e:
@@ -213,8 +213,8 @@ def create_temporal_aggregation_plot(df, time_col, value_col, granularity='month
         fig.update_layout(
             height=400,
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         return _to_html_responsive(fig)
     except Exception as e:
@@ -260,16 +260,16 @@ def create_temporal_evolution_plot(df, time_col, value_col, granularity='month')
             yaxis_title='CA (€)',
             height=400,
             showlegend=False,
-            template='plotly_dark',
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            template='plotly_white',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
                 tickangle=-45,
-                tickfont=dict(size=10, color='white')
+                tickfont=dict(size=10)
             ),
             yaxis=dict(
-                tickfont=dict(size=11, color='white'),
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                tickfont=dict(size=11),
+                gridcolor='rgba(200,200,200,0.3)'
             )
         )
         
@@ -317,10 +317,10 @@ def create_variation_plot(df, time_col, value_col, granularity='month'):
             xaxis_title='Période',
             yaxis_title='Variation (%)',
             height=400,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         return _to_html_responsive(fig)
     except Exception as e:
@@ -363,9 +363,9 @@ def create_ca_repartition_pie(df, time_col, value_col, granularity='month'):
         fig.update_layout(
             title=titles.get(granularity, 'Répartition du CA'),
             height=450,
-            template='plotly_dark',
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            template='plotly_white',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             showlegend=True,
             legend=dict(
                 orientation="v",
@@ -446,16 +446,16 @@ def create_top_periods_bar(df, time_col, value_col, granularity='month', n_top=5
             xaxis_title='CA (€)',
             yaxis_title='Période',
             height=350,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
-                tickfont=dict(size=10, color='white'),
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                tickfont=dict(size=10),
+                gridcolor='rgba(200,200,200,0.3)'
             ),
             yaxis=dict(
-                tickfont=dict(size=10, color='white')
+                tickfont=dict(size=10)
             )
         )
         
@@ -506,17 +506,17 @@ def create_ca_moyen_per_transaction(df, time_col, value_col, granularity='month'
             xaxis_title='Période',
             yaxis_title='CA Moyen (€)',
             height=400,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
                 tickangle=-45,
-                tickfont=dict(size=10, color='white')
+                tickfont=dict(size=10)
             ),
             yaxis=dict(
-                tickfont=dict(size=11, color='white'),
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                tickfont=dict(size=11),
+                gridcolor='rgba(200,200,200,0.3)'
             )
         )
         
@@ -565,17 +565,17 @@ def create_stability_chart(df, time_col, value_col, granularity='month'):
             xaxis_title='Période',
             yaxis_title='Écart-type (€)',
             height=400,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
                 tickangle=-45,
-                tickfont=dict(size=10, color='white')
+                tickfont=dict(size=10)
             ),
             yaxis=dict(
-                tickfont=dict(size=11, color='white'),
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                tickfont=dict(size=11),
+                gridcolor='rgba(200,200,200,0.3)'
             ),
             annotations=[
                 dict(
@@ -585,7 +585,7 @@ def create_stability_chart(df, time_col, value_col, granularity='month'):
                     yref='paper',
                     text='🟢 Vert = Stable (faible variation) | 🟠 Orange = Volatile (forte variation)',
                     showarrow=False,
-                    font=dict(size=10, color='white'),
+                    font=dict(size=10),
                     xanchor='center'
                 )
             ]
@@ -644,10 +644,10 @@ def create_qq_plot(df, variable):
             xaxis_title='Quantiles théoriques (distribution normale)',
             yaxis_title='Quantiles empiriques (données)',
             height=400,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=True,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         
         return _to_html_responsive(fig)
@@ -705,11 +705,11 @@ def create_normality_test_plot(df, variable):
             xaxis_title=variable,
             yaxis_title='Densité de probabilité',
             height=400,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=True,
             bargap=0.1,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         
         return _to_html_responsive(fig)
@@ -747,10 +747,10 @@ def create_outliers_boxplot(df, variables):
             title='Analyse des Valeurs Aberrantes (Boxplot)',
             yaxis_title='Valeur',
             height=500,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=True,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         
         return _to_html_responsive(fig)
@@ -795,11 +795,11 @@ def create_correlation_heatmap_enhanced(df, variables):
         fig.update_layout(
             title='Matrice de Corrélation (Triangle inférieur)',
             height=450,
-            template='plotly_dark',
+            template='plotly_white',
             xaxis=dict(side='bottom'),
             yaxis=dict(autorange='reversed'),
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         
         return _to_html_responsive(fig)
@@ -865,24 +865,24 @@ def create_monthly_evolution_plot(df, time_col, value_col, stat_type='mean', tit
             xaxis_title='Période (Mois)',
             yaxis_title=f'{value_col} (€)' if 'Montant' in value_col or 'PU' in value_col else value_col,
             height=450,
-            template='plotly_dark',
+            template='plotly_white',
             showlegend=False,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
                 tickangle=-45,
                 tickmode='auto',
-                tickfont=dict(size=11, color='white'),
+                tickfont=dict(size=11),
                 showgrid=True,
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                gridcolor='rgba(200,200,200,0.3)'
             ),
             yaxis=dict(
-                tickfont=dict(size=11, color='white'),
+                tickfont=dict(size=11),
                 showgrid=True,
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                gridcolor='rgba(200,200,200,0.3)'
             ),
             hovermode='x unified',
-            font=dict(color='white')
+            font=dict()
         )
         
         return _to_html_responsive(fig)
@@ -948,20 +948,20 @@ def create_distribution_by_month(df, time_col, value_col, title=None, granularit
             xaxis_title=f'Période ({period_label})',
             yaxis_title=f'{value_col} (€)' if 'Montant' in value_col or 'PU' in value_col else value_col,
             height=500,
-            template='plotly_dark',
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            template='plotly_white',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
                 tickangle=-45,
-                tickfont=dict(size=10, color='white'),
+                tickfont=dict(size=10),
                 showgrid=False
             ),
             yaxis=dict(
-                tickfont=dict(size=11, color='white'),
+                tickfont=dict(size=11),
                 showgrid=True,
-                gridcolor='rgba(128, 128, 128, 0.2)'
+                gridcolor='rgba(200,200,200,0.3)'
             ),
-            font=dict(color='white'),
+            font=dict(),
             violinmode='group'
         )
         
@@ -996,26 +996,26 @@ def create_boxplot_by_month(df, time_col, value_col, title=None):
             x=time_col,
             y=value_col,
             title=title,
-            template='plotly_dark',
+            template='plotly_white',
             points='outliers'  # Afficher uniquement les outliers
         )
         
         fig.update_layout(
             height=450,
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(
                 tickangle=-45,
-                tickfont=dict(size=11, color='white'),
+                tickfont=dict(size=11),
                 title='Période (Mois)',
-                title_font=dict(color='white')
+                title_font=dict()
             ),
             yaxis=dict(
-                tickfont=dict(size=11, color='white'),
+                tickfont=dict(size=11),
                 title=f'{value_col} (€)' if 'Montant' in value_col or 'PU' in value_col else value_col,
-                title_font=dict(color='white')
+                title_font=dict()
             ),
-            font=dict(color='white')
+            font=dict()
         )
         
         fig.update_traces(marker_color='rgb(99, 110, 250)')

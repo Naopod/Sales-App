@@ -7,21 +7,6 @@
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
 <style>
-.interpretation-box {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 20px;
-    border-radius: 10px;
-    margin: 20px 0;
-}
-.interpretation-box h5 {
-    color: white;
-    font-weight: bold;
-}
-.interpretation-box ul {
-    margin-bottom: 0;
-}
-
 /* Plotly (onglet Produits) : éviter l'espace blanc à droite */
 .products-plotly {
     overflow-x: hidden;
@@ -34,12 +19,87 @@
 {% endblock %}
 
 {% block dataset_nav %}
+<<<<<<< HEAD
 {% include 'client_analytics/partials/_dataset_nav_tabs.html' %}
+=======
+<nav class="analysis-nav" id="analysisNav">
+    <div class="container-fluid">
+        <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
+            <i class="bi bi-chevron-up"></i>
+        </button>
+        <div class="analysis-tabs" id="analysisTabs">
+            <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-info-circle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Overview</span>
+                    <span class="tab-subtitle">Description des données</span>
+                </div>
+            </a>
+            <a class="analysis-tab active" href="{% url 'client_analytics:stats' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-bar-chart-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Statistiques</span>
+                    <span class="tab-subtitle">Analyse de données</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-diagram-3-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Clustering</span>
+                    <span class="tab-subtitle">Segmentation K-Means</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:anomalies' dataset.pk %}">
+                <div class="tab-icon">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Détection d'Anomalies</span>
+                    <span class="tab-subtitle">Portefeuille client</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="#" onclick="alert('Fonctionnalité en développement'); return false;" style="opacity: 0.7;">
+                <div class="tab-icon">
+                    <i class="bi bi-graph-up-arrow"></i>
+                </div>
+                <div class="tab-content">
+                    <span class="tab-title">Projections</span>
+                    <span class="tab-subtitle">Prévisions & Tendances</span>
+                </div>
+            </a>
+        </div>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Changer le thème">
+            <i class="bi bi-moon-fill"></i>
+        </button>
+        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
+            <i class="bi bi-arrow-left-circle"></i>
+            <span>Accueil</span>
+        </a>
+    </div>
+</nav>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const navToggleBtn = document.getElementById('navToggleBtn');
+    const analysisNav = document.getElementById('analysisNav');
+    const isCollapsed = localStorage.getItem('navCollapsed') === 'true';
+    if (isCollapsed) analysisNav.classList.add('collapsed');
+    navToggleBtn?.addEventListener('click', function() {
+        analysisNav.classList.toggle('collapsed');
+        localStorage.setItem('navCollapsed', analysisNav.classList.contains('collapsed'));
+    });
+});
+</script>
+>>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
 {% endblock %}
 
 {% block content %}
-<!-- Canvas Particules Scientifiques -->
-<canvas id="scientificParticles"></canvas>
 
 <script>
     document.body.classList.add('analysis-page');
@@ -69,7 +129,7 @@
         <div class="card bg-primary text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Transactions</h6>
-                <h3>{{ kpis.total_transactions|default:"—" }}</h3>
+                <h3>{{ kpis.total_transactions|default:"" }}</h3>
             </div>
         </div>
     </div>
@@ -77,7 +137,7 @@
         <div class="card bg-success text-white kpi-card">
             <div class="card-body text-center">
                 <h6>CA Total</h6>
-                <h3 style="font-size: 1.3rem;">{{ kpis.ca_total|default:"—" }}</h3>
+                <h3 style="font-size: 1.3rem;">{{ kpis.ca_total|default:"" }}</h3>
             </div>
         </div>
     </div>
@@ -85,7 +145,7 @@
         <div class="card bg-info text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Clients</h6>
-                <h3>{{ kpis.nb_clients|default:"—" }}</h3>
+                <h3>{{ kpis.nb_clients|default:"" }}</h3>
             </div>
         </div>
     </div>
@@ -93,7 +153,7 @@
         <div class="card bg-warning text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Familles</h6>
-                <h3>{{ kpis.nb_familles|default:"—" }}</h3>
+                <h3>{{ kpis.nb_familles|default:"" }}</h3>
             </div>
         </div>
     </div>
@@ -101,7 +161,7 @@
         <div class="card bg-danger text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Panier Moyen</h6>
-                <h3 style="font-size: 1.3rem;">{{ kpis.panier_moyen|default:"—" }}</h3>
+                <h3 style="font-size: 1.3rem;">{{ kpis.panier_moyen|default:"" }}</h3>
             </div>
         </div>
     </div>
@@ -109,7 +169,7 @@
         <div class="card bg-secondary text-white kpi-card">
             <div class="card-body text-center">
                 <h6>Pays</h6>
-                <h3>{{ kpis.nb_pays|default:"—" }}</h3>
+                <h3>{{ kpis.nb_pays|default:"" }}</h3>
             </div>
         </div>
     </div>
@@ -166,9 +226,9 @@
 
 <div class="tab-content" id="analysisTabContent">
     
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ------------------------------------------------------------ -->
     <!-- ONGLET 1: ANALYSE PAR PÉRIODES -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ------------------------------------------------------------ -->
     <div class="tab-pane fade {% if not active_tab or active_tab == 'statistics' %}show active{% endif %}" id="stats" role="tabpanel">
         
         <h2 class="mb-4 mt-4"><i class="bi bi-bar-chart-line"></i> Analyse par périodes</h2>
@@ -206,7 +266,7 @@
                             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
                                 {% if results_month.available_months %}
-                                <select class="form-select form-select-sm w-auto" id="monthStatsSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                <select class="form-select form-select-sm w-auto" id="monthStatsSelector" >
                                     {% for month in results_month.available_months %}
                                     <option value="{{ month }}">{{ month }}</option>
                                     {% endfor %}
@@ -272,7 +332,7 @@
                         <div class="card">
                             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Distribution par Mois (Violin Plot)</h5>
-                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelector" >
                                     {% if graphs_month.distribution_montant_by_month %}
                                     <option value="montant">Montant</option>
                                     {% endif %}
@@ -455,7 +515,7 @@
                             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
                                 {% if results_quarter.available_months %}
-                                <select class="form-select form-select-sm w-auto" id="quarterStatsSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                <select class="form-select form-select-sm w-auto" id="quarterStatsSelector" >
                                     {% for month in results_quarter.available_months %}
                                     <option value="{{ month }}">{{ month }}</option>
                                     {% endfor %}
@@ -521,7 +581,7 @@
                         <div class="card">
                             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Distribution par Trimestre (Violin Plot)</h5>
-                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelectorQuarter" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelectorQuarter" >
                                     {% if graphs_quarter.distribution_montant_by_month %}
                                     <option value="montant">Montant</option>
                                     {% endif %}
@@ -685,7 +745,7 @@
                             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0">📊 Tableau des Statistiques Descriptives</h5>
                                 {% if results_fiscal.available_months %}
-                                <select class="form-select form-select-sm w-auto" id="fiscalStatsSelector" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                <select class="form-select form-select-sm w-auto" id="fiscalStatsSelector" >
                                     {% for month in results_fiscal.available_months %}
                                     <option value="{{ month }}">{{ month }}</option>
                                     {% endfor %}
@@ -751,7 +811,7 @@
                         <div class="card">
                             <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                                 <h5 class="mb-0"><i class="bi bi-bar-chart-fill"></i> Distribution par Année (Violin Plot)</h5>
-                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelectorFiscal" style="background-color: rgba(255,255,255,0.2); border-color: rgba(255,255,255,0.3); color: white;">
+                                <select class="form-select form-select-sm w-auto" id="histogramVariableSelectorFiscal" >
                                     {% if graphs_fiscal.distribution_montant_by_month %}
                                     <option value="montant">Montant</option>
                                     {% endif %}
@@ -904,9 +964,9 @@
         
     </div>
     
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ------------------------------------------------------------ -->
     <!-- ONGLET 2: ANALYSE SÉRIE TEMPORELLE -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ------------------------------------------------------------ -->
     <div class="tab-pane fade {% if active_tab == 'temporal' %}show active{% endif %}" id="temporal" role="tabpanel">
         
         <h2 class="mb-4 mt-4"><i class="bi bi-calendar3"></i> Analyse Série temporelle</h2>
@@ -949,17 +1009,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>CA</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_month.insights.ca.last_period }} — {{ results_month.insights.ca.last_value|floatformat:0 }} €</div>
-                                {% if results_month.insights.ca.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_month.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_month.insights.ca.last_period }} "" {{ results_month.insights.ca.last_value|floatformat:0 }} €</div>
+                                {% if results_month.insights.ca.pct_change_last != None %}<div><strong>Î":</strong> {{ results_month.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_month.insights.ca.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_month.insights.ca.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_month.insights.ca.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                    {% for it in results_month.insights.ca.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }} €</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_month.insights.ca.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                    {% for it in results_month.insights.ca.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }} €</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -971,17 +1031,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_month.insights.qty.last_period }} — {{ results_month.insights.qty.last_value|floatformat:0 }}</div>
-                                {% if results_month.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_month.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_month.insights.qty.last_period }} "" {{ results_month.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_month.insights.qty.pct_change_last != None %}<div><strong>Î":</strong> {{ results_month.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_month.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_month.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_month.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_month.insights.qty.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_month.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_month.insights.qty.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -993,17 +1053,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_month.insights.clients.last_period }} — {{ results_month.insights.clients.last_value|floatformat:0 }}</div>
-                                {% if results_month.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_month.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_month.insights.clients.last_period }} "" {{ results_month.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_month.insights.clients.pct_change_last != None %}<div><strong>Î":</strong> {{ results_month.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_month.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_month.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_month.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_month.insights.clients.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_month.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_month.insights.clients.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1035,13 +1095,13 @@
                 </div>
                 {% endif %}
 
-                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d'anomalies (CA / Qty / Clients)</h3>
                 {% if results_month.anomalies %}
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-dark text-white">
-                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                                <h5 class="mb-0">🚨 Détection d'anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
@@ -1071,9 +1131,7 @@
                                             <tr>
                                                 <th>Date</th>
                                                 <th class="text-end">Observed</th>
-                                                <th class="text-end">Expected</th>
-                                                <th class="text-end">Resid</th>
-                                                <th class="text-end">z</th>
+                                                <th class="text-end">Score ML</th>
                                                 <th>Direction</th>
                                             </tr>
                                         </thead>
@@ -1082,9 +1140,7 @@
                                             <tr>
                                                 <td>{{ it.date }}</td>
                                                 <td class="text-end">{{ it.observed|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td class="text-end">{{ it.anomaly_score|floatformat:3 }}</td>
                                                 <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
                                             </tr>
                                             {% endfor %}
@@ -1101,9 +1157,7 @@
                                             <tr>
                                                 <th>Date</th>
                                                 <th class="text-end">Observed</th>
-                                                <th class="text-end">Expected</th>
-                                                <th class="text-end">Resid</th>
-                                                <th class="text-end">z</th>
+                                                <th class="text-end">Score ML</th>
                                                 <th>Direction</th>
                                             </tr>
                                         </thead>
@@ -1112,9 +1166,7 @@
                                             <tr>
                                                 <td>{{ it.date }}</td>
                                                 <td class="text-end">{{ it.observed|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td class="text-end">{{ it.anomaly_score|floatformat:3 }}</td>
                                                 <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
                                             </tr>
                                             {% endfor %}
@@ -1131,9 +1183,7 @@
                                             <tr>
                                                 <th>Date</th>
                                                 <th class="text-end">Observed</th>
-                                                <th class="text-end">Expected</th>
-                                                <th class="text-end">Resid</th>
-                                                <th class="text-end">z</th>
+                                                <th class="text-end">Score ML</th>
                                                 <th>Direction</th>
                                             </tr>
                                         </thead>
@@ -1142,9 +1192,7 @@
                                             <tr>
                                                 <td>{{ it.date }}</td>
                                                 <td class="text-end">{{ it.observed|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.expected|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.resid|floatformat:0 }}</td>
-                                                <td class="text-end">{{ it.z|floatformat:2 }}</td>
+                                                <td class="text-end">{{ it.anomaly_score|floatformat:3 }}</td>
                                                 <td>{% if it.direction %}<span class="badge bg-secondary">{{ it.direction }}</span>{% endif %}</td>
                                             </tr>
                                             {% endfor %}
@@ -1182,7 +1230,7 @@
                 </div>
                 {% else %}
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Détection d’anomalies indisponible.
+                    <i class="bi bi-info-circle"></i> Détection d'anomalies indisponible.
                 </div>
                 {% endif %}
                 
@@ -1252,17 +1300,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>CA</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_quarter.insights.ca.last_period }} — {{ results_quarter.insights.ca.last_value|floatformat:0 }} €</div>
-                                {% if results_quarter.insights.ca.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.ca.last_period }} "" {{ results_quarter.insights.ca.last_value|floatformat:0 }} €</div>
+                                {% if results_quarter.insights.ca.pct_change_last != None %}<div><strong>Î":</strong> {{ results_quarter.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_quarter.insights.ca.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.ca.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_quarter.insights.ca.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                    {% for it in results_quarter.insights.ca.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }} €</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_quarter.insights.ca.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                    {% for it in results_quarter.insights.ca.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }} €</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1274,17 +1322,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_quarter.insights.qty.last_period }} — {{ results_quarter.insights.qty.last_value|floatformat:0 }}</div>
-                                {% if results_quarter.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.qty.last_period }} "" {{ results_quarter.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_quarter.insights.qty.pct_change_last != None %}<div><strong>Î":</strong> {{ results_quarter.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_quarter.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_quarter.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_quarter.insights.qty.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_quarter.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_quarter.insights.qty.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1296,17 +1344,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_quarter.insights.clients.last_period }} — {{ results_quarter.insights.clients.last_value|floatformat:0 }}</div>
-                                {% if results_quarter.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.clients.last_period }} "" {{ results_quarter.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_quarter.insights.clients.pct_change_last != None %}<div><strong>Î":</strong> {{ results_quarter.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_quarter.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_quarter.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_quarter.insights.clients.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_quarter.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_quarter.insights.clients.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1338,13 +1386,13 @@
                 </div>
                 {% endif %}
 
-                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d'anomalies (CA / Qty / Clients)</h3>
                 {% if results_quarter.anomalies %}
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-dark text-white">
-                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                                <h5 class="mb-0">🚨 Détection d'anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
@@ -1563,7 +1611,7 @@
                 </div>
                 {% else %}
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Détection d’anomalies indisponible.
+                    <i class="bi bi-info-circle"></i> Détection d'anomalies indisponible.
                 </div>
                 {% endif %}
                 
@@ -1633,17 +1681,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>CA</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.ca.last_period }} — {{ results_fiscal.insights.ca.last_value|floatformat:0 }} €</div>
-                                {% if results_fiscal.insights.ca.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_fiscal.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.ca.last_period }} "" {{ results_fiscal.insights.ca.last_value|floatformat:0 }} €</div>
+                                {% if results_fiscal.insights.ca.pct_change_last != None %}<div><strong>Î":</strong> {{ results_fiscal.insights.ca.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_fiscal.insights.ca.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_fiscal.insights.ca.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_fiscal.insights.ca.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                    {% for it in results_fiscal.insights.ca.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }} €</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_fiscal.insights.ca.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }} €</li>{% endfor %}
+                                    {% for it in results_fiscal.insights.ca.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }} €</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1655,17 +1703,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.qty.last_period }} — {{ results_fiscal.insights.qty.last_value|floatformat:0 }}</div>
-                                {% if results_fiscal.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_fiscal.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.qty.last_period }} "" {{ results_fiscal.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_fiscal.insights.qty.pct_change_last != None %}<div><strong>Î":</strong> {{ results_fiscal.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_fiscal.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_fiscal.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_fiscal.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_fiscal.insights.qty.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_fiscal.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_fiscal.insights.qty.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1677,17 +1725,17 @@
                         <div class="card">
                             <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
                             <div class="card-body">
-                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.clients.last_period }} — {{ results_fiscal.insights.clients.last_value|floatformat:0 }}</div>
-                                {% if results_fiscal.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_fiscal.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                <div><strong>Dernière:</strong> {{ results_fiscal.insights.clients.last_period }} "" {{ results_fiscal.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_fiscal.insights.clients.pct_change_last != None %}<div><strong>Î":</strong> {{ results_fiscal.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
                                 {% if results_fiscal.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_fiscal.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
                                 <hr class="my-2">
                                 <div class="small"><strong>Top 3</strong></div>
                                 <ul class="small mb-2">
-                                    {% for it in results_fiscal.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_fiscal.insights.clients.top_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                                 <div class="small"><strong>Flop 3</strong></div>
                                 <ul class="small mb-0">
-                                    {% for it in results_fiscal.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                    {% for it in results_fiscal.insights.clients.bottom_periods %}<li>{{ it.period }} "" {{ it.value|floatformat:0 }}</li>{% endfor %}
                                 </ul>
                             </div>
                         </div>
@@ -1737,13 +1785,13 @@
                 {% endif %}
                 {% endif %}
 
-                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d'anomalies (CA / Qty / Clients)</h3>
                 {% if results_fiscal.anomalies %}
                 <div class="row mb-4">
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-dark text-white">
-                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                                <h5 class="mb-0">🚨 Détection d'anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
                             </div>
                             <div class="card-body">
                                 <div class="mb-3">
@@ -1884,7 +1932,7 @@
                 </div>
                 {% else %}
                 <div class="alert alert-info">
-                    <i class="bi bi-info-circle"></i> Détection d’anomalies indisponible.
+                    <i class="bi bi-info-circle"></i> Détection d'anomalies indisponible.
                 </div>
                 {% endif %}
                 
@@ -1923,9 +1971,9 @@
         
     </div>
     
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ------------------------------------------------------------ -->
     <!-- ONGLET 3: ANALYSE TEMPORELLE APPROFONDIE - SUPPRIMER TOUT CE BLOC -->
-    <!-- ═══════════════════════════════════════════════════════════════ -->
+    <!-- ------------------------------------------------------------ -->
     <!--
     <div class="tab-pane fade" id="temporal-advanced" role="tabpanel">
     CONTENU SUPPRIMÉ POUR SIMPLIFICATION
@@ -1934,9 +1982,9 @@
     
 </div> <!-- end temporal -->
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <!-- ONGLET 3: ANALYSE DES FAMILLES DE PRODUITS -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <div class="tab-pane fade {% if active_tab == 'products' %}show active{% endif %}" id="products" role="tabpanel">
     
     <h2 class="mb-4 mt-4"><i class="bi bi-box-seam"></i> Analyse produits</h2>
@@ -1965,9 +2013,9 @@
 
     </div> <!-- end products -->
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <!-- ONGLET 4: ANALYSES CLIENTS -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <div class="tab-pane fade {% if active_tab == 'clients' %}show active{% endif %}" id="clients" role="tabpanel">
     <h2 class="mb-4 mt-4"><i class="bi bi-people-fill"></i> Analyses clients</h2>
     
@@ -1978,7 +2026,7 @@
             <div class="card text-center bg-primary text-white">
                 <div class="card-body">
                     <h5 class="card-title"><i class="bi bi-people"></i> Total Clients</h5>
-                    <h2>{{ client_analysis.kpis.nb_clients|default:"—" }}</h2>
+                    <h2>{{ client_analysis.kpis.nb_clients|default:"" }}</h2>
                 </div>
             </div>
         </div>
@@ -1986,7 +2034,7 @@
             <div class="card text-center bg-success text-white">
                 <div class="card-body">
                     <h5 class="card-title"><i class="bi bi-trophy"></i> Top 20% Clients</h5>
-                    <h2>{{ concentration_top20_pct|floatformat:1|default:"—" }}%</h2>
+                    <h2>{{ concentration_top20_pct|floatformat:1|default:"" }}%</h2>
                     <small>du CA total</small>
                 </div>
             </div>
@@ -1995,7 +2043,7 @@
             <div class="card text-center bg-warning text-dark">
                 <div class="card-body">
                     <h5 class="card-title"><i class="bi bi-star-fill"></i> Top 10 Clients</h5>
-                    <h2>{{ concentration_top10_pct|floatformat:1|default:"—" }}%</h2>
+                    <h2>{{ concentration_top10_pct|floatformat:1|default:"" }}%</h2>
                     <small>du CA total</small>
                 </div>
             </div>
@@ -2004,7 +2052,7 @@
             <div class="card text-center bg-info text-white">
                 <div class="card-body">
                     <h5 class="card-title"><i class="bi bi-cash-coin"></i> CA Moyen</h5>
-                    <h2>{{ client_analysis.kpis.ca_moyen_par_unite_freq|floatformat:0|default:"—" }}€</h2>
+                    <h2>{{ client_analysis.kpis.ca_moyen_par_unite_freq|floatformat:0|default:"" }}€</h2>
                     <small>par {{ client_analysis.meta.period_unit|default:"commande" }}</small>
                 </div>
             </div>
@@ -2138,14 +2186,14 @@
                 <div class="col-lg-8">
                     <label class="form-label">Sélectionner un client</label>
                     <select class="form-select" name="client">
-                        <option value="">— Choisir —</option>
+                        <option value="">"" Choisir ""</option>
                         {% for opt in client_options %}
                             <option value="{{ opt.value }}" {% if selected_client and opt.value == selected_client %}selected{% endif %}>
                                 {{ opt.label }}
                             </option>
                         {% endfor %}
                     </select>
-                    <div class="form-text">Rechargement via GET (pas d’AJAX).</div>
+                    <div class="form-text">Rechargement via GET (pas d'AJAX).</div>
                 </div>
                 <div class="col-lg-4">
                     <button class="btn btn-primary w-100" type="submit">
@@ -2189,9 +2237,9 @@
     
 </div> <!-- end clients -->
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <!-- ONGLET 5: ANALYSE GÉOGRAPHIQUE -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <div class="tab-pane fade {% if active_tab == 'geographic' %}show active{% endif %}" id="geography" role="tabpanel">
     <h2 class="mb-4 mt-4"><i class="bi bi-globe"></i> Analyses géographique</h2>
     
@@ -2494,9 +2542,9 @@
     
 </div> <!-- end geography -->
 
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <!-- ONGLET 6: ANALYSE DE LA DÉPENDANCE AUX DEVISES -->
-<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- ------------------------------------------------------------ -->
 <div class="tab-pane fade {% if active_tab == 'currency' %}show active{% endif %}" id="currency" role="tabpanel">
     
     <h2 class="mb-4 mt-4"><i class="bi bi-currency-exchange"></i> Dépendance aux devises</h2>
@@ -2667,10 +2715,10 @@
         <div class="col-md-6">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-grid"></i> Carte Thermique Pays × Devises</h5>
+                    <h5 class="mb-0"><i class="bi bi-grid"></i> Carte Thermique Pays Ã- Devises</h5>
                 </div>
                 <div class="card-body">
-                    <img src="{{ currency_charts.country_currency_heatmap }}" class="img-fluid" alt="Carte Thermique Pays × Devises">
+                    <img src="{{ currency_charts.country_currency_heatmap }}" class="img-fluid" alt="Carte Thermique Pays Ã- Devises">
                 </div>
             </div>
         </div>

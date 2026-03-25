@@ -9,11 +9,73 @@
 {% endblock %}
 
 {% block dataset_nav %}
+<<<<<<< HEAD
 {% include 'client_analytics/partials/_dataset_nav_tabs.html' %}
+=======
+<nav class="analysis-nav" id="analysisNav">
+    <div class="container-fluid">
+        <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
+            <i class="bi bi-chevron-up"></i>
+        </button>
+        <div class="analysis-tabs" id="analysisTabs">
+            <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
+                <div class="tab-icon"><i class="bi bi-info-circle-fill"></i></div>
+                <div class="tab-content">
+                    <span class="tab-title">Overview</span>
+                    <span class="tab-subtitle">Description des données</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:stats' dataset.pk %}">
+                <div class="tab-icon"><i class="bi bi-bar-chart-fill"></i></div>
+                <div class="tab-content">
+                    <span class="tab-title">Statistiques</span>
+                    <span class="tab-subtitle">Analyse de données</span>
+                </div>
+            </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
+                <div class="tab-icon"><i class="bi bi-diagram-3-fill"></i></div>
+                <div class="tab-content">
+                    <span class="tab-title">Clustering</span>
+                    <span class="tab-subtitle">Segmentation K-Means</span>
+                </div>
+            </a>
+            <a class="analysis-tab active" href="{% url 'client_analytics:anomalies' dataset.pk %}">
+                <div class="tab-icon"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div class="tab-content">
+                    <span class="tab-title">Détection d'Anomalies</span>
+                    <span class="tab-subtitle">Portefeuille client</span>
+                </div>
+            </a>
+        </div>
+        <button class="theme-toggle-btn" id="themeToggleBtn" title="Changer le thème">
+            <i class="bi bi-moon-fill"></i>
+        </button>
+        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
+            <i class="bi bi-arrow-left-circle"></i>
+            <span>Accueil</span>
+        </a>
+    </div>
+</nav>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const navToggleBtn = document.getElementById('navToggleBtn');
+    const analysisNav = document.getElementById('analysisNav');
+    const isCollapsed = localStorage.getItem('navCollapsed') === 'true';
+    if (isCollapsed) {
+        analysisNav.classList.add('collapsed');
+    }
+    navToggleBtn?.addEventListener('click', function() {
+        analysisNav.classList.toggle('collapsed');
+        const collapsed = analysisNav.classList.contains('collapsed');
+        localStorage.setItem('navCollapsed', collapsed);
+    });
+});
+</script>
+>>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
 {% endblock %}
 
 {% block content %}
-<canvas id="scientificParticles"></canvas>
 
 <script>
     document.body.classList.add('analysis-page');

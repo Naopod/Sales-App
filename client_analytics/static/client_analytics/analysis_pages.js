@@ -391,28 +391,63 @@
             btn.addEventListener('click', function() {
                 const period = this.getAttribute('data-period');
                 
-                // Mettre à jour l'URL avec les paramètres granularity ET tab
-                const url = new URL(window.location.href);
-                url.searchParams.set('granularity', period);
-
-                // Conserver l'onglet courant (si présent dans l'URL), sinon le déduire de l'onglet actif
-                const tabFromUrl = url.searchParams.get('tab');
-                if (!tabFromUrl) {
-                    const activeMainTab = document.querySelector('ul.nav-tabs .nav-link.active[data-bs-target]');
-                    const target = activeMainTab ? activeMainTab.getAttribute('data-bs-target') : null;
-                    const tabMapping = {
-                        '#stats': 'statistics',
-                        '#temporal': 'temporal',
-                        '#products': 'products',
-                        '#clients': 'clients',
-                        '#geography': 'geographic',
-                        '#currency': 'currency'
-                    };
-                    url.searchParams.set('tab', tabMapping[target] || 'statistics');
+                // Activer visuellement le bouton
+                periodButtons.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Basculer vers l'onglet de période correspondant (client-side uniquement)
+                const tabId = periodMapping[period];
+                const tabElement = document.getElementById(tabId);
+                if (tabElement) {
+                    const tab = new bootstrap.Tab(tabElement);
+                    tab.show();
                 }
                 
-                // Forcer le rechargement avec la nouvelle URL
-                window.location.href = url.toString();
+                // Pour les sous-onglets géographiques
+                const geoTabMapping = {
+                    'month': 'geo-month-tab',
+                    'quarter': 'geo-quarter-tab',
+                    'year': 'geo-fiscal-tab'
+                };
+                const geoTabId = geoTabMapping[period];
+                const geoTabElement = document.getElementById(geoTabId);
+                if (geoTabElement) {
+                    const geoTab = new bootstrap.Tab(geoTabElement);
+                    geoTab.show();
+                }
+                
+                // Pour les sous-onglets devises
+                const currencyTabMapping = {
+                    'month': 'currency-month-tab',
+                    'quarter': 'currency-quarter-tab',
+                    'year': 'currency-fiscal-tab'
+                };
+                const currencyTabId = currencyTabMapping[period];
+                const currencyTabElement = document.getElementById(currencyTabId);
+                if (currencyTabElement) {
+                    const currencyTab = new bootstrap.Tab(currencyTabElement);
+                    currencyTab.show();
+                }
+                
+                // Pour les sous-onglets temporels
+                const temporalTabMapping = {
+                    'month': 'temporal-month-tab',
+                    'quarter': 'temporal-quarter-tab',
+                    'year': 'temporal-fiscal-tab'
+                };
+                const temporalTabId = temporalTabMapping[period];
+                const temporalTabElement = document.getElementById(temporalTabId);
+                if (temporalTabElement) {
+                    const temporalTab = new bootstrap.Tab(temporalTabElement);
+                    temporalTab.show();
+                }
+                
+                // Redimensionner les graphiques Plotly après changement d'onglet
+                setTimeout(() => {
+                    if (window.resizePlotlyIn) {
+                        window.resizePlotlyIn(document);
+                    }
+                }, 150);
             });
         });
         
@@ -627,22 +662,12 @@
                 const tabName = tabMapping[tabId];
                 
                 if (tabName) {
-                    // Mettre à jour l'URL avec le paramètre tab
+                    // Mettre à jour l'URL sans recharger la page
                     const currentUrl = new URL(window.location.href);
-                    const currentTab = currentUrl.searchParams.get('tab');
-
-                    // Si on est déjà sur le bon onglet côté serveur, ne pas recharger.
-                    if (currentTab === tabName) {
-                        console.log('📑 Onglet déjà actif (pas de reload):', tabName);
-                        return;
-                    }
-
                     currentUrl.searchParams.set('tab', tabName);
-
-                    // IMPORTANT : les analyses sont calculées côté serveur selon ?tab=...
-                    // Un simple switch Bootstrap (sans reload) affiche donc du contenu vide.
-                    // On force la navigation pour obtenir le contexte correct.
-                    window.location.assign(currentUrl.toString());
+                    window.history.pushState({tab: tabName}, '', currentUrl.toString());
+                    
+                    console.log('📑 Onglet activé:', tabName);
                 }
             });
         });
@@ -674,4 +699,379 @@
     } else {
         initTabTracking();
     }
+})();
+
+// ==========================================
+// AJAX HANDLERS POUR ANALYSES CIBLÉES
+// Évite le rechargement complet de la page
+// ==========================================
+(function() {
+    'use strict';
+    
+    /**
+     * Injecte du HTML et exécute les scripts qu'il contient
+     * (nécessaire pour les graphiques Plotly qui ont des <script>)
+     */
+    function injectHTMLWithScripts(container, htmlString) {
+        // Créer un élément temporaire pour parser le HTML
+        const temp = document.createElement('div');
+        temp.innerHTML = htmlString;
+        
+        // Extraire tous les scripts
+        const scripts = temp.querySelectorAll('script');
+        const scriptContents = [];
+        scripts.forEach(script => {
+            if (script.src) {
+                // Script externe
+                scriptContents.push({type: 'external', src: script.src});
+            } else {
+                // Script inline
+                scriptContents.push({type: 'inline', content: script.textContent});
+            }
+            script.remove(); // Retirer le script du HTML
+        });
+        
+        // Injecter le HTML sans les scripts
+        container.innerHTML = temp.innerHTML;
+        
+        // Exécuter les scripts un par un
+        scriptContents.forEach(script => {
+            const scriptElement = document.createElement('script');
+            if (script.type === 'external') {
+                scriptElement.src = script.src;
+            } else {
+                scriptElement.textContent = script.content;
+            }
+            container.appendChild(scriptElement);
+        });
+    }
+    
+    function initAjaxForms() {
+        // Récupérer le dataset PK depuis l'URL
+        const pathParts = window.location.pathname.split('/');
+        const pkIndex = pathParts.indexOf('dataset');
+        const datasetPk = pkIndex >= 0 ? pathParts[pkIndex + 1] : null;
+        
+        if (!datasetPk) return;
+        
+        // ===== 1. PORTEFEUILLE CLIENT =====
+        const clientPortfolioForms = document.querySelectorAll('form:has(select[name="client"]):has(input[name="tab"][value="clients"])');
+        clientPortfolioForms.forEach(form => {
+            if (form.hasAttribute('data-ajax-handled')) return;
+            form.setAttribute('data-ajax-handled', 'true');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const clientId = this.querySelector('select[name="client"]').value;
+                const granularity = this.querySelector('input[name="granularity"]').value || 'month';
+                
+                if (!clientId) {
+                    alert('Veuillez sélectionner un client');
+                    return;
+                }
+                
+                // Trouver le conteneur de résultats (après le formulaire)
+                let resultsContainer = this.parentElement.querySelector('.client-portfolio-results');
+                if (!resultsContainer) {
+                    // Chercher le conteneur existant avec condition {% if selected_client %}
+                    const nextDiv = this.nextElementSibling;
+                    if (nextDiv && nextDiv.classList.contains('mt-4')) {
+                        resultsContainer = nextDiv;
+                        resultsContainer.classList.add('client-portfolio-results');
+                    } else {
+                        resultsContainer = document.createElement('div');
+                        resultsContainer.className = 'mt-4 client-portfolio-results';
+                        this.parentElement.appendChild(resultsContainer);
+                    }
+                }
+                
+                // Afficher un loader
+                resultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Chargement...</span></div></div>';
+                
+                // Requête AJAX
+                const url = `/dataset/${datasetPk}/ajax/client-portfolio/?client=${encodeURIComponent(clientId)}&granularity=${granularity}`;
+                
+                fetch(url)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            injectHTMLWithScripts(resultsContainer, data.html);
+                            // Redimensionner les graphiques Plotly si présents
+                            if (window.Plotly) {
+                                setTimeout(() => {
+                                    const plotlyDivs = resultsContainer.querySelectorAll('.plotly-graph-div');
+                                    plotlyDivs.forEach(div => {
+                                        try {
+                                            Plotly.Plots.resize(div);
+                                        } catch(e) {}
+                                    });
+                                }, 100);
+                            }
+                        } else {
+                            resultsContainer.innerHTML = `<div class="alert alert-danger">${data.error || 'Erreur lors du chargement'}</div>`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur AJAX:', error);
+                        resultsContainer.innerHTML = '<div class="alert alert-danger">Erreur de chargement</div>';
+                    });
+            });
+        });
+        
+        // ===== 2. CORRÉLATION CIBLÉE (PRODUIT/FAMILLE) =====
+        const correlationForms = document.querySelectorAll('form:has(select[name="product"]):has(select[name="family"]):has(input[name="tab"][value="products"])');
+        correlationForms.forEach(form => {
+            if (form.hasAttribute('data-ajax-handled')) return;
+            form.setAttribute('data-ajax-handled', 'true');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const product = this.querySelector('select[name="product"]').value;
+                const family = this.querySelector('select[name="family"]').value;
+                const granularity = this.querySelector('input[name="granularity"]').value || 'month';
+                
+                if (!product && !family) {
+                    alert('Veuillez sélectionner un produit OU une famille');
+                    return;
+                }
+                
+                // Trouver ou créer le conteneur de résultats
+                let resultsContainer = this.parentElement.querySelector('.correlation-results');
+                if (!resultsContainer) {
+                    // Chercher le conteneur existant après le formulaire
+                    const conditionalResults = Array.from(this.parentElement.children)
+                        .find(el => el.classList.contains('mt-3') && !el.querySelector('form'));
+                    
+                    if (conditionalResults) {
+                        resultsContainer = conditionalResults;
+                        resultsContainer.classList.add('correlation-results');
+                    } else {
+                        resultsContainer = document.createElement('div');
+                        resultsContainer.className = 'correlation-results mt-3';
+                        this.parentElement.appendChild(resultsContainer);
+                    }
+                }
+                
+                resultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Chargement...</span></div></div>';
+                
+                const params = new URLSearchParams({
+                    product: product,
+                    family: family,
+                    granularity: granularity
+                });
+                
+                fetch(`/dataset/${datasetPk}/ajax/product-correlation/?${params}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            injectHTMLWithScripts(resultsContainer, data.html);
+                            if (window.Plotly) {
+                                setTimeout(() => {
+                                    const plotlyDivs = resultsContainer.querySelectorAll('.plotly-graph-div');
+                                    plotlyDivs.forEach(div => {
+                                        try {
+                                            Plotly.Plots.resize(div);
+                                        } catch(e) {}
+                                    });
+                                }, 100);
+                            }
+                        } else {
+                            resultsContainer.innerHTML = `<div class="alert alert-danger">${data.error || 'Erreur'}</div>`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur AJAX:', error);
+                        resultsContainer.innerHTML = '<div class="alert alert-danger">Erreur de chargement</div>';
+                    });
+            });
+        });
+        
+        // ===== 3. COMPARAISON PRODUITS =====
+        const compareProductsForms = document.querySelectorAll('form:has(select[name="compare_products"][multiple]):has(select[name="compare_products_metric"])');
+        compareProductsForms.forEach(form => {
+            if (form.hasAttribute('data-ajax-handled')) return;
+            form.setAttribute('data-ajax-handled', 'true');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const productsSelect = this.querySelector('select[name="compare_products"]');
+                const selectedProducts = Array.from(productsSelect.selectedOptions).map(opt => opt.value);
+                const metric = this.querySelector('select[name="compare_products_metric"]').value;
+                const granularity = this.querySelector('input[name="granularity"]').value || 'month';
+                
+                if (selectedProducts.length === 0) {
+                    alert('Veuillez sélectionner au moins un produit');
+                    return;
+                }
+                
+                let resultsContainer = this.parentElement.querySelector('.compare-products-results');
+                if (!resultsContainer) {
+                    // Chercher résultats existants
+                    const conditionalResults = Array.from(this.parentElement.children)
+                        .find(el => el.classList.contains('mt-3') && !el.querySelector('form'));
+                    
+                    if (conditionalResults) {
+                        resultsContainer = conditionalResults;
+                        resultsContainer.classList.add('compare-products-results');
+                    } else {
+                        resultsContainer = document.createElement('div');
+                        resultsContainer.className = 'compare-products-results mt-3';
+                        this.parentElement.appendChild(resultsContainer);
+                    }
+                }
+                
+                resultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Chargement...</span></div></div>';
+                
+                const params = new URLSearchParams({
+                    compare_products_metric: metric,
+                    granularity: granularity
+                });
+                selectedProducts.forEach(p => params.append('compare_products', p));
+                
+                fetch(`/dataset/${datasetPk}/ajax/compare-products/?${params}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            injectHTMLWithScripts(resultsContainer, data.html);
+                            if (window.Plotly) {
+                                setTimeout(() => {
+                                    const plotlyDivs = resultsContainer.querySelectorAll('.plotly-graph-div');
+                                    plotlyDivs.forEach(div => {
+                                        try {
+                                            Plotly.Plots.resize(div);
+                                        } catch(e) {}
+                                    });
+                                }, 100);
+                            }
+                        } else {
+                            resultsContainer.innerHTML = `<div class="alert alert-danger">${data.error || 'Erreur'}</div>`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur AJAX:', error);
+                        resultsContainer.innerHTML = '<div class="alert alert-danger">Erreur de chargement</div>';
+                    });
+            });
+        });
+        
+        // ===== 4. COMPARAISON FAMILLES =====
+        const compareFamiliesForms = document.querySelectorAll('form:has(select[name="compare_families"][multiple]):has(select[name="compare_families_metric"])');
+        compareFamiliesForms.forEach(form => {
+            if (form.hasAttribute('data-ajax-handled')) return;
+            form.setAttribute('data-ajax-handled', 'true');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const familiesSelect = this.querySelector('select[name="compare_families"]');
+                const selectedFamilies = Array.from(familiesSelect.selectedOptions).map(opt => opt.value);
+                const metric = this.querySelector('select[name="compare_families_metric"]').value;
+                const granularity = this.querySelector('input[name="granularity"]').value || 'month';
+                
+                if (selectedFamilies.length === 0) {
+                    alert('Veuillez sélectionner au moins une famille');
+                    return;
+                }
+                
+                let resultsContainer = this.parentElement.querySelector('.compare-families-results');
+                if (!resultsContainer) {
+                    // Chercher résultats existants
+                    const conditionalResults = Array.from(this.parentElement.children)
+                        .find(el => el.classList.contains('mt-3') && !el.querySelector('form'));
+                    
+                    if (conditionalResults) {
+                        resultsContainer = conditionalResults;
+                        resultsContainer.classList.add('compare-families-results');
+                    } else {
+                        resultsContainer = document.createElement('div');
+                        resultsContainer.className = 'compare-families-results mt-3';
+                        this.parentElement.appendChild(resultsContainer);
+                    }
+                }
+                
+                resultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Chargement...</span></div></div>';
+                
+                const params = new URLSearchParams({
+                    compare_families_metric: metric,
+                    granularity: granularity
+                });
+                selectedFamilies.forEach(f => params.append('compare_families', f));
+                
+                fetch(`/dataset/${datasetPk}/ajax/compare-families/?${params}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            injectHTMLWithScripts(resultsContainer, data.html);
+                            if (window.Plotly) {
+                                setTimeout(() => {
+                                    const plotlyDivs = resultsContainer.querySelectorAll('.plotly-graph-div');
+                                    plotlyDivs.forEach(div => {
+                                        try {
+                                            Plotly.Plots.resize(div);
+                                        } catch(e) {}
+                                    });
+                                }, 100);
+                            }
+                        } else {
+                            resultsContainer.innerHTML = `<div class="alert alert-danger">${data.error || 'Erreur'}</div>`;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Erreur AJAX:', error);
+                        resultsContainer.innerHTML = '<div class="alert alert-danger">Erreur de chargement</div>';
+                    });
+            });
+        });
+        
+        console.log('🔄 AJAX forms initialized');
+    }
+    
+    // Initialiser quand le DOM est prêt
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAjaxForms);
+    } else {
+        initAjaxForms();
+    }
+})();
+
+// ==========================================
+// THEME CHANGE HANDLER FOR PLOTLY
+// Updates Plotly chart colors when theme switches
+// ==========================================
+(function() {
+    'use strict';
+
+    function getPlotlyThemeColors() {
+        const style = getComputedStyle(document.documentElement);
+        return {
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: style.getPropertyValue('--plotly-bg').trim(),
+            font: { color: style.getPropertyValue('--plotly-text').trim() },
+            xaxis: {
+                gridcolor: style.getPropertyValue('--plotly-grid').trim(),
+                zerolinecolor: style.getPropertyValue('--plotly-grid').trim()
+            },
+            yaxis: {
+                gridcolor: style.getPropertyValue('--plotly-grid').trim(),
+                zerolinecolor: style.getPropertyValue('--plotly-grid').trim()
+            }
+        };
+    }
+
+    function updatePlotlyTheme() {
+        if (!window.Plotly) return;
+        const colors = getPlotlyThemeColors();
+        document.querySelectorAll('.plotly-graph-div').forEach(div => {
+            try {
+                Plotly.relayout(div, colors);
+            } catch (e) { /* graph not ready */ }
+        });
+    }
+
+    document.addEventListener('themeChanged', () => {
+        setTimeout(updatePlotlyTheme, 100);
+    });
 })();

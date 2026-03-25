@@ -79,8 +79,8 @@ def create_clustering_pca_plot(df_client, X, title="Clustering K-Means (PCA 2D)"
                 xanchor="left",
                 x=1.02
             ),
-            paper_bgcolor='rgba(20, 30, 50, 1)',
-            plot_bgcolor='rgba(30, 40, 60, 1)'
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
         
         fig.update_traces(marker=dict(line=dict(width=0.5, color='DarkSlateGrey')))
