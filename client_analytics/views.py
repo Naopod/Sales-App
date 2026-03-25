@@ -728,23 +728,14 @@ def stats(request, pk):
         "concentration_top10_pct": client_analysis.get("concentration_top10_pct"),
         "client_graphs": client_analysis.get("client_graphs", {}),
         # Client 360
-<<<<<<< HEAD
-        'client_options': client_options,
-        'selected_client': selected_client,
-        'selected_client_families': selected_client_families,
-        'family_options': family_options,
-        'client_portfolio': client_portfolio,
-        'client_portfolio_month': client_portfolio_month,
-        'client_portfolio_quarter': client_portfolio_quarter,
-        'client_portfolio_fiscal': client_portfolio_fiscal,
-=======
         "client_options": client_options,
         "selected_client": selected_client,
+        "selected_client_families": selected_client_families,
+        "family_options": family_options,
         "client_portfolio": client_portfolio,
         "client_portfolio_month": client_portfolio_month,
         "client_portfolio_quarter": client_portfolio_quarter,
         "client_portfolio_fiscal": client_portfolio_fiscal,
->>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
         # Analyse des familles de produits
         "family_analysis": family_analysis,
         "stats_famille": family_analysis.get("stats_famille"),
@@ -1053,21 +1044,21 @@ def anomalies(request, pk):
         logger.exception("[anomalies] ERROR generating graphs")
 
     context = {
-<<<<<<< HEAD
-        'dataset': dataset,
-        'anom': anom,
-        'client_options': client_options,
-        'selected_client': selected_client,
-        'selected_clients': selected_clients,
-        'all_clients': all_clients,
-        'anom_client': anom_client,
-        'anom_clients': anom_clients,
-        'anom_clients_graph': anom_clients_graph,
+        "dataset": dataset,
+        "granularity": granularity if 'granularity' in locals() else None,
+        "anom": anom,
+        "client_options": client_options,
+        "selected_client": selected_client,
+        "selected_clients": selected_clients,
+        "all_clients": all_clients,
+        "anom_client": anom_client,
+        "anom_clients": anom_clients,
+        "anom_clients_graph": anom_clients_graph,
     }
 
     # Ajout Isolation Forest (analyse sur le client sélectionné)
     # Analyse Isolation Forest uniquement si un client est sélectionné
-    if selected_clients and not all_clients:
+    if 'selected_clients' in locals() and selected_clients and not all_clients:
         try:
             df_iforest = df_processed.copy()
             client_col = 'Client' if 'Client' in df_iforest.columns else None
@@ -1089,21 +1080,7 @@ def anomalies(request, pk):
             context['iforest_time_col'] = None
             context['iforest_value_col'] = None
 
-    return render(request, 'client_analytics/anomalies.html', context)
-=======
-        "dataset": dataset,
-        "granularity": granularity,
-        "anom": anom,
-        "client_options": client_options,
-        "selected_client": selected_client,
-        "selected_clients": selected_clients,
-        "all_clients": all_clients,
-        "anom_client": anom_client,
-        "anom_clients": anom_clients,
-        "anom_clients_graph": anom_clients_graph,
-    }
     return render(request, "client_analytics/anomalies.html", context)
->>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
 
 
 def clustering(request, pk):

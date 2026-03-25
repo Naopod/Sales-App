@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-=======
 """Détection d'anomalies — Portefeuille client.
 
 Objectif: identifier des variations anormales par client et par période (mois / trimestre fiscal / année fiscale)
@@ -7,8 +5,6 @@ sur des métriques agrégées (CA, quantité, fréquence, prix moyen).
 
 Méthode: Machine Learning avec Isolation Forest (détection d'anomalies multivariée).
 """
-
->>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
 from __future__ import annotations
 
 from dataclasses import dataclass
