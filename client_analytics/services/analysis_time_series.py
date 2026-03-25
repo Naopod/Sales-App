@@ -139,7 +139,7 @@ def _create_evolution_selector_plot(
     return pio.to_html(
         fig,
         full_html=False,
-        include_plotlyjs='cdn',
+        include_plotlyjs=False,
         config={'displayModeBar': False, 'responsive': True},
     )
 

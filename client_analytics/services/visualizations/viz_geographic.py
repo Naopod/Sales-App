@@ -19,7 +19,7 @@ def _make_responsive(fig):
 def _to_html_responsive(fig):
     """Convertit une figure Plotly en HTML avec config responsive."""
     fig = _make_responsive(fig)
-    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'responsive': True})
+    return fig.to_html(full_html=False, include_plotlyjs=False, config={'responsive': True})
 
 
 def create_geographic_ca_chart(stats_pays):

@@ -34,85 +34,7 @@
 {% endblock %}
 
 {% block dataset_nav %}
-<nav class="analysis-nav" id="analysisNav">
-    <div class="container-fluid">
-        <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
-            <i class="bi bi-chevron-up"></i>
-        </button>
-        <div class="analysis-tabs" id="analysisTabs">
-            <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-info-circle-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Overview</span>
-                    <span class="tab-subtitle">Description des données</span>
-                </div>
-            </a>
-            <a class="analysis-tab active" href="{% url 'client_analytics:stats' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-bar-chart-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Statistiques</span>
-                    <span class="tab-subtitle">Analyse de données</span>
-                </div>
-            </a>
-            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-diagram-3-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Clustering</span>
-                    <span class="tab-subtitle">Segmentation K-Means</span>
-                </div>
-            </a>
-            <a class="analysis-tab" href="{% url 'client_analytics:anomalies' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Détection d'Anomalies</span>
-                    <span class="tab-subtitle">Portefeuille client</span>
-                </div>
-            </a>
-            <a class="analysis-tab" href="#" onclick="alert('Fonctionnalité en développement'); return false;" style="opacity: 0.7;">
-                <div class="tab-icon">
-                    <i class="bi bi-graph-up-arrow"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Projections</span>
-                    <span class="tab-subtitle">Prévisions & Tendances</span>
-                </div>
-            </a>
-        </div>
-        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
-            <i class="bi bi-arrow-left-circle"></i>
-            <span>Accueil</span>
-        </a>
-    </div>
-</nav>
-
-<script>
-// Toggle navigation compacte
-document.addEventListener('DOMContentLoaded', function() {
-    const navToggleBtn = document.getElementById('navToggleBtn');
-    const analysisNav = document.getElementById('analysisNav');
-    const analysisTabs = document.getElementById('analysisTabs');
-    
-    // Vérifier l'état sauvegardé
-    const isCollapsed = localStorage.getItem('navCollapsed') === 'true';
-    if (isCollapsed) {
-        analysisNav.classList.add('collapsed');
-    }
-    
-    navToggleBtn?.addEventListener('click', function() {
-        analysisNav.classList.toggle('collapsed');
-        const collapsed = analysisNav.classList.contains('collapsed');
-        localStorage.setItem('navCollapsed', collapsed);
-    });
-});
-</script>
+{% include 'client_analytics/partials/_dataset_nav_tabs.html' %}
 {% endblock %}
 
 {% block content %}
@@ -339,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                     </div>
                 </div>
-                {% endif %}
+                
                 
                 <!-- Distributions et Boxplots par mois -->
                 <h4 class="mb-4"><i class="bi bi-bar-chart-steps"></i> Distributions par Mois</h4>
@@ -1427,6 +1349,84 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div class="card-body">
                                 <div class="mb-3">
                                     <span class="badge bg-primary">CA: {{ results_quarter.anomalies.by_metric.CA_Total.n_anomalies|default:0 }}</span>
+                                    <span class="badge bg
+                            <div class="card-header bg-secondary text-white"><strong>Quantité</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.qty.last_period }} — {{ results_quarter.insights.qty.last_value|floatformat:0 }}</div>
+                                {% if results_quarter.insights.qty.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.qty.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_quarter.insights.qty.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.qty.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_quarter.insights.qty.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_quarter.insights.qty.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if results_quarter.insights.clients %}
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white"><strong>Nb clients</strong></div>
+                            <div class="card-body">
+                                <div><strong>Dernière:</strong> {{ results_quarter.insights.clients.last_period }} — {{ results_quarter.insights.clients.last_value|floatformat:0 }}</div>
+                                {% if results_quarter.insights.clients.pct_change_last != None %}<div><strong>Δ:</strong> {{ results_quarter.insights.clients.pct_change_last|floatformat:1 }}%</div>{% endif %}
+                                {% if results_quarter.insights.clients.cv_pct != None %}<div><strong>Volatilité:</strong> {{ results_quarter.insights.clients.cv_pct|floatformat:1 }}%</div>{% endif %}
+                                <hr class="my-2">
+                                <div class="small"><strong>Top 3</strong></div>
+                                <ul class="small mb-2">
+                                    {% for it in results_quarter.insights.clients.top_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                                <div class="small"><strong>Flop 3</strong></div>
+                                <ul class="small mb-0">
+                                    {% for it in results_quarter.insights.clients.bottom_periods %}<li>{{ it.period }} — {{ it.value|floatformat:0 }}</li>{% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
+                {% if graphs_quarter.stl_decomposition %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu</h5>
+                                {% if results_quarter.stl_trend_strength %}
+                                <small>Force de la tendance: {{ results_quarter.stl_trend_strength }} | Force de la saisonnalité: {{ results_quarter.stl_seasonal_strength }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_quarter.stl_decomposition|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Pas assez de données pour la décomposition STL (minimum 12 périodes requis).
+                </div>
+                {% endif %}
+
+                <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
+                {% if results_quarter.anomalies %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-dark text-white">
+                                <h5 class="mb-0">🚨 Détection d’anomalies <span class="badge bg-secondary ms-2">STL+MAD</span> <span class="badge bg-dark ms-2">rendu IMG</span></h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <span class="badge bg-primary">CA: {{ results_quarter.anomalies.by_metric.CA_Total.n_anomalies|default:0 }}</span>
                                     <span class="badge bg-primary">Quantité: {{ results_quarter.anomalies.by_metric.Qty_Total.n_anomalies|default:0 }}</span>
                                     <span class="badge bg-primary">Nb clients: {{ results_quarter.anomalies.by_metric.Nb_Clients.n_anomalies|default:0 }}</span>
                                     <span class="badge bg-warning text-dark">Joint ≥ 2: {{ results_quarter.anomalies.joint.n_joint_ge_2|default:0 }}</span>
@@ -1694,7 +1694,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     {% endif %}
                 </div>
-                {% endif %}
                 
                 <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
                 {% if graphs_fiscal.stl_decomposition %}
@@ -1716,7 +1715,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 {% else %}
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i> Pas assez de données pour la décomposition STL (minimum 12 périodes requis).
+                {% endif %}
                 </div>
+                <h3 class="mb-4"><i class="bi bi-diagram-2"></i> Décomposition STL</h3>
+                {% if graphs_quarter.stl_decomposition %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">📊 Décomposition STL - Tendance, Saisonnalité, Résidu</h5>
+                                {% if results_quarter.stl_trend_strength %}
+                                <small>Force de la tendance: {{ results_quarter.stl_trend_strength }} | Force de la saisonnalité: {{ results_quarter.stl_seasonal_strength }}</small>
+                                {% endif %}
+                            </div>
+                            <div class="card-body">
+                                {{ graphs_quarter.stl_decomposition|safe }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 {% endif %}
 
                 <h3 class="mb-4"><i class="bi bi-exclamation-triangle"></i> Détection d’anomalies (CA / Qty / Clients)</h3>
@@ -2005,10 +2023,19 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">📊 Concentration Clients - Analyse de Pareto</h5>
+                    <button class="btn btn-sm btn-light text-primary" type="button" data-bs-toggle="collapse" data-bs-target="#pareto_help" aria-expanded="false" aria-controls="pareto_help">?
+                    </button>
                 </div>
                 <div class="card-body">
+                    <div class="collapse mb-3" id="pareto_help">
+                        <div class="card card-body small" style="background-color:#ffffff!important;color:#000!important;opacity:1!important;position:relative;z-index:2000;border:1px solid #ddd;padding:12px;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.25);">
+                            <strong>Qu'est‑ce que l'analyse de Pareto ?</strong>
+                            <p class="mb-0">Le Pareto montre comment le CA se concentre sur un petit nombre de clients. Les barres représentent le CA par client (tri décroissant) et la courbe rouge la part cumulée du CA total. Le point où la courbe atteint 80 % indique combien de clients produisent 80 % du CA.</p>
+                            <p class="mb-0">Pourquoi c'est utile : identifie les clients critiques à protéger (rétention) et les dépendances commerciales.</p>
+                        </div>
+                    </div>
                     {{ client_graphs.concentration|safe }}
                 </div>
             </div>
@@ -2020,10 +2047,19 @@ document.addEventListener('DOMContentLoaded', function() {
         {% if client_graphs.rfm_distribution %}
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header bg-success text-white">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">🎯 Distribution des Segments RFM</h5>
+                    <button class="btn btn-sm btn-light text-success" type="button" data-bs-toggle="collapse" data-bs-target="#rfm_help" aria-expanded="false" aria-controls="rfm_help">?
+                    </button>
                 </div>
                 <div class="card-body">
+                    <div class="collapse mb-3" id="rfm_help">
+                        <div class="card card-body small" style="background-color:#ffffff!important;color:#000!important;opacity:1!important;position:relative;z-index:2000;border:1px solid #ddd;padding:12px;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,0.25);">
+                            <strong>Qu'est‑ce que la segmentation RFM ?</strong>
+                            <p class="mb-0">RFM = Recency (récence), Frequency (fréquence), Monetary (valeur). Chaque client est noté sur ces 3 axes puis classé en segments (ex. Champions, Fidèles, Potentiels, Risque).</p>
+                            <p class="mb-0">Comment lire ce graphique : chaque barre montre le nombre de clients par segment. Utilisez‑le pour prioriser actions : rétention des Champions, relance des Risque, conversion des Potentiels.</p>
+                        </div>
+                    </div>
                     {{ client_graphs.rfm_distribution|safe }}
                 </div>
             </div>
@@ -2117,6 +2153,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     </button>
                 </div>
             </form>
+
+            <script>
+            // Activer/désactiver le sélecteur de familles selon le client
+            document.addEventListener('DOMContentLoaded', function() {
+                const clientSelect = document.getElementById('client-select');
+                const familySelect = document.getElementById('family-select');
+                
+                if (clientSelect && familySelect) {
+                    clientSelect.addEventListener('change', function() {
+                        if (this.value) {
+                            familySelect.disabled = false;
+                        } else {
+                            familySelect.disabled = true;
+                            familySelect.selectedIndex = -1;
+                        }
+                    });
+                }
+            });
+            </script>
 
             {% if selected_client %}
             <div class="mt-4">

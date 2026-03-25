@@ -599,7 +599,7 @@ def analyze_product_families(
                 )
                 fig.update_yaxes(automargin=True)
 
-                return fig.to_html(full_html=False, include_plotlyjs='cdn')
+                return fig.to_html(full_html=False, include_plotlyjs=False)
             except Exception:
                 return None
 
@@ -705,6 +705,27 @@ def analyze_product_families(
             family_graphs['compare_products_timeseries'] = compare_products_html
         if compare_families_html:
             family_graphs['compare_families_timeseries'] = compare_families_html
+
+        # --- NEW: SKU-level charts when a product is selected ---
+        if selected_product_norm and product_col and product_col in df_final.columns and time_col in df_final.columns:
+            try:
+                family_graphs["sku_pu_distribution"] = viz_products.create_sku_pu_distribution_bubble(
+                    df_final=df_final,
+                    selected_product=selected_product_norm,
+                    product_col=product_col,
+                    time_col=time_col,
+                    window_periods=6,
+                )
+                family_graphs["sku_price_impact"] = viz_products.create_sku_price_impact_scatter(
+                    df_final=df_final,
+                    selected_product=selected_product_norm,
+                    product_col=product_col,
+                    time_col=time_col,
+                    window_periods=6,
+                )
+            except Exception:
+                pass
+
         family_graphs = {k: v for k, v in family_graphs.items() if v}
 
         if len(stats) == 0:

@@ -20,7 +20,7 @@ def _make_responsive(fig):
 def _to_html_responsive(fig):
     """Convertit une figure Plotly en HTML avec config responsive."""
     fig = _make_responsive(fig)
-    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'responsive': True})
+    return fig.to_html(full_html=False, include_plotlyjs=False, config={'responsive': True})
 
 
 def create_client_concentration_chart(client_stats_df):
@@ -258,6 +258,16 @@ def create_client_orders_over_time(monthly_orders_df, period_label: str = 'Mois'
             df = df.sort_values(['period_index', x_col])
         else:
             df = df.sort_values(x_col)
+
+        # Normaliser l'axe X en datetime uniquement si TOUTES les valeurs sont parsables.
+        # Sinon, on garde les libellés d'origine pour éviter des NaT qui peuvent casser l'affichage.
+        x_as_dt = pd.to_datetime(df[x_col], errors='coerce')
+        if x_as_dt.notna().all():
+            df['_x'] = x_as_dt
+            is_date_axis = True
+        else:
+            df['_x'] = df[x_col]
+            is_date_axis = False
         df['ca'] = pd.to_numeric(df['ca'], errors='coerce')
         df['nb_orders'] = pd.to_numeric(df['nb_orders'], errors='coerce')
 
@@ -666,6 +676,7 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         # Lag-1: activity next month
         df['orders_next'] = df['nb_orders'].shift(-1)
         df['ca_next'] = df['ca'].shift(-1)
+        df['_x_next'] = df['_x'].shift(-1)
 
         # Guardrails: besoin de quelques points
         base = df[[x_col, 'lt', 'orders_next', 'ca_next']].dropna(subset=[x_col, 'lt'])
@@ -696,12 +707,16 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         # Row 1: LT + orders_next
         fig.add_trace(
             go.Scatter(
-                x=df[x_col],
+                x=df['_x'],
                 y=df['lt'],
                 name='Lead time (t)',
                 mode='lines+markers',
                 line=dict(color='#3b82f6', width=3),
-                hovertemplate=f"{period_label} %{{x}}<br>LT: %{{y:.1f}} j<extra></extra>",
+                hovertemplate=(
+                    f"{period_label} %{{x}}<br>LT: %{{y:.1f}} j<extra></extra>"
+                    if not is_date_axis else
+                    f"{period_label} %{{x|%b %Y}}<br>LT: %{{y:.1f}} j<extra></extra>"
+                ),
             ),
             row=1,
             col=1,
@@ -710,12 +725,23 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         if df['orders_next'].notna().any():
             fig.add_trace(
                 go.Bar(
-                    x=df[x_col],
+                    x=df['_x'],
                     y=df['orders_next'],
                     name='Cmd (t+1)',
+                    customdata=df['_x_next'],
                     marker_color='#10b981',
                     opacity=0.55,
-                    hovertemplate=f"{period_label} %{{x}}<br>Cmd (t+1): %{{y:.0f}}<extra></extra>",
+                    hovertemplate=(
+                        f"{period_label} (t) %{{x}}"
+                        f"<br>{period_label} (t+1) %{{customdata}}"
+                        f"<br>Cmd (t+1): %{{y:.0f}}"
+                        "<extra></extra>"
+                    ) if not is_date_axis else (
+                        f"{period_label} (t) %{{x|%b %Y}}"
+                        f"<br>{period_label} (t+1) %{{customdata|%b %Y}}"
+                        f"<br>Cmd (t+1): %{{y:.0f}}"
+                        "<extra></extra>"
+                    ),
                 ),
                 row=1,
                 col=1,
@@ -725,13 +751,17 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         # Row 2: LT + ca_next
         fig.add_trace(
             go.Scatter(
-                x=df[x_col],
+                x=df['_x'],
                 y=df['lt'],
                 name='Lead time (t)',
                 mode='lines+markers',
                 showlegend=False,
                 line=dict(color='#3b82f6', width=3),
-                hovertemplate=f"{period_label} %{{x}}<br>LT: %{{y:.1f}} j<extra></extra>",
+                hovertemplate=(
+                    f"{period_label} %{{x}}<br>LT: %{{y:.1f}} j<extra></extra>"
+                    if not is_date_axis else
+                    f"{period_label} %{{x|%b %Y}}<br>LT: %{{y:.1f}} j<extra></extra>"
+                ),
             ),
             row=2,
             col=1,
@@ -740,12 +770,23 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         if df['ca_next'].notna().any():
             fig.add_trace(
                 go.Scatter(
-                    x=df[x_col],
+                    x=df['_x'],
                     y=df['ca_next'],
                     name='CA (t+1)',
                     mode='lines+markers',
                     line=dict(color='#8b5cf6', width=2),
-                    hovertemplate=f"{period_label} %{{x}}<br>CA (t+1): %{{y:,.0f}}<extra></extra>",
+                    customdata=df['_x_next'],
+                    hovertemplate=(
+                        f"{period_label} (t) %{{x}}"
+                        f"<br>{period_label} (t+1) %{{customdata}}"
+                        f"<br>CA (t+1): %{{y:,.0f}}"
+                        "<extra></extra>"
+                    ) if not is_date_axis else (
+                        f"{period_label} (t) %{{x|%b %Y}}"
+                        f"<br>{period_label} (t+1) %{{customdata|%b %Y}}"
+                        f"<br>CA (t+1): %{{y:,.0f}}"
+                        "<extra></extra>"
+                    ),
                 ),
                 row=2,
                 col=1,
@@ -785,13 +826,23 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
             height=760 if has_gap else 620,
             hovermode='x unified',
             legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='left', x=0),
+            margin=dict(b=90),
         )
 
         fig.update_yaxes(title_text='Lead time (jours)', row=1, col=1, secondary_y=False)
         fig.update_yaxes(title_text='Cmd (t+1)', row=1, col=1, secondary_y=True)
         fig.update_yaxes(title_text='Lead time (jours)', row=2, col=1, secondary_y=False)
         fig.update_yaxes(title_text='CA (t+1)', row=2, col=1, secondary_y=True)
-        fig.update_xaxes(title_text=period_label, row=rows, col=1)
+
+        # Avec shared_xaxes=True, Plotly n'affiche souvent les ticks que sur la dernière ligne.
+        # Ici on force l'affichage sur les 2 sous-graphiques pour que l'utilisateur voie les mois.
+        axis_kwargs = dict(showticklabels=True, tickangle=-45, automargin=True)
+        if is_date_axis:
+            # Éviter les options d'axe trop strictes: certaines versions/configs Plotly peuvent être sensibles.
+            axis_kwargs.update(dict(tickformat='%b %Y'))
+        fig.update_xaxes(title_text=period_label, row=rows, col=1, **axis_kwargs)
+        fig.update_xaxes(row=1, col=1, **axis_kwargs)
+        fig.update_xaxes(row=2, col=1, **axis_kwargs)
         if has_gap:
             fig.update_yaxes(title_text='Jours avant prochaine cmd', row=3, col=1)
 
@@ -826,4 +877,83 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         
     except Exception as e:
         print(f"Erreur lors de la création de l'histogramme CA: {e}")
+        return None
+
+
+def create_client_period_family_stacked(records: list, value_key: str = 'value', title: str = 'Analyse par période et famille', is_price: bool = False) -> str:
+    """
+    Crée un graphique en barres empilées pour visualiser les valeurs par période et famille.
+    
+    Args:
+        records: Liste de dicts avec clés 'period', 'family', et value_key
+                 Ex: [{"period": "2024-Q1", "family": "Bakery", "value": 12345}]
+        value_key: Nom de la clé contenant la valeur (par défaut: 'value')
+        title: Titre du graphique
+        is_price: Si True, formate comme prix avec 2 décimales (par défaut: False)
+    
+    Returns:
+        str: HTML du graphique Plotly
+    """
+    if not records:
+        return None
+    
+    try:
+        df = pd.DataFrame(records)
+        if df.empty or 'period' not in df.columns or 'family' not in df.columns or value_key not in df.columns:
+            return None
+        
+        # Nettoyer les données
+        df = df.copy()
+        df['period'] = df['period'].astype(str)
+        df['family'] = df['family'].astype(str)
+        df[value_key] = pd.to_numeric(df[value_key], errors='coerce')
+        df = df.dropna(subset=['period', 'family', value_key])
+        
+        if df.empty:
+            return None
+        
+        # Créer le graphique empilé
+        fig = px.bar(
+            df,
+            x='period',
+            y=value_key,
+            color='family',
+            title=title,
+            barmode='stack',
+            template='plotly_white',
+        )
+        
+        # Déterminer le format d'affichage
+        if is_price:
+            hover_format = '<b>%{fullData.name}</b><br>Prix: %{y:,.2f}€<extra></extra>'
+            yaxis_title = 'Prix Unitaire Net (€)'
+        else:
+            hover_format = '<b>%{fullData.name}</b><br>Valeur: %{y:,.0f}<extra></extra>'
+            yaxis_title = 'Valeur'
+        
+        # Mise en forme
+        fig.update_layout(
+            height=520,
+            xaxis_title='Période',
+            yaxis_title=yaxis_title,
+            legend=dict(
+                orientation='v',
+                yanchor='top',
+                y=1,
+                xanchor='left',
+                x=1.02,
+                title='Famille'
+            ),
+            hovermode='x unified',
+            xaxis=dict(tickangle=-45),
+        )
+        
+        fig.update_traces(
+            hovertemplate=hover_format
+        )
+        
+        return _to_html_responsive(fig)
+        
+    except Exception as e:
+        print(f"Erreur create_client_period_family_stacked: {e}")
         return None

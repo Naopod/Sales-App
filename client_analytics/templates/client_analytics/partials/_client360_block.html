@@ -95,6 +95,44 @@
     </div>
 </div>
 
+{% if client_portfolio.tables.lead_time_by_product %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">Logistique — Délai par produit (Top)</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th class="text-end">Nb cmd</th>
+                                <th class="text-end">LT médian (j)</th>
+                                <th class="text-end">LT P90 (j)</th>
+                                <th class="text-end">Retard</th>
+                                <th class="text-end">CA</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in client_portfolio.tables.lead_time_by_product %}
+                            <tr>
+                                <td>{{ r.product }}</td>
+                                <td class="text-end">{{ r.nb_orders|default:"—" }}</td>
+                                <td class="text-end">{{ r.lead_time_median|floatformat:1|default:"—" }}</td>
+                                <td class="text-end">{{ r.lead_time_p90|floatformat:1|default:"—" }}</td>
+                                <td class="text-end">{% if r.late_rate_pct %}{{ r.late_rate_pct|floatformat:1 }}%{% else %}—{% endif %}</td>
+                                <td class="text-end">{{ r.ca|floatformat:0|default:"—" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% if client_portfolio.kpis.currency_mix %}
 <div class="card mb-4">
     <div class="card-header">Devises (mix)</div>
@@ -182,43 +220,7 @@
     </div>
 </div>
 
-{% if client_portfolio.tables.lead_time_by_product %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">Logistique — Délai par produit (Top)</div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-sm table-hover">
-                        <thead>
-                            <tr>
-                                <th>Produit</th>
-                                <th class="text-end">Nb cmd</th>
-                                <th class="text-end">LT médian (j)</th>
-                                <th class="text-end">LT P90 (j)</th>
-                                <th class="text-end">Retard</th>
-                                <th class="text-end">CA</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for r in client_portfolio.tables.lead_time_by_product %}
-                            <tr>
-                                <td>{{ r.product }}</td>
-                                <td class="text-end">{{ r.nb_orders|default:"—" }}</td>
-                                <td class="text-end">{{ r.lead_time_median|floatformat:1|default:"—" }}</td>
-                                <td class="text-end">{{ r.lead_time_p90|floatformat:1|default:"—" }}</td>
-                                <td class="text-end">{% if r.late_rate_pct %}{{ r.late_rate_pct|floatformat:1 }}%{% else %}—{% endif %}</td>
-                                <td class="text-end">{{ r.ca|floatformat:0|default:"—" }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
+
 
 <div class="row mb-4">
     {% if client_portfolio.graphs.families_pie %}
@@ -258,36 +260,6 @@
     {% endif %}
 </div>
 
-<div class="row mb-4">
-    {% if client_portfolio.graphs.lead_time_hist %}
-    <div class="col-lg-6 mb-3">
-        <div class="card">
-            <div class="card-header bg-light">Lead time (distribution)</div>
-            <div class="card-body">{{ client_portfolio.graphs.lead_time_hist|safe }}</div>
-        </div>
-    </div>
-    {% endif %}
-    {% if client_portfolio.graphs.lead_time_over_time %}
-    <div class="col-lg-6 mb-3">
-        <div class="card">
-            <div class="card-header bg-light">Lead time ({{ client_portfolio.meta.period_adjective|default:"mensuel" }})</div>
-            <div class="card-body">{{ client_portfolio.graphs.lead_time_over_time|safe }}</div>
-        </div>
-    </div>
-    {% endif %}
-</div>
-
-{% if client_portfolio.graphs.lead_time_impact %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-light">Impact du délai sur les commandes / CA</div>
-            <div class="card-body">{{ client_portfolio.graphs.lead_time_impact|safe }}</div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 {% if client_portfolio.alerts %}
 <div class="card mb-4 border-warning">
     <div class="card-header bg-warning text-dark">
@@ -302,6 +274,819 @@
     </div>
 </div>
 {% endif %}
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<!-- NOUVELLE SECTION: ANALYSE CLIENT TYPE POWERBI (VERSION OPTIMISÉE) -->
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+
+<div class="card mb-4 border-info">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Analyse Client PowerBI</h5>
+    </div>
+    <div class="card-body">
+        
+        <!-- Onglets principaux -->
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="powerbi-table-tab" data-bs-toggle="tab" data-bs-target="#powerbi-table" type="button" role="tab">
+                    <i class="bi bi-table"></i> Vue Table
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="powerbi-trend-tab" data-bs-toggle="tab" data-bs-target="#powerbi-trend" type="button" role="tab">
+                    <i class="bi bi-graph-up"></i> Tendance & Comparaison
+                </button>
+            </li>
+        </ul>
+
+        <!-- Contenu des onglets -->
+        <div class="tab-content">
+            
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- ONGLET 1: Vue Table (Excel-like) -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <div class="tab-pane fade show active" id="powerbi-table" role="tabpanel">
+                
+                <div class="row">
+                    <!-- Colonne principale : Table -->
+                    <div class="col-lg-9 mb-3">
+                        <div class="card">
+                            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0"><i class="bi bi-table"></i> Tableau des Produits × Années Fiscales</h6>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <input type="radio" class="btn-check" name="table-view-toggle" id="table-view-amount" value="amount" checked autocomplete="off">
+                                    <label class="btn btn-outline-success" for="table-view-amount">
+                                        <i class="bi bi-currency-euro"></i> Montant
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="table-view-toggle" id="table-view-qty" value="qty" autocomplete="off">
+                                    <label class="btn btn-outline-primary" for="table-view-qty">
+                                        <i class="bi bi-basket"></i> Quantité
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="table-view-toggle" id="table-view-price" value="price" autocomplete="off">
+                                    <label class="btn btn-outline-info" for="table-view-price">
+                                        <i class="bi bi-tag"></i> Prix
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="card-body p-0">
+                                <!-- Vue Montant -->
+                                <div id="table-view-amount-content" class="table-view-content" style="max-height: 600px; overflow-y: auto;">
+                                    {% if client_portfolio.tables.products_fy_amount_table_html %}
+                                        {{ client_portfolio.tables.products_fy_amount_table_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info m-3">
+                                            <i class="bi bi-info-circle"></i> Aucune donnée disponible (Montant).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Vue Quantité -->
+                                <div id="table-view-qty-content" class="table-view-content" style="display:none; max-height: 600px; overflow-y: auto;">
+                                    {% if client_portfolio.tables.products_fy_qty_table_html %}
+                                        {{ client_portfolio.tables.products_fy_qty_table_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info m-3">
+                                            <i class="bi bi-info-circle"></i> Aucune donnée disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <!-- Vue Prix -->
+                                <div id="table-view-price-content" class="table-view-content" style="display:none; max-height: 600px; overflow-y: auto;">
+                                    {% if client_portfolio.tables.pu_product_period_table_html %}
+                                        <div class="alert alert-info m-3">
+                                            <i class="bi bi-info-circle"></i> Cette table montre le prix unitaire net pondéré de chaque produit pour ce client, période par période.
+                                        </div>
+                                        {{ client_portfolio.tables.pu_product_period_table_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info m-3">
+                                            <i class="bi bi-info-circle"></i> Aucune donnée disponible (Prix).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Colonne latérale : Statistiques et Filtres -->
+                    <div class="col-lg-3 mb-3">
+                        <!-- Alertes Produits -->
+                        {% if client_portfolio.product_status_summary %}
+                        <div class="card mb-3 border-warning">
+                            <div class="card-header bg-warning text-dark">
+                                <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Alertes Produits</h6>
+                            </div>
+                            <div class="card-body py-2">
+                                {% if client_portfolio.product_status_summary.new > 0 %}
+                                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                    <span><span style="font-size: 1.2em;">🆕</span> <small>Nouveaux</small></span>
+                                    <span class="badge bg-info">{{ client_portfolio.product_status_summary.new }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if client_portfolio.product_status_summary.declining > 0 %}
+                                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                    <span><span style="font-size: 1.2em;">📉</span> <small>En baisse</small></span>
+                                    <span class="badge bg-warning text-dark">{{ client_portfolio.product_status_summary.declining }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if client_portfolio.product_status_summary.risk > 0 %}
+                                <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                                    <span><span style="font-size: 1.2em;">⚠️</span> <small>À risque</small></span>
+                                    <span class="badge bg-warning">{{ client_portfolio.product_status_summary.risk }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if client_portfolio.product_status_summary.stopped > 0 %}
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span><span style="font-size: 1.2em;">🔴</span> <small>Arrêtés</small></span>
+                                    <span class="badge bg-danger">{{ client_portfolio.product_status_summary.stopped }}</span>
+                                </div>
+                                {% endif %}
+                                
+                                {% if client_portfolio.product_status_summary.active > 0 %}
+                                <div class="d-flex justify-content-between align-items-center text-muted">
+                                    <span><span style="font-size: 1.2em;">✅</span> <small>Actifs</small></span>
+                                    <span class="badge bg-success">{{ client_portfolio.product_status_summary.active }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Statistiques récapitulatives -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0"><i class="bi bi-bar-chart"></i> Résumé</h6>
+                            </div>
+                            <div class="card-body">
+                                {% if client_portfolio.kpis %}
+                                    <div class="mb-2">
+                                        <small class="text-muted">CA Total</small>
+                                        <h5 class="mb-0 text-success">{{ client_portfolio.kpis.ca_client|floatformat:0|default:"—" }}€</h5>
+                                    </div>
+                                    <hr>
+                                    <div class="mb-2">
+                                        <small class="text-muted">Nb Commandes</small>
+                                        <h6 class="mb-0">{{ client_portfolio.kpis.nb_orders|default:"—" }}</h6>
+                                    </div>
+                                    <div class="mb-2">
+                                        <small class="text-muted">Nb Familles</small>
+                                        <h6 class="mb-0">{{ client_portfolio.kpis.nb_families|default:"—" }}</h6>
+                                    </div>
+                                {% else %}
+                                    <div class="text-muted small">Aucune statistique disponible</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <!-- Aide -->
+                        <div class="card">
+                            <div class="card-header bg-light">
+                                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Aide</h6>
+                            </div>
+                            <div class="card-body">
+                                <small class="text-muted">
+                                    <p class="mb-2"><strong>💡 Astuce :</strong></p>
+                                    <ul class="mb-0 ps-3">
+                                        <li>Utilisez le toggle pour basculer entre Montant et Quantité</li>
+                                        <li>La ligne Total montre les totaux par année</li>
+                                        <li>Triez par colonne en cliquant sur les en-têtes</li>
+                                    </ul>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- ONGLET 2: Tendance Trimestrielle (Graphique + Table) -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <div class="tab-pane fade" id="powerbi-trend" role="tabpanel">
+                
+                <!-- Sélecteur Famille / Produit -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-0"><i class="bi bi-calendar3"></i> Évolution par Trimestre Fiscal</h6>
+                            <small class="text-muted">Choisissez la dimension et la vue souhaitée</small>
+                        </div>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="dimension-toggle" id="dimension-family" value="family" checked autocomplete="off">
+                            <label class="btn btn-outline-secondary" for="dimension-family">
+                                <i class="bi bi-collection"></i> Par Famille
+                            </label>
+                            
+                            <input type="radio" class="btn-check" name="dimension-toggle" id="dimension-product" value="product" autocomplete="off">
+                            <label class="btn btn-outline-secondary" for="dimension-product">
+                                <i class="bi bi-box"></i> Par Produit
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Toggle Montant/Quantité/Les deux/Prix/Prix+Qté -->
+                <div class="d-flex justify-content-end align-items-center mb-3">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <input type="radio" class="btn-check" name="trend-view-toggle" id="trend-view-amount" value="amount" autocomplete="off">
+                        <label class="btn btn-outline-success" for="trend-view-amount">
+                            <i class="bi bi-currency-euro"></i> Montant
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="trend-view-toggle" id="trend-view-qty" value="qty" autocomplete="off">
+                        <label class="btn btn-outline-primary" for="trend-view-qty">
+                            <i class="bi bi-basket"></i> Quantité
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="trend-view-toggle" id="trend-view-both" value="both" checked autocomplete="off">
+                        <label class="btn btn-outline-info" for="trend-view-both">
+                            <i class="bi bi-arrow-left-right"></i> Montant + Qté
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="trend-view-toggle" id="trend-view-price" value="price" autocomplete="off">
+                        <label class="btn btn-outline-warning" for="trend-view-price">
+                            <i class="bi bi-tag"></i> Prix
+                        </label>
+                        
+                        <input type="radio" class="btn-check" name="trend-view-toggle" id="trend-view-price-qty" value="price-qty" autocomplete="off">
+                        <label class="btn btn-outline-danger" for="trend-view-price-qty">
+                            <i class="bi bi-graph-up-arrow"></i> Prix + Qté
+                        </label>
+                    </div>
+                </div>
+
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <!-- SECTION FAMILLE -->
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <div class="dimension-section dimension-family">
+                <!-- Graphiques Empilés -->
+                <div class="mb-4">
+                    <!-- Vue Montant Seul -->
+                    <div class="trend-view-amount d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-success mb-3">
+                                        <i class="bi bi-currency-euro"></i> Montant par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_amount_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_amount_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Montant).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Quantité Seule -->
+                    <div class="trend-view-qty d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-primary mb-3">
+                                        <i class="bi bi-basket"></i> Quantité par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_qty_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_qty_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Les Deux Côte-à-Côte (visible par défaut) -->
+                    <div class="trend-view-both">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-success mb-3">
+                                        <i class="bi bi-currency-euro"></i> Montant par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_amount_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_amount_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Montant).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-primary mb-3">
+                                        <i class="bi bi-basket"></i> Quantité par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_qty_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_qty_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Prix Seul -->
+                    <div class="trend-view-price d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-warning mb-3">
+                                        <i class="bi bi-tag"></i> Prix Unitaire Net par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_price_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_price_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Prix).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Prix + Quantité Côte-à-Côte -->
+                    <div class="trend-view-price-qty d-none">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-warning mb-3">
+                                        <i class="bi bi-tag"></i> Prix Unitaire Net par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_price_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_price_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Prix).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-primary mb-3">
+                                        <i class="bi bi-basket"></i> Quantité par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_family_qty_html %}
+                                        {{ client_portfolio.graphs.chart_efq_family_qty_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tables Détail -->
+                <div class="mb-4">
+                    <h6 class="text-muted border-top pt-3 mb-3">
+                        <i class="bi bi-table"></i> Détail des Valeurs
+                    </h6>
+                    
+                    <!-- Vue Montant Seul -->
+                    <div class="trend-view-amount d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-success"><i class="bi bi-currency-euro"></i> Montant</h6>
+                                {% if client_portfolio.tables.efq_family_amount_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_family_amount_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Famille (Montant).
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Quantité Seule -->
+                    <div class="trend-view-qty d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-primary"><i class="bi bi-basket"></i> Quantité</h6>
+                                {% if client_portfolio.tables.efq_family_qty_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_family_qty_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Famille (Quantité).
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Les Deux Côte-à-Côte (visible par défaut) -->
+                    <div class="trend-view-both">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-success"><i class="bi bi-currency-euro"></i> Montant</h6>
+                                {% if client_portfolio.tables.efq_family_amount_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_family_amount_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Famille (Montant).
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-primary"><i class="bi bi-basket"></i> Quantité</h6>
+                                {% if client_portfolio.tables.efq_family_qty_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_family_qty_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Famille (Quantité).
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+                <!-- FIN SECTION FAMILLE -->
+
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <!-- SECTION PRODUIT -->
+                <!-- ═══════════════════════════════════════════════════════ -->
+                <div class="dimension-section dimension-product d-none">
+                <!-- Graphiques Empilés -->
+                <div class="mb-4">
+                    <!-- Vue Montant Seul -->
+                    <div class="trend-view-amount d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-success mb-3">
+                                        <i class="bi bi-currency-euro"></i> Montant par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_amount_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_amount_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Montant).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Quantité Seule -->
+                    <div class="trend-view-qty d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-primary mb-3">
+                                        <i class="bi bi-basket"></i> Quantité par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_qty_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_qty_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Les Deux Côte-à-Côte (visible par défaut) -->
+                    <div class="trend-view-both">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-success mb-3">
+                                        <i class="bi bi-currency-euro"></i> Montant par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_amount_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_amount_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Montant).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-primary mb-3">
+                                        <i class="bi bi-basket"></i> Quantité par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_qty_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_qty_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Prix Seul -->
+                    <div class="trend-view-price d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-warning mb-3">
+                                        <i class="bi bi-tag"></i> Prix Unitaire Net par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_price_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_price_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Prix).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Prix + Quantité Côte-à-Côte -->
+                    <div class="trend-view-price-qty d-none">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-warning mb-3">
+                                        <i class="bi bi-tag"></i> Prix Unitaire Net par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_price_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_price_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Prix).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="border rounded p-2">
+                                    <h6 class="text-center text-primary mb-3">
+                                        <i class="bi bi-basket"></i> Quantité par EF&Q
+                                    </h6>
+                                    {% if client_portfolio.graphs.chart_efq_product_qty_html %}
+                                        {{ client_portfolio.graphs.chart_efq_product_qty_html|safe }}
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="bi bi-info-circle"></i> Aucun graphique disponible (Quantité).
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tables Détail -->
+                <div class="mb-4">
+                    <h6 class="text-muted border-top pt-3 mb-3">
+                        <i class="bi bi-table"></i> Détail des Valeurs
+                    </h6>
+                    
+                    <!-- Vue Montant Seul -->
+                    <div class="trend-view-amount d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-success"><i class="bi bi-currency-euro"></i> Montant</h6>
+                                {% if client_portfolio.tables.efq_product_amount_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_product_amount_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Produit (Montant).
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Quantité Seule -->
+                    <div class="trend-view-qty d-none">
+                        <div class="row">
+                            <div class="col-12">
+                                <h6 class="text-primary"><i class="bi bi-basket"></i> Quantité</h6>
+                                {% if client_portfolio.tables.efq_product_qty_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_product_qty_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Produit (Quantité).
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Vue Les Deux Côte-à-Côte (visible par défaut) -->
+                    <div class="trend-view-both">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-success"><i class="bi bi-currency-euro"></i> Montant</h6>
+                                {% if client_portfolio.tables.efq_product_amount_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_product_amount_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Produit (Montant).
+                                    </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <h6 class="text-primary"><i class="bi bi-basket"></i> Quantité</h6>
+                                {% if client_portfolio.tables.efq_product_qty_table_html %}
+                                    <div class="table-responsive">
+                                        {{ client_portfolio.tables.efq_product_qty_table_html|safe }}
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-info-circle"></i> Aucune donnée disponible pour EF&Q × Produit (Quantité).
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+                <!-- FIN SECTION PRODUIT -->
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+// JavaScript pour gérer les toggles Montant/Quantité
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // Toggle Vue Table (Montant / Quantité)
+    document.querySelectorAll('input[name="table-view-toggle"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const mode = this.value;
+            document.querySelectorAll('.table-view-content').forEach(function(el) {
+                el.style.display = 'none';
+            });
+            const targetView = document.getElementById('table-view-' + mode + '-content');
+            if (targetView) {
+                targetView.style.display = 'block';
+            }
+        });
+    });
+    
+    // ═══════════════════════════════════════════════════
+    // Utility: force Plotly charts to resize properly
+    // ═══════════════════════════════════════════════════
+    function resizePlotlyChartsIn(container) {
+        if (!container || typeof Plotly === 'undefined') return;
+        var plotlyDivs = container.querySelectorAll('.plotly-graph-div');
+        plotlyDivs.forEach(function(div) {
+            try {
+                Plotly.Plots.resize(div);
+            } catch(e) {
+                console.warn('⚠️ Plotly resize failed:', div.id, e);
+            }
+        });
+    }
+
+    // Toggle Tendance Trimestrielle (5 options)
+    function updateTrendView(mode) {
+        console.log('🔄 Switching to view:', mode);
+        
+        // Trouver la section active (famille ou produit)
+        const activeSection = document.querySelector('.dimension-section:not(.d-none)');
+        if (!activeSection) {
+            console.warn('⚠️ No active dimension section found');
+            return;
+        }
+        
+        // Cacher toutes les vues dans la section active
+        const allViews = activeSection.querySelectorAll('.trend-view-amount, .trend-view-qty, .trend-view-both, .trend-view-price, .trend-view-price-qty');
+        allViews.forEach(function(el) {
+            el.classList.add('d-none');
+        });
+        
+        // Afficher la vue sélectionnée dans la section active
+        const viewClass = '.trend-view-' + mode;
+        const selectedViews = activeSection.querySelectorAll(viewClass);
+        selectedViews.forEach(function(el) {
+            el.classList.remove('d-none');
+        });
+        
+        // Forcer le redimensionnement des graphiques Plotly après un court délai
+        setTimeout(function() {
+            selectedViews.forEach(function(view) {
+                resizePlotlyChartsIn(view);
+            });
+            window.dispatchEvent(new Event('resize'));
+        }, 200);
+    }
+    
+    // Attacher les événements
+    document.querySelectorAll('input[name="trend-view-toggle"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            console.log('🎛️ Radio changed to:', this.value);
+            updateTrendView(this.value);
+        });
+    });
+    
+    // Initialiser la vue au chargement (afficher la vue cochée par défaut)
+    const checkedRadio = document.querySelector('input[name="trend-view-toggle"]:checked');
+    if (checkedRadio) {
+        console.log('🚀 Initial view:', checkedRadio.value);
+        updateTrendView(checkedRadio.value);
+    } else {
+        console.warn('⚠️ No radio button checked by default');
+    }
+    
+    // Toggle Dimension (Famille vs Produit)
+    document.querySelectorAll('input[name="dimension-toggle"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            const dimension = this.value;
+            console.log('🔀 Switching dimension to:', dimension);
+            
+            // Cacher toutes les sections
+            document.querySelectorAll('.dimension-section').forEach(function(el) {
+                el.classList.add('d-none');
+            });
+            
+            // Afficher la section sélectionnée
+            const sectionClass = '.dimension-' + dimension;
+            const selectedSection = document.querySelector(sectionClass);
+            if (selectedSection) {
+                selectedSection.classList.remove('d-none');
+                console.log('✅ Showing dimension section:', dimension);
+                
+                // Réappliquer la vue sélectionnée (montant/quantité/les deux)
+                const checkedViewRadio = document.querySelector('input[name="trend-view-toggle"]:checked');
+                if (checkedViewRadio) {
+                    updateTrendView(checkedViewRadio.value);
+                }
+                
+                // Forcer le redimensionnement des graphiques Plotly
+                setTimeout(function() {
+                    resizePlotlyChartsIn(selectedSection);
+                    window.dispatchEvent(new Event('resize'));
+                }, 200);
+            }
+        });
+    });
+    
+    // ═══════════════════════════════════════════════════════════════
+    // RESIZE PLOTLY QUAND ON CHANGE D'ONGLET
+    // ═══════════════════════════════════════════════════════════════
+    const trendTab = document.getElementById('powerbi-trend-tab');
+    if (trendTab) {
+        trendTab.addEventListener('shown.bs.tab', function() {
+            setTimeout(function() {
+                var trendPane = document.getElementById('powerbi-trend');
+                resizePlotlyChartsIn(trendPane);
+                // Réappliquer la vue active
+                var checkedViewRadio = document.querySelector('input[name="trend-view-toggle"]:checked');
+                if (checkedViewRadio) {
+                    updateTrendView(checkedViewRadio.value);
+                }
+                window.dispatchEvent(new Event('resize'));
+            }, 150);
+        });
+    }
+    
+});
+</script>
 
 {% endif %}
 

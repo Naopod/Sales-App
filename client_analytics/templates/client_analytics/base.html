@@ -12,7 +12,8 @@
     <!-- Chart.js pour graphiques interactifs -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
-    <!-- Plotly: chargé via les snippets HTML des graphiques (include_plotlyjs='cdn') -->
+    <!-- Plotly: chargé UNE SEULE FOIS ici (les snippets utilisent include_plotlyjs=False) -->
+    <script charset="utf-8" src="https://cdn.plot.ly/plotly-3.3.1.min.js"></script>
     
     {% load static %}
     <link rel="stylesheet" href="{% static 'client_analytics/app.css' %}">

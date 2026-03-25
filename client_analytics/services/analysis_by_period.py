@@ -493,7 +493,7 @@ def generate_period_analysis(df, granularity='month', skip_preprocessing=True):
                             xaxis=dict(tickangle=-45)
                         )
                         
-                        graphs['correlation_evolution'] = fig.to_html(full_html=False, include_plotlyjs='cdn')
+                        graphs['correlation_evolution'] = fig.to_html(full_html=False, include_plotlyjs=False)
                     else:
                         pass
                 else:

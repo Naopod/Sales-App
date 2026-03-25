@@ -6,7 +6,80 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+
 from scipy import stats
+from sklearn.ensemble import IsolationForest
+
+def create_isolation_forest_time_anomaly_plot(df, time_col, value_col, contamination=0.05, title=None, return_anomalies=False):
+    """
+    Détecte les anomalies sur une série temporelle avec Isolation Forest et affiche un graphique interactif.
+    
+    Args:
+        df: DataFrame
+        time_col: Colonne temporelle (ex: 'Month', 'Date')
+        value_col: Colonne numérique à analyser (ex: 'Montant')
+        contamination: Proportion attendue d'anomalies (float)
+        title: Titre du graphique
+        return_anomalies: Si True, retourne aussi un DataFrame des anomalies
+    
+    Returns:
+        HTML du graphique Plotly (et DataFrame anomalies si return_anomalies=True)
+    """
+    try:
+        data = df[[time_col, value_col]].dropna().copy()
+        # Encodage temporel si nécessaire
+        import numpy as np
+        import pandas as pd
+        import plotly.graph_objects as go
+        if not np.issubdtype(data[time_col].dtype, np.number):
+            data['_time_idx'] = pd.factorize(data[time_col])[0]
+            X = np.c_[data['_time_idx'], data[value_col]]
+        else:
+            X = np.c_[data[time_col], data[value_col]]
+        model = IsolationForest(contamination=contamination, random_state=42)
+        preds = model.fit_predict(X)
+        data['anomaly'] = preds
+        data['color'] = np.where(data['anomaly'] == -1, 'Anomalie', 'Normal')
+        if title is None:
+            title = f"Détection d'anomalies sur {value_col} ({time_col})"
+        fig = go.Figure()
+        # Courbe normale
+        normal = data[data['anomaly'] == 1]
+        fig.add_trace(go.Scatter(
+            x=normal[time_col],
+            y=normal[value_col],
+            mode='lines+markers',
+            name='Normal',
+            marker=dict(color='blue', size=7),
+            line=dict(color='blue', width=2)
+        ))
+        # Points anomalies
+        anomalies = data[data['anomaly'] == -1]
+        fig.add_trace(go.Scatter(
+            x=anomalies[time_col],
+            y=anomalies[value_col],
+            mode='markers',
+            name='Anomalie',
+            marker=dict(color='red', size=12, symbol='x')
+        ))
+        fig.update_layout(
+            title=title,
+            xaxis_title=time_col,
+            yaxis_title=value_col,
+            height=450,
+            template='plotly_dark',
+            paper_bgcolor='rgba(20, 30, 50, 1)',
+            plot_bgcolor='rgba(30, 40, 60, 1)'
+        )
+        html = _to_html_responsive(fig)
+        if return_anomalies:
+            return html, anomalies[[time_col, value_col]]
+        return html
+    except Exception as e:
+        print(f"   ⚠️ Erreur détection d'anomalies Isolation Forest: {e}")
+        if return_anomalies:
+            return None, None
+        return None
 
 
 def _make_responsive(fig):
@@ -27,7 +100,7 @@ def _to_html_responsive(fig):
     Convertit une figure Plotly en HTML avec config responsive.
     """
     fig = _make_responsive(fig)
-    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'responsive': True})
+    return fig.to_html(full_html=False, include_plotlyjs=False, config={'responsive': True})
 
 
 def create_correlation_matrix(df, variables):

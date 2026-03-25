@@ -8,6 +8,7 @@ from .services import analysis_overview, analysis_by_period, analysis_time_serie
 from .services import analysis_products, analysis_geographic, analysis_clients
 from .services import analysis_anomalies
 from .services import anomaly_detection
+from .services.visualizations.viz_by_period import create_isolation_forest_time_anomaly_plot
 import pandas as pd
 
 import logging
@@ -195,6 +196,23 @@ def stats(request, pk):
     except Exception as e:
         logger.exception("[client360] ERROR get_client_options in view")
         client_options = []
+    
+    # Lire le slicer Famille (multi-select)
+    selected_client_families = request.GET.getlist('client_families')
+    
+    # Calculer les options de familles pour le client sélectionné
+    family_options = []
+    if selected_client:
+        try:
+            family_col = analysis_clients._pick_col(df_processed, ['Famille', 'Famille Produit', 'Famille article', 'Famille_Produit'])
+            client_col = analysis_clients._pick_col(df_processed, ['Cpt Client', 'Compte Client', 'Client', 'Code Client'])
+            if family_col and client_col:
+                df_client_temp = df_processed[df_processed[client_col].astype(str) == str(selected_client)]
+                families = sorted(df_client_temp[family_col].dropna().unique().tolist())
+                family_options = [{'value': f, 'label': f} for f in families]
+        except Exception as e:
+            logger.exception("[client360] ERROR getting family_options")
+            family_options = []
 
     if selected_client:
         try:
@@ -204,6 +222,7 @@ def stats(request, pk):
                 time_granularity='month',
                 top_n_families=8,
                 top_n_products=10,
+                selected_families=selected_client_families,
             )
             client_portfolio_quarter = analysis_clients.analyze_client_portfolio_full(
                 df_processed,
@@ -211,6 +230,7 @@ def stats(request, pk):
                 time_granularity='quarter',
                 top_n_families=8,
                 top_n_products=10,
+                selected_families=selected_client_families,
             )
             client_portfolio_fiscal = analysis_clients.analyze_client_portfolio_full(
                 df_processed,
@@ -218,6 +238,7 @@ def stats(request, pk):
                 time_granularity='year',
                 top_n_families=8,
                 top_n_products=10,
+                selected_families=selected_client_families,
             )
 
             # compat: variable historique utilisée dans le template
@@ -552,6 +573,8 @@ def stats(request, pk):
         # Client 360
         'client_options': client_options,
         'selected_client': selected_client,
+        'selected_client_families': selected_client_families,
+        'family_options': family_options,
         'client_portfolio': client_portfolio,
         'client_portfolio_month': client_portfolio_month,
         'client_portfolio_quarter': client_portfolio_quarter,
@@ -735,7 +758,6 @@ def anomalies(request, pk):
 
     context = {
         'dataset': dataset,
-        'granularity': granularity,
         'anom': anom,
         'client_options': client_options,
         'selected_client': selected_client,
@@ -745,6 +767,31 @@ def anomalies(request, pk):
         'anom_clients': anom_clients,
         'anom_clients_graph': anom_clients_graph,
     }
+
+    # Ajout Isolation Forest (analyse sur le client sélectionné)
+    # Analyse Isolation Forest uniquement si un client est sélectionné
+    if selected_clients and not all_clients:
+        try:
+            df_iforest = df_processed.copy()
+            client_col = 'Client' if 'Client' in df_iforest.columns else None
+            if client_col:
+                df_iforest = df_iforest[df_iforest[client_col].isin(selected_clients)]
+            time_col = 'Month' if 'Month' in df_iforest.columns else df_iforest.columns[0]
+            value_col = 'Montant' if 'Montant' in df_iforest.columns else df_iforest.select_dtypes(include='number').columns[0]
+            html_iforest, anomalies_df = create_isolation_forest_time_anomaly_plot(
+                df_iforest, time_col, value_col, return_anomalies=True
+            )
+            context['iforest_html'] = html_iforest
+            context['iforest_anomalies'] = anomalies_df.to_dict('records') if anomalies_df is not None else []
+            context['iforest_time_col'] = time_col
+            context['iforest_value_col'] = value_col
+        except Exception as e:
+            logger.exception('[anomalies] Isolation Forest error')
+            context['iforest_html'] = None
+            context['iforest_anomalies'] = []
+            context['iforest_time_col'] = None
+            context['iforest_value_col'] = None
+
     return render(request, 'client_analytics/anomalies.html', context)
 
 

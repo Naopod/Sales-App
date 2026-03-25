@@ -1,12 +1,3 @@
-"""Détection d'anomalies — Portefeuille client.
-
-Objectif: identifier des variations anormales par client et par période (mois / trimestre fiscal / année fiscale)
-sur des métriques agrégées (CA, quantité, fréquence, prix moyen).
-
-Méthode: z-score robuste basé sur une médiane + MAD calculés sur l'historique uniquement (shift(1)),
-pour éviter toute fuite d'information.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

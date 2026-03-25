@@ -225,7 +225,7 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
         "Cpt Client", "Intitulé", "Country", "Code Recette",
 
         # Produit
-        "Libelle 1", "Famille",
+        "Libelle 1", "Libelle 2", "Famille",
 
         # Financier
         "Montant", "PU Net", "Quantité", "Nom Devise",

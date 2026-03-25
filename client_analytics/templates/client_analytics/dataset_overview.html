@@ -9,52 +9,7 @@
 {% endblock %}
 
 {% block dataset_nav %}
-<nav class="analysis-nav">
-    <div class="container-fluid">
-        <div class="analysis-tabs">
-            <a class="analysis-tab active" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-info-circle-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Overview</span>
-                    <span class="tab-subtitle">Description des données</span>
-                </div>
-            </a>
-            <a class="analysis-tab" href="{% url 'client_analytics:stats' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-bar-chart-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Statistiques</span>
-                    <span class="tab-subtitle">Analyse de données</span>
-                </div>
-            </a>
-            <a class="analysis-tab" href="{% url 'client_analytics:clustering' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-diagram-3-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Clustering</span>
-                    <span class="tab-subtitle">Segmentation K-Means</span>
-                </div>
-            </a>
-            <a class="analysis-tab" href="{% url 'client_analytics:anomalies' dataset.pk %}">
-                <div class="tab-icon">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                </div>
-                <div class="tab-content">
-                    <span class="tab-title">Détection d'Anomalies</span>
-                    <span class="tab-subtitle">Portefeuille client</span>
-                </div>
-            </a>
-        </div>
-        <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
-            <i class="bi bi-arrow-left-circle"></i>
-            <span>Accueil</span>
-        </a>
-    </div>
-</nav>
+{% include 'client_analytics/partials/_dataset_nav_tabs.html' %}
 {% endblock %}
 
 {% block content %}
