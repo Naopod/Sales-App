@@ -294,18 +294,31 @@ def plot_pareto_non_eur_clients(df: pd.DataFrame, output_path: Optional[Path] = 
     if non_eur_df.empty:
         return None
     
-    client_agg = non_eur_df.groupby("Intitulé")["Montant"].sum().sort_values(ascending=False).head(top_n)
-    
-    if client_agg.empty:
+    # Calculer l'agrégat complet pour Pareto (pour trouver n80)
+    client_agg_full = non_eur_df.groupby("Intitulé")["Montant"].sum().sort_values(ascending=False)
+    if client_agg_full.empty:
         return None
-    
-    # Cumul %
-    cumul_pct = (client_agg.cumsum() / client_agg.sum() * 100)
-    
+
+    # Calcul du nombre de clients pour atteindre 80% (n80)
+    cumul_full_pct = (client_agg_full.cumsum() / client_agg_full.sum() * 100)
+    try:
+        n80_idx = int((cumul_full_pct >= 80).to_numpy().argmax())  # index (0-based)
+        n80 = n80_idx + 1
+        n80_pct = float(cumul_full_pct.iloc[n80_idx])
+    except Exception:
+        n80 = None
+        n80_pct = None
+
+    # Trancher pour l'affichage (top_n)
+    client_agg = client_agg_full.head(top_n)
+
+    # Cumul % (portion affichée)
+    cumul_pct = (client_agg.cumsum() / client_agg_full.sum() * 100)
+
     fig, ax1 = plt.subplots(figsize=(14, 7))
-    
+
     # Barres
-    ax1.bar(range(len(client_agg)), client_agg.values, color=COLORS['non_EUR'], 
+    ax1.bar(range(len(client_agg)), client_agg.values, color=COLORS['non_EUR'],
             edgecolor='black', linewidth=0.7, alpha=0.7)
     ax1.set_xlabel("Client", fontsize=12, fontweight='bold')
     ax1.set_ylabel("CA non-EUR (€)", fontsize=12, fontweight='bold', color=COLORS['non_EUR'])
@@ -314,12 +327,27 @@ def plot_pareto_non_eur_clients(df: pd.DataFrame, output_path: Optional[Path] = 
     
     # Courbe cumul
     ax2 = ax1.twinx()
-    ax2.plot(range(len(cumul_pct)), cumul_pct.values, 
+    ax2.plot(range(len(cumul_pct)), cumul_pct.values,
              marker='o', linewidth=2.5, markersize=8, color='red', label='Cumul %')
     ax2.set_ylabel("Cumul (%)", fontsize=12, fontweight='bold', color='red')
     ax2.tick_params(axis='y', labelcolor='red')
     ax2.set_ylim(0, 110)
     ax2.axhline(80, color='gray', linestyle='--', linewidth=1, alpha=0.7, label='80%')
+    # Annotation n80 si calcul possible
+    if n80 is not None:
+        # Si n80 est dans la portion affichée, dessiner ligne verticale et annoter
+        if n80 <= top_n:
+            x_pos = n80 - 1
+            ax1.axvline(x=x_pos, color='green', linestyle='--', linewidth=1)
+            ax2.annotate(f"{n80} clients → {n80_pct:.1f}%",
+                         xy=(x_pos, n80_pct), xycoords=('data', 'data'),
+                         xytext=(10, 15), textcoords='offset points', color='green', fontsize=10,
+                         arrowprops=dict(arrowstyle='->', color='green'))
+        else:
+            # Indiquer que n80 dépasse le Top affiché
+            ax2.text(0.99, 0.95, f"n80 = {n80} (hors top {top_n})",
+                     transform=ax2.transAxes, ha='right', va='top', color='green', fontsize=10,
+                     bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     ax2.legend(loc='lower right')
     
     ax1.set_xticks(range(len(client_agg)))

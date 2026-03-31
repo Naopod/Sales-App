@@ -3,12 +3,13 @@
 Visualisations Plotly pour le sous-onglet "Analyse produits".
 
 Objectifs:
-- Snippets HTML autonomes (include_plotlyjs='cdn').
+- Snippets HTML autonomes (include_plotlyjs=False, CDN chargé dans base.html).
 - Robustesse: si colonnes manquantes ou dataset vide, retourner None.
 """
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -25,7 +26,7 @@ def _to_html(fig: go.Figure) -> str:
     fig = _tight_plotly(fig)
     return fig.to_html(
         full_html=False,
-        include_plotlyjs='cdn',
+        include_plotlyjs=False,
         config={'responsive': True, 'displayModeBar': True},
     )
 
@@ -994,6 +995,302 @@ def create_corr_heatmap(corr_matrix: pd.DataFrame, title: str = 'Corrélations (
         return _to_html(fig)
     except Exception as e:
         print(f"viz_products.create_corr_heatmap error: {e}")
+        return None
+
+
+# --- NEW: SKU PU distribution among customers (bubble) ---
+def create_sku_pu_distribution_bubble(
+    df_final: pd.DataFrame,
+    selected_product: str,
+    product_col: str,
+    time_col: str,
+    window_periods: int = 6,
+    client_col: str = "Cpt Client",
+    qty_col: str = "Quantité",
+    amount_col: str = "Montant",
+    country_col: str | None = "Country",
+    label_top_n: int = 6,          # labels: top CA (recommandé petit)
+    label_outliers_n: int = 1,      # + outliers PU/Qty
+    bubble_cap_q: float = 0.98,     # cap tailles bulles (98% par défaut)
+) -> str | None:
+    try:
+        import math
+
+        def _log_ticks_125(vmin: float, vmax: float):
+            """Ticks log lisibles: 1–2–5 * 10^k couvrant [vmin, vmax]."""
+            if vmin <= 0 or vmax <= 0:
+                return [], []
+            kmin = int(math.floor(math.log10(vmin)))
+            kmax = int(math.ceil(math.log10(vmax)))
+            vals = []
+            for k in range(kmin, kmax + 1):
+                for m in (1, 2, 5):
+                    vals.append(m * (10 ** k))
+            vals = sorted(set(vals))
+            vals = [v for v in vals if vmin <= v <= vmax]
+
+            def fmt(v: float) -> str:
+                if v >= 1:
+                    # 1, 2, 5, 10, 20, 50, 100, ...
+                    return f"{v:g}"
+                # 0.1, 0.2, 0.5, 0.05, ...
+                # garde assez de décimales sans trailing zeros excessifs
+                s = f"{v:.6f}".rstrip("0").rstrip(".")
+                return s
+
+            return vals, [fmt(v) for v in vals]
+
+        if df_final is None or df_final.empty:
+            return None
+        if selected_product is None or str(selected_product).strip() == "":
+            return None
+        if product_col not in df_final.columns or time_col not in df_final.columns:
+            return None
+        if client_col not in df_final.columns or amount_col not in df_final.columns:
+            return None
+
+        d = df_final.copy()
+        d[product_col] = d[product_col].astype(str)
+        d = d[d[product_col] == str(selected_product)].copy()
+        if d.empty:
+            return None
+
+        periods_sorted = _sorted_periods(d[time_col].dropna().unique())
+        if not periods_sorted:
+            return None
+        last_periods = periods_sorted[-window_periods:]
+        d = d[d[time_col].astype(str).isin([str(p) for p in last_periods])].copy()
+        if d.empty:
+            return None
+
+        d[amount_col] = pd.to_numeric(d[amount_col], errors="coerce")
+        if qty_col in d.columns:
+            d[qty_col] = pd.to_numeric(d[qty_col], errors="coerce")
+        else:
+            d[qty_col] = np.nan
+
+        grp_cols = [client_col]
+        if country_col and country_col in d.columns:
+            grp_cols.append(country_col)
+
+        g = d.groupby(grp_cols, dropna=False).agg(
+            CA=(amount_col, "sum"),
+            QTY=(qty_col, "sum"),
+        ).reset_index()
+
+        g["PU"] = np.where(g["QTY"] > 0, g["CA"] / g["QTY"], np.nan)
+
+        # Clean log-safety (X et Y en log => strictement positifs)
+        g["CA"] = pd.to_numeric(g["CA"], errors="coerce")
+        g["QTY"] = pd.to_numeric(g["QTY"], errors="coerce")
+        g["PU"] = pd.to_numeric(g["PU"], errors="coerce")
+        g = g.replace([np.inf, -np.inf], np.nan).dropna(subset=["CA", "QTY", "PU"])
+        g = g[(g["CA"] >= 0) & (g["QTY"] > 0) & (g["PU"] > 0)]
+        if g.empty:
+            return None
+
+        # Bubble sizing: cap extrêmes pour éviter qu'un "whale" écrase tout
+        size_raw = g["CA"].clip(lower=0).fillna(0)
+        cap_val = float(size_raw.quantile(bubble_cap_q)) if len(size_raw) else 0.0
+        size_for_plot = size_raw.clip(upper=cap_val) if cap_val > 0 else size_raw
+
+        desired_max = 46  # px
+        max_ca = float(size_for_plot.max()) if float(size_for_plot.max()) else 1.0
+        sizeref = 2.0 * max_ca / (desired_max ** 2)
+
+        # Labels: top CA + outliers (PU haut + QTY haut)
+        top_ca = g.nlargest(label_top_n, "CA")
+        out_pu_high = g.nlargest(label_outliers_n, "PU")
+        out_qty_high = g.nlargest(label_outliers_n, "QTY")
+        labels_df = (
+            pd.concat([top_ca, out_pu_high, out_qty_high], ignore_index=True)
+            .drop_duplicates(subset=grp_cols)
+        )
+
+        # Log ticks X (1–2–5)
+        pu_min = float(g["PU"].min())
+        pu_max = float(g["PU"].max())
+        tickvals, ticktext = _log_ticks_125(pu_min, pu_max)
+
+        # Build figure
+        fig = go.Figure()
+
+        # Trace 1: points only (lisible)
+        fig.add_trace(
+            go.Scatter(
+                x=g["PU"],
+                y=g["QTY"],
+                mode="markers",
+                text=g[client_col].astype(str),
+                customdata=np.stack([size_raw.values], axis=1),  # vrai CA dans hover
+                marker=dict(
+                    size=size_for_plot,
+                    sizemode="area",
+                    sizeref=sizeref,
+                    sizemin=6,
+                    opacity=0.55,
+                    line=dict(width=1, color="white"),
+                ),
+                hovertemplate=(
+                    "<b>%{text}</b><br>"
+                    "PU=%{x:,.4g}€<br>"
+                    "Qty=%{y:,.4g}<br>"
+                    "CA=%{customdata[0]:,.4g}€<br>"
+                    "<extra></extra>"
+                ),
+            )
+        )
+
+        # Trace 2: labels (peu nombreux)
+        if not labels_df.empty:
+            fig.add_trace(
+                go.Scatter(
+                    x=labels_df["PU"],
+                    y=labels_df["QTY"],
+                    mode="text",
+                    text=labels_df[client_col].astype(str),
+                    textposition="top center",
+                    textfont=dict(size=10),
+                    hoverinfo="skip",
+                    cliponaxis=False,
+                )
+            )
+
+        fig.update_layout(
+            title=f"Distribution PU (€) — SKU {selected_product} (fenêtre {len(last_periods)} périodes)",
+            height=560,
+            margin=dict(l=30, r=20, t=70, b=45),
+            template="plotly_white",
+            hovermode="closest",
+            showlegend=False,
+        )
+
+        # Axes
+        fig.update_xaxes(
+            title_text="PU moyen pondéré (€)",
+            type="log",
+            tickmode="array" if tickvals else "auto",
+            tickvals=tickvals if tickvals else None,
+            ticktext=ticktext if tickvals else None,
+            showgrid=True,
+            zeroline=False,
+        )
+        fig.update_yaxes(
+            title_text="Quantité (sur la fenêtre)",
+            type="log",
+            tickformat="~s",
+            showgrid=True,
+            zeroline=False,
+        )
+
+        return _to_html(fig)
+
+    except Exception as e:
+        print(f"viz_products.create_sku_pu_distribution_bubble error: {e}")
+        return None
+
+
+# --- NEW: Price impact per customer (scatter %ΔPU vs %ΔQty) ---
+def create_sku_price_impact_scatter(
+    df_final: pd.DataFrame,
+    selected_product: str,
+    product_col: str,
+    time_col: str,
+    window_periods: int = 6,
+    client_col: str = "Cpt Client",
+    qty_col: str = "Quantité",
+    amount_col: str = "Montant",
+) -> str | None:
+    try:
+        if df_final is None or df_final.empty:
+            return None
+        if not selected_product:
+            return None
+        if product_col not in df_final.columns or time_col not in df_final.columns:
+            return None
+        if client_col not in df_final.columns or amount_col not in df_final.columns:
+            return None
+        if qty_col not in df_final.columns:
+            return None
+
+        d = df_final.copy()
+        d[product_col] = d[product_col].astype(str)
+        d = d[d[product_col] == str(selected_product)].copy()
+        if d.empty:
+            return None
+
+        periods_sorted = _sorted_periods(d[time_col].dropna().unique())
+        if len(periods_sorted) < 2 * window_periods:
+            # pas assez d'historique pour last6 vs prev6
+            return None
+
+        last = [str(p) for p in periods_sorted[-window_periods:]]
+        prev = [str(p) for p in periods_sorted[-2 * window_periods : -window_periods]]
+
+        d[amount_col] = pd.to_numeric(d[amount_col], errors="coerce")
+        d[qty_col] = pd.to_numeric(d[qty_col], errors="coerce")
+
+        def _agg_for(period_list: list[str]) -> pd.DataFrame:
+            x = d[d[time_col].astype(str).isin(period_list)].copy()
+            g = x.groupby(client_col, dropna=False).agg(
+                CA=(amount_col, "sum"),
+                QTY=(qty_col, "sum"),
+            ).reset_index()
+            g["PU"] = np.where(g["QTY"] > 0, g["CA"] / g["QTY"], np.nan)
+            return g
+
+        g_last = _agg_for(last).rename(columns={"CA": "CA_last", "QTY": "QTY_last", "PU": "PU_last"})
+        g_prev = _agg_for(prev).rename(columns={"CA": "CA_prev", "QTY": "QTY_prev", "PU": "PU_prev"})
+
+        m = g_prev.merge(g_last, on=client_col, how="outer")
+
+        m["dPU_pct"] = (m["PU_last"] - m["PU_prev"]) / m["PU_prev"]
+        m["dQTY_pct"] = (m["QTY_last"] - m["QTY_prev"]) / m["QTY_prev"]
+        m = m.replace([np.inf, -np.inf], np.nan).dropna(subset=["dPU_pct", "dQTY_pct"])
+        
+        # Filtrer les clients avec variation de prix nulle ou quasi-nulle (< 0.1%)
+        m = m[np.abs(m["dPU_pct"]) >= 0.001]
+
+        if m.empty:
+            return None
+
+        # size by CA_prev
+        size_raw = pd.to_numeric(m["CA_prev"], errors="coerce").fillna(0).clip(lower=0)
+        denom = float(size_raw.max()) if float(size_raw.max()) else 1.0
+        size = (size_raw / denom) * 40 + 10
+
+        fig = go.Figure(
+            data=[
+                go.Scatter(
+                    x=(m["dPU_pct"] * 100.0),
+                    y=(m["dQTY_pct"] * 100.0),
+                    mode="markers+text",
+                    text=m[client_col].astype(str),
+                    textposition="top center",
+                    textfont=dict(size=9),
+                    marker=dict(size=size, opacity=0.7, line=dict(width=1, color='white')),
+                    customdata=np.stack([m["CA_prev"].fillna(0).values, m[client_col].astype(str)], axis=1),
+                    hovertemplate=(
+                        "<b>%{customdata[1]}</b><br>"
+                        "ΔPU=%{x:.1f}%<br>"
+                        "ΔQty=%{y:.1f}%<br>"
+                        "CA prev=%{customdata[0]:,.0f}€<br>"
+                        "<extra></extra>"
+                    ),
+                )
+            ]
+        )
+        fig.update_layout(
+            title=f"Impact prix → volume (clients) — SKU {selected_product} (last{window_periods} vs prev{window_periods})",
+            height=520,
+            margin=dict(l=20, r=20, t=60, b=40),
+        )
+        fig.update_xaxes(title_text="%ΔPU")
+        fig.update_yaxes(title_text="%ΔQuantité")
+
+        return _to_html(fig)
+    except Exception as e:
+        print(f"viz_products.create_sku_price_impact_scatter error: {e}")
         return None
 
 

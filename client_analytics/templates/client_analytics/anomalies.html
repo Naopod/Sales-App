@@ -1,5 +1,6 @@
 {% extends 'client_analytics/base.html' %}
 {% load static %}
+{% load custom_filters %}
 
 {% block title %}Détection d'Anomalies - {{ dataset.name }}{% endblock %}
 
@@ -8,6 +9,9 @@
 {% endblock %}
 
 {% block dataset_nav %}
+<<<<<<< HEAD
+{% include 'client_analytics/partials/_dataset_nav_tabs.html' %}
+=======
 <nav class="analysis-nav" id="analysisNav">
     <div class="container-fluid">
         <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
@@ -68,6 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+>>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
 {% endblock %}
 
 {% block content %}
@@ -138,6 +143,23 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 
+{% if selected_clients %}
+<div class="card border-info mb-4 mt-4">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0"><i class="bi bi-tree"></i> Détection d'anomalies (Isolation Forest)</h5>
+    </div>
+    <div class="card-body">
+        {% if iforest_html %}
+            <div class="mb-3">
+                {{ iforest_html|safe }}
+            </div>
+        {% else %}
+            <div class="alert alert-warning mb-0">Graphique Isolation Forest non disponible.</div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
 {% if all_clients %}
   <div class="card border-danger mb-4">
       <div class="card-header bg-danger text-white">
@@ -159,32 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
   </div>
 {% else %}
   <div class="card border-primary mb-4">
-      <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="bi bi-graph-up"></i> Anomalies — portefeuille des clients sélectionnés</h5>
-      </div>
-      <div class="card-body">
-          {% if not selected_clients %}
-              <div class="alert alert-info mb-0">Sélectionne un ou plusieurs clients, ou coche “Tous les clients”.</div>
-          {% elif anom_clients|length == 1 %}
-              {% include 'client_analytics/partials/_client_anomalies_client_block.html' with anom_client=anom_client selected_client=selected_clients.0 show_timeline=True %}
-          {% else %}
-              {% if anom_clients_graph %}
-                <div class="mb-3">
-                    <img
-                        class="img-fluid"
-                        alt="Graphique anomalies clients sélectionnés"
-                        src="data:image/png;base64,{{ anom_clients_graph }}"
-                    />
-                </div>
-              {% endif %}
-              {% for rep in anom_clients %}
-                  <div class="mb-4">
-                      {% include 'client_analytics/partials/_client_anomalies_client_block.html' with anom_client=rep selected_client=rep.client.id show_timeline=False %}
-                  </div>
-              {% endfor %}
-          {% endif %}
-      </div>
-  </div>
+  <!-- Bloc Anomalies — portefeuille des clients sélectionnés supprimé -->
 {% endif %}
 
 {% endblock %}

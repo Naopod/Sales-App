@@ -69,10 +69,19 @@ def analyze_client_portfolio_full(
     time_granularity: str = 'month',
     top_n_families: int = 8,
     top_n_products: int = 10,
+    selected_families: list = None,
 ) -> dict:
     """Analyse complète d'un client (Client 360), robuste aux colonnes manquantes.
 
     Tous les objets retournés sont sérialisables (dict/list/str/float/int/None).
+    
+    Args:
+        df: DataFrame
+        client_id: ID du client
+        time_granularity: 'month', 'quarter', 'year'
+        top_n_families: Nombre de familles top à garder
+        top_n_products: Nombre de produits top à garder
+        selected_families: Liste de familles à filtrer (None = toutes)
     """
 
     def _safe_float(x):
@@ -208,6 +217,13 @@ def analyze_client_portfolio_full(
     if df_client.empty:
         portfolio['error'] = 'Client introuvable ou sans lignes'
         return portfolio
+    
+    # Filtrer sur les familles sélectionnées si specified
+    if selected_families and family_col and family_col in df_client.columns:
+        df_client = df_client[df_client[family_col].isin(selected_families)].copy()
+        if df_client.empty:
+            portfolio['error'] = 'Aucune donnée pour les familles sélectionnées'
+            return portfolio
 
     if amount_col:
         df_client[amount_col] = pd.to_numeric(df_client[amount_col], errors='coerce')
@@ -921,6 +937,739 @@ def analyze_client_portfolio_full(
         )
     except Exception as e:
         print(f"[client360] Graph generation error: {e}")
+
+    # ═══════════════════════════════════════════════════════════════════
+    # NOUVELLES ANALYSES TYPE POWERBI
+    # ═══════════════════════════════════════════════════════════════════
+
+    def analyze_product_status(df_pivot: pd.DataFrame) -> dict:
+        """
+        Analyse le statut de chaque produit basé sur les tendances d'achat.
+        
+        Returns:
+            dict: {
+                'statuses': {product: {'status': str, 'icon': str, 'color': str}},
+                'summary': {'new': int, 'declining': int, 'stopped': int, 'risk': int}
+            }
+        """
+        if df_pivot.empty or len(df_pivot.columns) < 2:
+            return {'statuses': {}, 'summary': {'new': 0, 'declining': 0, 'stopped': 0, 'risk': 0}}
+        
+        statuses = {}
+        summary = {'new': 0, 'declining': 0, 'stopped': 0, 'risk': 0, 'active': 0}
+        
+        # Exclure la colonne Total et la ligne Total
+        columns = [col for col in df_pivot.columns if col != 'Total']
+        products = [idx for idx in df_pivot.index if idx != 'Total']
+        
+        if len(columns) < 2:
+            return {'statuses': {}, 'summary': summary}
+        
+        # Trier les colonnes (années)
+        sorted_cols = sorted(columns)
+        
+        for product in products:
+            try:
+                row = df_pivot.loc[product, sorted_cols]
+                
+                # Convertir en liste de valeurs
+                values = [float(v) if pd.notna(v) else 0.0 for v in row]
+
+                # Calculer la différence entre les deux dernières périodes
+                change_value = None
+                change_pct = None
+                status = 'active'
+                icon = '✅'
+                color = '#e8f5e9'
+
+                if len(values) >= 2:
+                    prev = values[-2]
+                    last = values[-1]
+                    change_value = last - prev
+                    if prev != 0:
+                        try:
+                            change_pct = (change_value / prev) * 100.0
+                        except Exception:
+                            change_pct = None
+                    else:
+                        change_pct = None
+
+                    # Nouveau produit
+                    if prev == 0 and last > 0:
+                        status = 'new'
+                        icon = '🆕'
+                        color = '#e3f2fd'
+                        summary['new'] += 1
+
+                    # Arrêté
+                    elif prev > 0 and last == 0:
+                        status = 'stopped'
+                        icon = '🔴'
+                        color = '#ffebee'
+                        summary['stopped'] += 1
+
+                    # Augmentation
+                    elif change_value > 0:
+                        status = 'increasing'
+                        icon = '📈'
+                        color = '#e8f5e9'
+                        summary.setdefault('increasing', 0)
+                        summary['increasing'] += 1
+
+                    # Diminution
+                    elif change_value < 0:
+                        status = 'declining'
+                        icon = '📉'
+                        color = '#fff9c4'
+                        summary['declining'] += 1
+
+                    else:
+                        status = 'unchanged'
+                        icon = '➡️'
+                        color = '#f5f5f5'
+                        summary['active'] += 1
+                else:
+                    summary['active'] += 1
+
+                statuses[product] = {
+                    'status': status,
+                    'icon': icon,
+                    'color': color,
+                    'change_pct': change_pct,
+                    'change_value': change_value,
+                }
+            except Exception as e:
+                print(f"[analyze_product_status] Error for {product}: {e}")
+                statuses[product] = {'status': 'active', 'icon': '✅', 'color': '#e8f5e9'}
+                summary['active'] += 1
+        
+        return {'statuses': statuses, 'summary': summary}
+
+    def format_table_html(df_pivot: pd.DataFrame, title: str = "", product_statuses: dict = None, is_price: bool = False) -> str:
+        """
+        Helper pour formater un DataFrame pivot en HTML bootstrap avec statuts produits.
+        
+        Args:
+            df_pivot: DataFrame pivot
+            title: Titre de la table
+            product_statuses: Dict retourné par analyze_product_status
+            is_price: Si True, formate comme prix (2 décimales), sinon comme entier
+        """
+        if df_pivot.empty:
+            return f"<p class='text-muted'>{title}: Aucune donnée disponible</p>"
+        try:
+            # Déterminer le format de nombre
+            if is_price:
+                float_formatter = lambda x: f"{x:,.2f}" if isinstance(x, (int, float)) and not pd.isna(x) else "—"
+            else:
+                float_formatter = lambda x: f"{x:,.0f}" if isinstance(x, (int, float)) and not pd.isna(x) else "—"
+            
+            # Si on a des statuts, ajouter la colonne Statut
+            if product_statuses and product_statuses.get('statuses'):
+                df_display = df_pivot.copy()
+                statuses_dict = product_statuses['statuses']
+                
+                # Ajouter colonne Statut (avant Total si existe)
+                status_col = []
+                for idx in df_display.index:
+                    if idx in statuses_dict:
+                        info = statuses_dict[idx]
+                        icon = info['icon']
+                        
+                        # Ajouter le pourcentage de baisse si disponible
+                        if info.get('change_pct') is not None:
+                            status_text = f"{icon} {info['change_pct']:.1f}%"
+                        elif info.get('change_value') is not None and info['status'] == 'new':
+                            # Pour les nouveaux produits, afficher la valeur
+                            status_text = f"{icon} +{info['change_value']:,.0f}"
+                        else:
+                            status_text = icon
+                        
+                        status_col.append(status_text)
+                    else:
+                        status_col.append('—')
+                
+                # Insérer la colonne Statut avant Total
+                if 'Total' in df_display.columns:
+                    # Insérer avant la colonne Total
+                    cols = list(df_display.columns)
+                    insert_pos = cols.index('Total')
+                    df_display.insert(insert_pos, 'Statut', status_col)
+                else:
+                    df_display['Statut'] = status_col
+                
+                # Générer HTML avec styling
+                html = df_display.to_html(
+                    classes='table table-sm table-striped table-bordered',
+                    float_format=float_formatter,
+                    na_rep="—",
+                    escape=False
+                )
+                
+                # Ajouter les couleurs de fond pour les lignes
+                for product, info in statuses_dict.items():
+                    product_escaped = product.replace('"', '&quot;').replace("'", "&#39;")
+                    color = info['color']
+                    # Ajouter style à la ligne
+                    html = html.replace(
+                        f'<tr>\n      <th>{product}</th>',
+                        f'<tr style="background-color: {color};">\n      <th>{product}</th>'
+                    )
+                
+                return html
+            else:
+                # Pas de statuts, génération normale
+                html = df_pivot.to_html(
+                    classes='table table-sm table-striped table-bordered',
+                    float_format=float_formatter,
+                    na_rep="—"
+                )
+                return html
+        except Exception as e:
+            print(f"[format_table_html] Error: {e}")
+            return f"<p class='text-muted'>{title}: Erreur de formatage</p>"
+
+    # A) Table Produits × Années Fiscales (FY)
+    portfolio['tables']['products_fy_amount_table_html'] = None
+    portfolio['tables']['products_fy_qty_table_html'] = None
+    
+    if product_col and product_col in df_client.columns:
+        # Identifier la colonne FY
+        fy_col = _pick_col(df_client, ['Fiscal_Year', 'FY', 'Exercice', 'EF', 'Year_FY'])
+        if not fy_col or fy_col not in df_client.columns:
+            fy_col = 'Year' if 'Year' in df_client.columns else None
+        
+        if fy_col:
+            # Créer une colonne produit composée (Libelle 1 + Libelle 2 si dispo)
+            libelle2_col = 'Libelle 2' if 'Libelle 2' in df_client.columns else None
+            if libelle2_col and df_client[libelle2_col].notna().any():
+                df_client['_product_label'] = (
+                    df_client[product_col].astype(str) + ' — ' + 
+                    df_client[libelle2_col].fillna('').astype(str)
+                )
+                df_client['_product_label'] = df_client['_product_label'].str.replace(' — $', '', regex=True).str.strip()
+            else:
+                df_client['_product_label'] = df_client[product_col].astype(str)
+            
+            # Table Montant
+            if amount_col and amount_col in df_client.columns:
+                try:
+                    pivot_amt = df_client.pivot_table(
+                        index='_product_label',
+                        columns=fy_col,
+                        values=amount_col,
+                        aggfunc='sum',
+                        fill_value=0
+                    )
+                    # Ajouter colonne Total
+                    pivot_amt['Total'] = pivot_amt.sum(axis=1)
+                    # Trier par Total décroissant
+                    pivot_amt = pivot_amt.sort_values('Total', ascending=False)
+                    # Analyser les statuts AVANT d'ajouter la ligne Total
+                    product_statuses_amt = analyze_product_status(pivot_amt)
+                    # Stocker le summary pour le panneau d'alertes
+                    portfolio['product_status_summary'] = product_statuses_amt['summary']
+                    # Ajouter ligne Total
+                    pivot_amt.loc['Total'] = pivot_amt.sum(axis=0)
+                    portfolio['tables']['products_fy_amount_table_html'] = format_table_html(
+                        pivot_amt, 
+                        "Produits × FY (Montant)",
+                        product_statuses=product_statuses_amt
+                    )
+                except Exception as e:
+                    print(f"[client360] products_fy_amount error: {e}")
+            
+            # Table Quantité
+            if qty_col and qty_col in df_client.columns:
+                try:
+                    pivot_qty = df_client.pivot_table(
+                        index='_product_label',
+                        columns=fy_col,
+                        values=qty_col,
+                        aggfunc='sum',
+                        fill_value=0
+                    )
+                    pivot_qty['Total'] = pivot_qty.sum(axis=1)
+                    pivot_qty = pivot_qty.sort_values('Total', ascending=False)
+                    # Analyser les statuts AVANT d'ajouter la ligne Total
+                    product_statuses_qty = analyze_product_status(pivot_qty)
+                    # Ajouter ligne Total
+                    pivot_qty.loc['Total'] = pivot_qty.sum(axis=0)
+                    portfolio['tables']['products_fy_qty_table_html'] = format_table_html(
+                        pivot_qty,
+                        "Produits × FY (Quantité)",
+                        product_statuses=product_statuses_qty
+                    )
+                except Exception as e:
+                    print(f"[client360] products_fy_qty error: {e}")
+
+    # B) Matrice EF&Q × Famille
+    portfolio['tables']['efq_family_amount_table_html'] = None
+    portfolio['tables']['efq_family_qty_table_html'] = None
+    portfolio['graphs']['chart_efq_family_amount_html'] = None
+    portfolio['graphs']['chart_efq_family_qty_html'] = None
+    portfolio['graphs']['chart_efq_family_price_html'] = None
+    portfolio['graphs']['chart_efq_family_amount_compare_html'] = None
+    portfolio['graphs']['chart_efq_family_qty_compare_html'] = None
+    
+    if family_col and family_col in df_client.columns:
+        # Identifier colonnes FY et Quarter
+        fy_col = _pick_col(df_client, ['Fiscal_Year', 'FY', 'Exercice', 'EF', 'Year_FY'])
+        if not fy_col:
+            fy_col = 'Year' if 'Year' in df_client.columns else None
+        quarter_col = _pick_col(df_client, ['Trimestre_Num', 'Quarter', 'Q', 'Fiscal_Quarter', 'Trimestre', 'Q_Num'])
+        
+        if fy_col and quarter_col:
+            # Créer colonne EF_Q = FY + "-Q" + Quarter_Num
+            try:
+                df_client['_fy_val'] = pd.to_numeric(df_client[fy_col], errors='coerce').fillna(0).astype(int)
+                df_client['_q_val'] = pd.to_numeric(df_client[quarter_col], errors='coerce').fillna(0).astype(int)
+                df_client['_efq'] = df_client['_fy_val'].astype(str) + '-Q' + df_client['_q_val'].astype(str)
+                
+                # Table Montant EFQ × Famille
+                if amount_col and amount_col in df_client.columns:
+                    try:
+                        pivot_efq_amt = df_client.pivot_table(
+                            index='_efq',
+                            columns=family_col,
+                            values=amount_col,
+                            aggfunc='sum',
+                            fill_value=0
+                        )
+                        pivot_efq_amt['Total'] = pivot_efq_amt.sum(axis=1)
+                        # Trier par période (index naturel)
+                        pivot_efq_amt = pivot_efq_amt.sort_index()
+                        portfolio['tables']['efq_family_amount_table_html'] = format_table_html(
+                            pivot_efq_amt,
+                            "EF&Q × Famille (Montant)"
+                        )
+                        
+                        # Graphe empilé Montant
+                        # Préparer records: [{"period": "2024-Q1", "family": "Bakery", "value": 12345}]
+                        records_amt = []
+                        for idx in pivot_efq_amt.index:
+                            if idx == 'Total':
+                                continue
+                            for col in pivot_efq_amt.columns:
+                                if col == 'Total':
+                                    continue
+                                val = pivot_efq_amt.loc[idx, col]
+                                # Inclure même les valeurs à 0 pour afficher toutes les périodes
+                                records_amt.append({
+                                    'period': str(idx),
+                                    'family': str(col),
+                                    'value': float(val)
+                                })
+                        
+                        portfolio['graphs']['chart_efq_family_amount_html'] = (
+                            viz_clients.create_client_period_family_stacked(
+                                records_amt,
+                                value_key='value',
+                                title='Montant par EF&Q et Famille'
+                            )
+                        )
+                    except Exception as e:
+                        print(f"[client360] efq_family_amount error: {e}")
+                
+                # Table Quantité EFQ × Famille
+                if qty_col and qty_col in df_client.columns:
+                    try:
+                        pivot_efq_qty = df_client.pivot_table(
+                            index='_efq',
+                            columns=family_col,
+                            values=qty_col,
+                            aggfunc='sum',
+                            fill_value=0
+                        )
+                        pivot_efq_qty['Total'] = pivot_efq_qty.sum(axis=1)
+                        pivot_efq_qty = pivot_efq_qty.sort_index()
+                        portfolio['tables']['efq_family_qty_table_html'] = format_table_html(
+                            pivot_efq_qty,
+                            "EF&Q × Famille (Quantité)"
+                        )
+                        
+                        # Graphe empilé Quantité
+                        records_qty = []
+                        for idx in pivot_efq_qty.index:
+                            if idx == 'Total':
+                                continue
+                            for col in pivot_efq_qty.columns:
+                                if col == 'Total':
+                                    continue
+                                val = pivot_efq_qty.loc[idx, col]
+                                # Inclure même les valeurs à 0 pour afficher toutes les périodes
+                                records_qty.append({
+                                    'period': str(idx),
+                                    'family': str(col),
+                                    'value': float(val)
+                                })
+                        
+                        portfolio['graphs']['chart_efq_family_qty_html'] = (
+                            viz_clients.create_client_period_family_stacked(
+                                records_qty, 
+                                value_key='value',
+                                title='Quantité par EF&Q et Famille'
+                            )
+                        )
+                        
+                        # Créer une copie pour la section Comparaison (pour éviter conflits d'IDs HTML)
+                        portfolio['graphs']['chart_efq_family_qty_compare_html'] = (
+                            viz_clients.create_client_period_family_stacked(
+                                records_qty, 
+                                value_key='value',
+                                title='Quantité par EF&Q'
+                            )
+                        )
+                    except Exception as e:
+                        print(f"[client360] efq_family_qty error: {e}")
+                
+                # Créer copie du graphique montant pour la comparaison
+                if amount_col and amount_col in df_client.columns:
+                    try:
+                        # Réutiliser records_amt déjà créé plus haut
+                        if 'records_amt' in locals() and records_amt:
+                            portfolio['graphs']['chart_efq_family_amount_compare_html'] = (
+                                viz_clients.create_client_period_family_stacked(
+                                    records_amt,
+                                    value_key='value',
+                                    title='Montant par EF&Q'
+                                )
+                            )
+                    except Exception as e:
+                        print(f"[client360] efq_family_amount_compare error: {e}")
+                
+                # Graphique PU Net EFQ × Famille
+                if pu_col and pu_col in df_client.columns and '_efq' in df_client.columns:
+                    try:
+                        pu_family_weighted = pd.DataFrame()  # Initialiser
+                        df_pu_family = df_client[['_efq', family_col, pu_col]].copy()
+                        
+                        if qty_col and qty_col in df_client.columns:
+                            df_pu_family[qty_col] = pd.to_numeric(df_client[qty_col], errors='coerce')
+                            df_pu_family = df_pu_family.dropna(subset=[pu_col, qty_col])
+                            df_pu_family = df_pu_family[df_pu_family[qty_col] > 0]
+                            
+                            if not df_pu_family.empty:
+                                df_pu_family['_px'] = pd.to_numeric(df_pu_family[pu_col], errors='coerce') * df_pu_family[qty_col]
+                                pivot_pu_family = df_pu_family.pivot_table(
+                                    index='_efq',
+                                    columns=family_col,
+                                    values=['_px', qty_col],
+                                    aggfunc='sum',
+                                    fill_value=0
+                                )
+                                # Calculer PU pondéré
+                                pu_family_weighted = pd.DataFrame()
+                                for col in pivot_pu_family['_px'].columns:
+                                    pu_family_weighted[col] = pivot_pu_family['_px'][col] / pivot_pu_family[qty_col][col].replace({0: np.nan})
+                        else:
+                            df_pu_family = df_pu_family.dropna(subset=[pu_col])
+                            if not df_pu_family.empty:
+                                pu_family_weighted = df_pu_family.pivot_table(
+                                    index='_efq',
+                                    columns=family_col,
+                                    values=pu_col,
+                                    aggfunc='mean',
+                                    fill_value=0
+                                )
+                        
+                        if not pu_family_weighted.empty:
+                            pu_family_weighted = pu_family_weighted.sort_index()
+                            
+                            # Préparer records pour graphique
+                            records_price_family = []
+                            for idx in pu_family_weighted.index:
+                                for col in pu_family_weighted.columns:
+                                    val = pu_family_weighted.loc[idx, col]
+                                    if pd.notna(val) and val > 0:
+                                        records_price_family.append({
+                                            'period': str(idx),
+                                            'family': str(col),
+                                            'value': float(val)
+                                        })
+                            
+                            if records_price_family:
+                                portfolio['graphs']['chart_efq_family_price_html'] = (
+                                    viz_clients.create_client_period_family_stacked(
+                                        records_price_family,
+                                        value_key='value',
+                                        title='PU Net par EF&Q et Famille',
+                                        is_price=True
+                                    )
+                                )
+                    except Exception as e:
+                        print(f"[client360] efq_family_price error: {e}")
+                        
+            except Exception as e:
+                print(f"[client360] efq_family setup error: {e}")
+
+    # C) Matrice EF&Q × Produit
+    portfolio['tables']['efq_product_amount_table_html'] = None
+    portfolio['tables']['efq_product_qty_table_html'] = None
+    portfolio['graphs']['chart_efq_product_amount_html'] = None
+    portfolio['graphs']['chart_efq_product_qty_html'] = None
+    portfolio['graphs']['chart_efq_product_price_html'] = None
+    
+    if product_col and product_col in df_client.columns:
+        # Identifier colonnes FY et Quarter
+        fy_col = _pick_col(df_client, ['Fiscal_Year', 'FY', 'Exercice', 'EF', 'Year_FY'])
+        if not fy_col:
+            fy_col = 'Year' if 'Year' in df_client.columns else None
+        quarter_col = _pick_col(df_client, ['Trimestre_Num', 'Quarter', 'Q', 'Fiscal_Quarter', 'Trimestre', 'Q_Num'])
+        
+        if fy_col and quarter_col:
+            # Créer colonne EF_Q si pas déjà créée
+            if '_efq' not in df_client.columns:
+                try:
+                    df_client['_fy_val'] = pd.to_numeric(df_client[fy_col], errors='coerce').fillna(0).astype(int)
+                    df_client['_q_val'] = pd.to_numeric(df_client[quarter_col], errors='coerce').fillna(0).astype(int)
+                    df_client['_efq'] = df_client['_fy_val'].astype(str) + '-Q' + df_client['_q_val'].astype(str)
+                except Exception as e:
+                    print(f"[client360] efq_product creation error: {e}")
+            
+            # Table Montant EFQ × Produit
+            if amount_col and amount_col in df_client.columns and '_efq' in df_client.columns:
+                try:
+                    pivot_efq_prod_amt = df_client.pivot_table(
+                        index='_efq',
+                        columns=product_col,
+                        values=amount_col,
+                        aggfunc='sum',
+                        fill_value=0
+                    )
+                    pivot_efq_prod_amt['Total'] = pivot_efq_prod_amt.sum(axis=1)
+                    pivot_efq_prod_amt = pivot_efq_prod_amt.sort_index()
+                    portfolio['tables']['efq_product_amount_table_html'] = format_table_html(
+                        pivot_efq_prod_amt,
+                        "EF&Q × Produit (Montant)"
+                    )
+                    
+                    # Graphe empilé Montant par Produit
+                    records_prod_amt = []
+                    for idx in pivot_efq_prod_amt.index:
+                        if idx == 'Total':
+                            continue
+                        for col in pivot_efq_prod_amt.columns:
+                            if col == 'Total':
+                                continue
+                            val = pivot_efq_prod_amt.loc[idx, col]
+                            # Inclure même les valeurs à 0 pour afficher toutes les périodes
+                            records_prod_amt.append({
+                                'period': str(idx),
+                                'family': str(col),  # Réutiliser 'family' comme clé générique
+                                'value': float(val)
+                            })
+                    
+                    portfolio['graphs']['chart_efq_product_amount_html'] = (
+                        viz_clients.create_client_period_family_stacked(
+                            records_prod_amt,
+                            value_key='value',
+                            title='Montant par EF&Q et Produit'
+                        )
+                    )
+                except Exception as e:
+                    print(f"[client360] efq_product_amount error: {e}")
+            
+            # Table Quantité EFQ × Produit
+            if qty_col and qty_col in df_client.columns and '_efq' in df_client.columns:
+                try:
+                    pivot_efq_prod_qty = df_client.pivot_table(
+                        index='_efq',
+                        columns=product_col,
+                        values=qty_col,
+                        aggfunc='sum',
+                        fill_value=0
+                    )
+                    pivot_efq_prod_qty['Total'] = pivot_efq_prod_qty.sum(axis=1)
+                    pivot_efq_prod_qty = pivot_efq_prod_qty.sort_index()
+                    portfolio['tables']['efq_product_qty_table_html'] = format_table_html(
+                        pivot_efq_prod_qty,
+                        "EF&Q × Produit (Quantité)"
+                    )
+                    
+                    # Graphe empilé Quantité par Produit
+                    records_prod_qty = []
+                    for idx in pivot_efq_prod_qty.index:
+                        if idx == 'Total':
+                            continue
+                        for col in pivot_efq_prod_qty.columns:
+                            if col == 'Total':
+                                continue
+                            val = pivot_efq_prod_qty.loc[idx, col]
+                            # Inclure même les valeurs à 0 pour afficher toutes les périodes
+                            records_prod_qty.append({
+                                'period': str(idx),
+                                'family': str(col),  # Réutiliser 'family' comme clé générique
+                                'value': float(val)
+                            })
+                    
+                    portfolio['graphs']['chart_efq_product_qty_html'] = (
+                        viz_clients.create_client_period_family_stacked(
+                            records_prod_qty,
+                            value_key='value',
+                            title='Quantité par EF&Q et Produit'
+                        )
+                    )
+                except Exception as e:
+                    print(f"[client360] efq_product_qty error: {e}")
+            
+            # Graphique PU Net EFQ × Produit
+            if pu_col and pu_col in df_client.columns and '_efq' in df_client.columns:
+                try:
+                    pu_product_weighted = pd.DataFrame()  # Initialiser
+                    df_pu_product = df_client[['_efq', product_col, pu_col]].copy()
+                    
+                    if qty_col and qty_col in df_client.columns:
+                        df_pu_product[qty_col] = pd.to_numeric(df_client[qty_col], errors='coerce')
+                        df_pu_product = df_pu_product.dropna(subset=[pu_col, qty_col])
+                        df_pu_product = df_pu_product[df_pu_product[qty_col] > 0]
+                        
+                        if not df_pu_product.empty:
+                            df_pu_product['_px'] = pd.to_numeric(df_pu_product[pu_col], errors='coerce') * df_pu_product[qty_col]
+                            pivot_pu_product = df_pu_product.pivot_table(
+                                index='_efq',
+                                columns=product_col,
+                                values=['_px', qty_col],
+                                aggfunc='sum',
+                                fill_value=0
+                            )
+                            # Calculer PU pondéré
+                            pu_product_weighted = pd.DataFrame()
+                            for col in pivot_pu_product['_px'].columns:
+                                pu_product_weighted[col] = pivot_pu_product['_px'][col] / pivot_pu_product[qty_col][col].replace({0: np.nan})
+                    else:
+                        df_pu_product = df_pu_product.dropna(subset=[pu_col])
+                        if not df_pu_product.empty:
+                            pu_product_weighted = df_pu_product.pivot_table(
+                                index='_efq',
+                                columns=product_col,
+                                values=pu_col,
+                                aggfunc='mean',
+                                fill_value=0
+                            )
+                    
+                    if not pu_product_weighted.empty:
+                        pu_product_weighted = pu_product_weighted.sort_index()
+                        
+                        # Préparer records pour graphique
+                        records_price_product = []
+                        for idx in pu_product_weighted.index:
+                            for col in pu_product_weighted.columns:
+                                val = pu_product_weighted.loc[idx, col]
+                                if pd.notna(val) and val > 0:
+                                    records_price_product.append({
+                                        'period': str(idx),
+                                        'family': str(col),  # Réutiliser 'family' comme clé générique
+                                        'value': float(val)
+                                    })
+                        
+                        if records_price_product:
+                            portfolio['graphs']['chart_efq_product_price_html'] = (
+                                viz_clients.create_client_period_family_stacked(
+                                    records_price_product,
+                                    value_key='value',
+                                    title='PU Net par EF&Q et Produit',
+                                    is_price=True
+                                )
+                            )
+                except Exception as e:
+                    print(f"[client360] efq_product_price error: {e}")
+
+    # D) Table PU Net par Produit × Période (pour évolution du prix)
+    portfolio['tables']['pu_product_period_table_html'] = None
+    
+    if product_col and product_col in df_client.columns and pu_col and pu_col in df_client.columns:
+        try:
+            # Créer une colonne produit composée
+            libelle2_col = 'Libelle 2' if 'Libelle 2' in df_client.columns else None
+            if libelle2_col and df_client[libelle2_col].notna().any():
+                df_client['_product_label_pu'] = (
+                    df_client[product_col].astype(str) + ' — ' + 
+                    df_client[libelle2_col].fillna('').astype(str)
+                )
+                df_client['_product_label_pu'] = df_client['_product_label_pu'].str.replace(' — $', '', regex=True).str.strip()
+            else:
+                df_client['_product_label_pu'] = df_client[product_col].astype(str)
+            
+            # Identifier la colonne FY si nécessaire
+            fy_col_local = _pick_col(df_client, ['Fiscal_Year', 'FY', 'Exercice', 'EF', 'Year_FY'])
+            if not fy_col_local or fy_col_local not in df_client.columns:
+                fy_col_local = 'Year' if 'Year' in df_client.columns else None
+            
+            # Identifier la colonne de période (utiliser month si dispo)
+            period_col = None
+            if 'month' in df_client.columns:
+                period_col = 'month'
+            elif '_efq' in df_client.columns:
+                period_col = '_efq'
+            elif fy_col_local and fy_col_local in df_client.columns:
+                period_col = fy_col_local
+            
+            if period_col:
+                # Préparer données: PU pondéré par quantité si disponible
+                df_pu = df_client[['_product_label_pu', period_col, pu_col]].copy()
+                
+                if qty_col and qty_col in df_client.columns:
+                    df_pu[qty_col] = pd.to_numeric(df_client[qty_col], errors='coerce')
+                    df_pu = df_pu.dropna(subset=[pu_col, qty_col])
+                    df_pu = df_pu[df_pu[qty_col] > 0]
+                    
+                    if not df_pu.empty:
+                        df_pu['_px'] = pd.to_numeric(df_pu[pu_col], errors='coerce') * df_pu[qty_col]
+                        pivot_pu = df_pu.pivot_table(
+                            index='_product_label_pu',
+                            columns=period_col,
+                            values=['_px', qty_col],
+                            aggfunc='sum',
+                            fill_value=0
+                        )
+                        # Calculer PU pondéré
+                        pu_weighted = pd.DataFrame()
+                        for col in pivot_pu['_px'].columns:
+                            pu_weighted[col] = pivot_pu['_px'][col] / pivot_pu[qty_col][col].replace({0: np.nan})
+                else:
+                    df_pu = df_pu.dropna(subset=[pu_col])
+                    if not df_pu.empty:
+                        pu_weighted = df_pu.pivot_table(
+                            index='_product_label_pu',
+                            columns=period_col,
+                            values=pu_col,
+                            aggfunc='mean',
+                            fill_value=0
+                        )
+                
+                if not pu_weighted.empty:
+                    # Ajouter colonne Moyenne
+                    pu_weighted['Moyenne'] = pu_weighted.mean(axis=1)
+                    
+                    # Calculer l'évolution (% entre première et dernière période non-nulle)
+                    evolution_pct = []
+                    for idx in pu_weighted.index:
+                        row = pu_weighted.loc[idx]
+                        # Exclure la colonne Moyenne
+                        values = [v for c, v in row.items() if c != 'Moyenne' and pd.notna(v) and v > 0]
+                        if len(values) >= 2:
+                            first_val = values[0]
+                            last_val = values[-1]
+                            pct = ((last_val - first_val) / first_val) * 100
+                            evolution_pct.append(pct)
+                        else:
+                            evolution_pct.append(None)
+                    
+                    pu_weighted['Évolution %'] = evolution_pct
+                    
+                    # Trier par Moyenne décroissante
+                    pu_weighted = pu_weighted.sort_values('Moyenne', ascending=False)
+                    # Limiter aux top produits
+                    pu_weighted = pu_weighted.head(20)
+                    
+                    portfolio['tables']['pu_product_period_table_html'] = format_table_html(
+                        pu_weighted,
+                        "PU Net par Produit × Période",
+                        is_price=True
+                    )
+        except Exception as e:
+            print(f"[client360] pu_product_period error: {e}")
 
     return portfolio
 

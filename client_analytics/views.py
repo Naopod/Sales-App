@@ -14,6 +14,7 @@ from .services import (
 from .services import analysis_products, analysis_geographic, analysis_clients
 from .services import analysis_anomalies
 from .services import anomaly_detection
+from .services.visualizations.viz_by_period import create_isolation_forest_time_anomaly_plot
 import pandas as pd
 
 import logging
@@ -605,6 +606,44 @@ def anomalies(request, pk):
         logger.exception("[anomalies] ERROR generating graphs")
 
     context = {
+<<<<<<< HEAD
+        'dataset': dataset,
+        'anom': anom,
+        'client_options': client_options,
+        'selected_client': selected_client,
+        'selected_clients': selected_clients,
+        'all_clients': all_clients,
+        'anom_client': anom_client,
+        'anom_clients': anom_clients,
+        'anom_clients_graph': anom_clients_graph,
+    }
+
+    # Ajout Isolation Forest (analyse sur le client sélectionné)
+    # Analyse Isolation Forest uniquement si un client est sélectionné
+    if selected_clients and not all_clients:
+        try:
+            df_iforest = df_processed.copy()
+            client_col = 'Client' if 'Client' in df_iforest.columns else None
+            if client_col:
+                df_iforest = df_iforest[df_iforest[client_col].isin(selected_clients)]
+            time_col = 'Month' if 'Month' in df_iforest.columns else df_iforest.columns[0]
+            value_col = 'Montant' if 'Montant' in df_iforest.columns else df_iforest.select_dtypes(include='number').columns[0]
+            html_iforest, anomalies_df = create_isolation_forest_time_anomaly_plot(
+                df_iforest, time_col, value_col, return_anomalies=True
+            )
+            context['iforest_html'] = html_iforest
+            context['iforest_anomalies'] = anomalies_df.to_dict('records') if anomalies_df is not None else []
+            context['iforest_time_col'] = time_col
+            context['iforest_value_col'] = value_col
+        except Exception as e:
+            logger.exception('[anomalies] Isolation Forest error')
+            context['iforest_html'] = None
+            context['iforest_anomalies'] = []
+            context['iforest_time_col'] = None
+            context['iforest_value_col'] = None
+
+    return render(request, 'client_analytics/anomalies.html', context)
+=======
         "dataset": dataset,
         "granularity": granularity,
         "anom": anom,
@@ -617,6 +656,7 @@ def anomalies(request, pk):
         "anom_clients_graph": anom_clients_graph,
     }
     return render(request, "client_analytics/anomalies.html", context)
+>>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
 
 
 def clustering(request, pk):

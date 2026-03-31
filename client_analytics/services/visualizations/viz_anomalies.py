@@ -32,6 +32,6 @@ def create_client_anomalies_scatter(df_latest: pd.DataFrame, z_thresh: float = 3
             title='Anomalies portefeuille client — Dernière période',
         )
         fig.update_layout(height=420, margin=dict(l=20, r=20, t=50, b=20))
-        return fig.to_html(full_html=False, include_plotlyjs='cdn')
+        return fig.to_html(full_html=False, include_plotlyjs=False)
     except Exception:
         return None

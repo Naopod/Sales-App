@@ -71,7 +71,7 @@ def _make_responsive(fig) -> go.Figure:
 def _to_html_responsive(fig) -> str:
     """Converts a Plotly figure to responsive HTML."""
     fig = _make_responsive(fig)
-    return fig.to_html(full_html=False, include_plotlyjs='cdn', config={'responsive': True})
+    return fig.to_html(full_html=False, include_plotlyjs=False, config={'responsive': True})
 
 
 def _get_country_display_name(code: str) -> str:
