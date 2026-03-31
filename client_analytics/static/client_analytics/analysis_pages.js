@@ -403,51 +403,22 @@
                     tab.show();
                 }
                 
-                // Pour les sous-onglets géographiques
-                const geoTabMapping = {
-                    'month': 'geo-month-tab',
-                    'quarter': 'geo-quarter-tab',
-                    'year': 'geo-fiscal-tab'
-                };
-                const geoTabId = geoTabMapping[period];
-                const geoTabElement = document.getElementById(geoTabId);
-                if (geoTabElement) {
-                    const geoTab = new bootstrap.Tab(geoTabElement);
-                    geoTab.show();
-                }
-                
-                // Pour les sous-onglets devises
-                const currencyTabMapping = {
-                    'month': 'currency-month-tab',
-                    'quarter': 'currency-quarter-tab',
-                    'year': 'currency-fiscal-tab'
-                };
-                const currencyTabId = currencyTabMapping[period];
-                const currencyTabElement = document.getElementById(currencyTabId);
-                if (currencyTabElement) {
-                    const currencyTab = new bootstrap.Tab(currencyTabElement);
-                    currencyTab.show();
-                }
-                
-                // Pour les sous-onglets temporels
-                const temporalTabMapping = {
-                    'month': 'temporal-month-tab',
-                    'quarter': 'temporal-quarter-tab',
-                    'year': 'temporal-fiscal-tab'
-                };
-                const temporalTabId = temporalTabMapping[period];
-                const temporalTabElement = document.getElementById(temporalTabId);
-                if (temporalTabElement) {
-                    const temporalTab = new bootstrap.Tab(temporalTabElement);
-                    temporalTab.show();
-                }
-                
+                // Reload all already-loaded AJAX tabs with the new granularity
+                document.querySelectorAll('[data-ajax-tab][data-ajax-loaded="true"]').forEach(pane => {
+                    delete pane.dataset.ajaxLoaded;
+                    if (window._ajaxTabSync) {
+                        window._ajaxTabSync.reloadPane(pane);
+                    }
+                });
+
                 // Redimensionner les graphiques Plotly après changement d'onglet
                 setTimeout(() => {
-                    if (window.resizePlotlyIn) {
-                        window.resizePlotlyIn(document);
+                    if (window.Plotly) {
+                        document.querySelectorAll('.plotly-graph-div').forEach(div => {
+                            try { Plotly.Plots.resize(div); } catch(e) {}
+                        });
                     }
-                }, 150);
+                }, 200);
             });
         });
         
@@ -1034,6 +1005,131 @@
         document.addEventListener('DOMContentLoaded', initAjaxForms);
     } else {
         initAjaxForms();
+    }
+})();
+
+// ==========================================
+// AJAX TAB LAZY LOADING
+// Loads tab content on first click via /ajax/tab/
+// ==========================================
+(function() {
+    'use strict';
+
+    function getDatasetPk() {
+        const parts = window.location.pathname.split('/');
+        const idx = parts.indexOf('dataset');
+        return idx >= 0 ? parts[idx + 1] : null;
+    }
+
+    function injectHTMLWithScripts(container, htmlString) {
+        const temp = document.createElement('div');
+        temp.innerHTML = htmlString;
+        const scripts = [];
+        temp.querySelectorAll('script').forEach(s => {
+            scripts.push(s.src ? {type: 'external', src: s.src} : {type: 'inline', content: s.textContent});
+            s.remove();
+        });
+        container.innerHTML = temp.innerHTML;
+        scripts.forEach(s => {
+            const el = document.createElement('script');
+            if (s.type === 'external') el.src = s.src;
+            else el.textContent = s.content;
+            container.appendChild(el);
+        });
+    }
+
+    // Sub-tab pill IDs for each ajax tab name
+    const SUB_TAB_PILLS = {
+        temporal:   { month: 'temporal-month-tab',  quarter: 'temporal-quarter-tab',  year: 'temporal-fiscal-tab'  },
+        products:   { month: 'products-month-tab',  quarter: 'products-quarter-tab',  year: 'products-fiscal-tab'  },
+        geographic: { month: 'geo-month-tab',        quarter: 'geo-quarter-tab',        year: 'geo-fiscal-tab'        },
+        currency:   { month: 'currency-month-tab',   quarter: 'currency-quarter-tab',   year: 'currency-fiscal-tab'   },
+        // clients has no sub-tab pills (single granularity per load)
+    };
+
+    function syncPeriodInPane(pane, period) {
+        const tabName = pane.dataset.ajaxTab;
+        const pillMap = SUB_TAB_PILLS[tabName];
+        if (!pillMap) return;
+        const pillId = pillMap[period] || pillMap['month'];
+        const pill = pane.querySelector('#' + pillId);
+        if (pill && window.bootstrap) {
+            new bootstrap.Tab(pill).show();
+        }
+    }
+
+    function resizePlotsIn(pane) {
+        if (!window.Plotly) return;
+        setTimeout(() => {
+            pane.querySelectorAll('.plotly-graph-div').forEach(div => {
+                try { Plotly.Plots.resize(div); } catch(e) {}
+            });
+        }, 250);
+    }
+
+    function getCurrentPeriod() {
+        const active = document.querySelector('.period-btn.active');
+        return active ? active.dataset.period : 'month';
+    }
+
+    function loadAjaxTab(pane, datasetPk) {
+        if (pane.dataset.ajaxLoaded === 'true') return;
+
+        const tabName = pane.dataset.ajaxTab;
+        const period  = getCurrentPeriod();
+        const params  = new URLSearchParams({ tab: tabName, granularity: period });
+
+        // Keep spinner visible during load
+        fetch(`/dataset/${datasetPk}/ajax/tab/?${params}`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    injectHTMLWithScripts(pane, data.html);
+                    pane.dataset.ajaxLoaded = 'true';
+                    syncPeriodInPane(pane, period);
+                    resizePlotsIn(pane);
+                } else {
+                    pane.innerHTML = `<div class="alert alert-danger mt-4"><i class="bi bi-exclamation-triangle"></i> ${data.error || 'Erreur de chargement'}</div>`;
+                }
+            })
+            .catch(() => {
+                pane.innerHTML = '<div class="alert alert-danger mt-4"><i class="bi bi-exclamation-triangle"></i> Erreur réseau lors du chargement.</div>';
+            });
+    }
+
+    function reloadPane(pane) {
+        loadAjaxTab(pane, getDatasetPk());
+    }
+
+    // Expose for use by period selector
+    window._ajaxTabSync = { syncPeriodInPane, reloadPane, SUB_TAB_PILLS };
+
+    function initAjaxTabLoading() {
+        const datasetPk = getDatasetPk();
+        if (!datasetPk) return;
+
+        document.querySelectorAll('#analysisTabs button[data-bs-toggle="tab"]').forEach(btn => {
+            btn.addEventListener('shown.bs.tab', function() {
+                const pane = document.querySelector(this.dataset.bsTarget);
+                if (pane && pane.dataset.ajaxTab) {
+                    loadAjaxTab(pane, datasetPk);
+                }
+            });
+        });
+
+        // Load the active AJAX tab on page init (in case URL param pre-selects a tab)
+        const activePane = document.querySelector('#analysisTabContent .tab-pane.active[data-ajax-tab]');
+        if (activePane) {
+            loadAjaxTab(activePane, datasetPk);
+        }
+
+        console.log('⚡ AJAX tab lazy loading initialized');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAjaxTabLoading);
+    } else {
+        initAjaxTabLoading();
     }
 })();
 

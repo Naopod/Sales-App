@@ -1,0 +1,179 @@
+{% load custom_filters %}
+    <h2 class="mb-4 mt-4"><i class="bi bi-people-fill"></i> Analyses clients</h2>
+    
+    {% if client_analysis %}
+    
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-people"></i> Total Clients</h5>
+                    <h2>{{ client_analysis.kpis.nb_clients|default:"" }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-trophy"></i> Top 20% Clients</h5>
+                    <h2>{{ concentration_top20_pct|floatformat:1|default:"" }}%</h2>
+                    <small>du CA total</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-star-fill"></i> Top 10 Clients</h5>
+                    <h2>{{ concentration_top10_pct|floatformat:1|default:"" }}%</h2>
+                    <small>du CA total</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="bi bi-cash-coin"></i> CA Moyen</h5>
+                    <h2>{{ client_analysis.kpis.ca_moyen_par_unite_freq|floatformat:0|default:"" }}€</h2>
+                    <small>par {{ client_analysis.meta.period_unit|default:"commande" }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualisations Clients -->
+    {% if client_graphs %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h3 class="mb-3"><i class="bi bi-bar-chart-fill"></i> Visualisations Clients</h3>
+        </div>
+    </div>
+    
+    {% if client_graphs.concentration %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📊 Concentration Clients - Analyse de Pareto</h5>
+                </div>
+                <div class="card-body">
+                    {{ client_graphs.concentration|safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="row mb-4">
+        {% if client_graphs.rfm_distribution %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">🎯 Distribution des Segments RFM</h5>
+                </div>
+                <div class="card-body">
+                    {{ client_graphs.rfm_distribution|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if client_graphs.ca_distribution %}
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">💰 Distribution du CA par Client</h5>
+                </div>
+                <div class="card-body">
+                    {{ client_graphs.ca_distribution|safe }}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- Top 10 Clients -->
+    {% if top10_clients is not None %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="bi bi-trophy"></i> Top 10 Clients</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th class="text-end">CA Total</th>
+                                    <th class="text-end">Part %</th>
+                                    <th class="text-end">Nb {{ client_analysis.meta.period_unit|default:"commandes" }}</th>
+                                    <th class="text-end">CA moyen / {{ client_analysis.meta.period_unit|default:"commande" }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for client_id, row in top10_clients.iterrows %}
+                                <tr>
+                                    <td><strong>{{ client_id }}</strong></td>
+                                    <td class="text-end">{{ row.CA_Total|floatformat:0 }}€</td>
+                                    <td class="text-end">{{ row.Part_CA_Pct|floatformat:2 }}%</td>
+                                    <td class="text-end">{{ row.Nb_Commandes|floatformat:0 }}</td>
+                                    <td class="text-end">{{ row.Panier_Moyen|floatformat:0 }}€</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> Analyse clients en cours de chargement...
+    </div>
+    {% endif %}
+
+    <!-- Portefeuille client complet (Client 360) - après les visualisations globales -->
+    <div class="card border-primary mb-4 mt-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="bi bi-person-badge"></i> Portefeuille client complet (Client 360)</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <input type="hidden" name="tab" value="clients">
+                <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
+                <div class="col-lg-8">
+                    <label class="form-label">Sélectionner un client</label>
+                    <select class="form-select" name="client">
+                        <option value="">"" Choisir ""</option>
+                        {% for opt in client_options %}
+                            <option value="{{ opt.value }}" {% if selected_client and opt.value == selected_client %}selected{% endif %}>
+                                {{ opt.label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Rechargement via GET (pas d'AJAX).</div>
+                </div>
+                <div class="col-lg-4">
+                    <button class="btn btn-primary w-100" type="submit">
+                        <i class="bi bi-search"></i> Afficher
+                    </button>
+                </div>
+            </form>
+
+            {% if selected_client %}
+            <div class="mt-4">
+                {% if granularity == 'quarter' %}
+                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_quarter %}
+                {% elif granularity == 'year' %}
+                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_fiscal %}
+                {% else %}
+                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_month %}
+                {% endif %}
+            </div>
+            {% endif %}

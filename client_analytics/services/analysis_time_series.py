@@ -592,32 +592,7 @@ def generate_temporal_analysis(
     except Exception as e:
         results['stl_error'] = str(e)
 
-    # Détection d'anomalies (multi-métriques) sur base JOURNALIÈRE (cacheable)
-    try:
-        from . import anomaly_detection
-
-        anomaly_report = anomaly_report_cache
-        if anomaly_report is None:
-            anomaly_report = anomaly_detection.build_anomaly_report(
-                df_daily,
-                value_cols=['CA_Total', 'Qty_Total', 'Nb_Clients'],
-                z_thresh=3.5,
-            )
-
-        # Le builder embarque un champ interne _anom_map (DataFrames) pour le graph.
-        anom_map = None
-        if isinstance(anomaly_report, dict):
-            anom_map = anomaly_report.get('_anom_map')
-            # Nettoyage pour le template (ne pas exposer des DataFrames)
-            anomaly_report_clean = {k: v for k, v in anomaly_report.items() if k != '_anom_map'}
-            results['anomalies'] = anomaly_report_clean
-
-        if isinstance(anom_map, dict) and anom_map:
-            dash_html = create_anomaly_dashboard_plot(anom_map)
-            if dash_html:
-                graphs['anomaly_dashboard'] = dash_html
-    except Exception as e:
-        results['anomalies_error'] = str(e)
+    # Anomaly detection removed from this tab.
 
     # (Réduction volontaire) On ne génère plus de graphes STL supplémentaires (Quantité / Nb clients)
     # pour éviter un empilement de visuels; l'évolution est couverte par le graphique unique ci-dessus.

@@ -1,0 +1,17 @@
+{% load custom_filters %}
+<h2 class="mb-4 mt-4"><i class="bi bi-globe"></i> Analyses géographique</h2>
+
+{% if geo_graphs.world_map %}
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-header bg-dark text-white d-flex align-items-center gap-2">
+        <i class="bi bi-globe2 fs-5"></i>
+        <span class="fw-semibold">Carte mondiale — Performance par pays</span>
+        <span class="ms-auto badge bg-secondary">Hover sur un pays pour les détails · Sélecteur de métrique intégré</span>
+    </div>
+    <div class="card-body p-0">
+        {{ geo_graphs.world_map|safe }}
+    </div>
+</div>
+{% endif %}
+
+{% include 'client_analytics/partials/_geo_detail_block.html' %}

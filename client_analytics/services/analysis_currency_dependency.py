@@ -359,17 +359,17 @@ def analyze_currency_dependency(
     if path:
         chart_paths["revenue_by_currency"] = str(path)
     
-    # Graph 2: Aire empilée mensuelle
+    # Graph 2: Aire empilée (granularité choisie)
     path = output_path_obj / "2_monthly_stacked_area.png" if output_path_obj else None
-    fig = plot_monthly_stacked_area(df_clean, path)
+    fig = plot_monthly_stacked_area(df_clean, path, granularity=granularity)
     if fig:
         charts["monthly_stacked_area"] = fig
     if path:
         chart_paths["monthly_stacked_area"] = str(path)
-    
-    # Graph 3: % non-EUR temporel
+
+    # Graph 3: % non-EUR temporel (granularité choisie)
     path = output_path_obj / "3_non_eur_pct_over_time.png" if output_path_obj else None
-    fig = plot_non_eur_pct_over_time(df_clean, path)
+    fig = plot_non_eur_pct_over_time(df_clean, path, granularity=granularity)
     if fig:
         charts["non_eur_pct_over_time"] = fig
     if path:
