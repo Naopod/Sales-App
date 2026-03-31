@@ -545,11 +545,10 @@ def generate_period_analysis(df, granularity="month", skip_preprocessing=True):
                         graphs["correlation_evolution"] = fig.to_html(
                             full_html=False, include_plotlyjs="cdn"
                         )
-<<<<<<< HEAD
-                        
-                        graphs['correlation_evolution'] = fig.to_html(full_html=False, include_plotlyjs=False)
-=======
->>>>>>> a9238f20f31511e1915097098fa4ef4ed06f8cd4
+
+                        graphs["correlation_evolution"] = fig.to_html(
+                            full_html=False, include_plotlyjs=False
+                        )
                     else:
                         pass
                 else:
