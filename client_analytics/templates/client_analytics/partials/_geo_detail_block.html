@@ -1,0 +1,204 @@
+{% load custom_filters %}
+{#
+  Partial: geographic detail for ONE granularity.
+  Expected context vars (passed via "with" tag):
+    stats_zone, stats_pays, classif_summary, top10_score, geo_graphs
+#}
+
+<!-- ── Zones ─────────────────────────────────────────────────────────────── -->
+{% if stats_zone %}
+<h3 class="mb-3 mt-4"><i class="bi bi-map"></i> Performance par Zone Géographique</h3>
+<div class="row mb-4">
+    {% for row in stats_zone %}
+    <div class="col-md-6 col-lg-4 mb-3">
+        <div class="card border-info h-100">
+            <div class="card-header bg-info text-white">
+                <strong>{{ row.Zone }}</strong>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>CA Total :</strong> {{ row.CA_Total|floatformat:0 }} €</p>
+                <p class="mb-2"><strong>Part du CA :</strong> {{ row.Part_Pct|floatformat:1 }} %</p>
+                <p class="mb-2"><strong>Pays :</strong> {{ row.Nb_Pays }}</p>
+                <p class="mb-2"><strong>Clients :</strong> {{ row.Nb_Clients }}</p>
+                <p class="mb-2"><strong>Panier Moyen :</strong> {{ row.Panier_Moyen|floatformat:2 }} €</p>
+                <p class="mb-0"><strong>CA Moyen/Pays :</strong> {{ row.CA_Moyen|floatformat:0 }} €</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- ── Classification ────────────────────────────────────────────────────── -->
+{% if classif_summary %}
+<h3 class="mb-3"><i class="bi bi-trophy"></i> Classification par Performance</h3>
+<div class="row mb-4">
+    {% for row in classif_summary %}
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100
+            {% if row.Classification == 'Excellence' %}border-success
+            {% elif row.Classification == 'Performant' %}border-primary
+            {% elif row.Classification == 'Moyen' %}border-warning
+            {% else %}border-danger{% endif %}">
+            <div class="card-header text-white
+                {% if row.Classification == 'Excellence' %}bg-success
+                {% elif row.Classification == 'Performant' %}bg-primary
+                {% elif row.Classification == 'Moyen' %}bg-warning
+                {% else %}bg-danger{% endif %}">
+                <strong>{{ row.Classification }}</strong>
+            </div>
+            <div class="card-body">
+                <p class="mb-2"><strong>Pays :</strong> {{ row.Nb_Pays|floatformat:0 }}</p>
+                <p class="mb-2"><strong>CA Total :</strong> {{ row.CA_Total|floatformat:0 }} €</p>
+                <p class="mb-2"><strong>Part du CA :</strong> {{ row.Part_CA_Pct|floatformat:1 }} %</p>
+                <p class="mb-0"><strong>Score Moyen :</strong> {{ row.Score_Moyen|floatformat:1 }}/100</p>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- ── Top 10 ───────────────────────────────────────────────────────────── -->
+{% if top10_score %}
+<h3 class="mb-3"><i class="bi bi-star-fill"></i> Top 10 Pays par Score de Performance</h3>
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>#</th><th>Pays</th><th>Zone</th><th>Classification</th>
+                        <th>CA Total (€)</th><th>Score CA</th>
+                        <th>Score Panier</th><th>Score Clients</th><th>Score Global</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in top10_score %}
+                    <tr>
+                        <td><strong>{{ forloop.counter }}</strong></td>
+                        <td><strong>{{ row.Pays }}</strong></td>
+                        <td>{{ row.Zone }}</td>
+                        <td>
+                            <span class="badge
+                                {% if row.Classification == 'Excellence' %}bg-success
+                                {% elif row.Classification == 'Performant' %}bg-primary
+                                {% elif row.Classification == 'Moyen' %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {{ row.Classification }}
+                            </span>
+                        </td>
+                        <td>{{ row.CA_Total|floatformat:0 }}</td>
+                        <td>{{ row.Score_CA|floatformat:1 }}</td>
+                        <td>{{ row.Score_Panier|floatformat:1 }}</td>
+                        <td>{{ row.Score_Clients|floatformat:1 }}</td>
+                        <td><strong>{{ row.Score_Global|floatformat:1 }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── All countries (collapsible) ────────────────────────────────────────── -->
+{% if stats_pays %}
+<div class="mb-4">
+    <button class="btn btn-outline-secondary btn-sm mb-2" type="button"
+            data-bs-toggle="collapse" data-bs-target="#geoAllCountriesTable"
+            aria-expanded="false">
+        <i class="bi bi-table"></i> Afficher tous les pays ({{ stats_pays|length }})
+    </button>
+    <div class="collapse" id="geoAllCountriesTable">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Pays</th><th>Zone</th>
+                        <th>CA Total (€)</th><th>Part CA (%)</th>
+                        <th>Clients</th><th>Panier Moyen (€)</th>
+                        <th>Score Global</th><th>Classification</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in stats_pays %}
+                    <tr>
+                        <td><strong>{{ row.Pays }}</strong></td>
+                        <td>{{ row.Zone }}</td>
+                        <td>{{ row.CA_Total|floatformat:0 }}</td>
+                        <td>{{ row.Part_Pct|floatformat:1 }}</td>
+                        <td>{{ row.Nb_Clients }}</td>
+                        <td>{{ row.Panier_Moyen|floatformat:0 }}</td>
+                        <td>{{ row.Score_Global|floatformat:1 }}</td>
+                        <td>
+                            <span class="badge
+                                {% if row.Classification == 'Excellence' %}bg-success
+                                {% elif row.Classification == 'Performant' %}bg-primary
+                                {% elif row.Classification == 'Moyen' %}bg-warning text-dark
+                                {% else %}bg-danger{% endif %}">
+                                {{ row.Classification }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ── Charts ───────────────────────────────────────────────────────────── -->
+{% if geo_graphs %}
+<h3 class="mb-3 mt-4"><i class="bi bi-bar-chart-fill"></i> Visualisations</h3>
+
+{% if geo_graphs.ca_by_country %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Top 15 Pays par Chiffre d'Affaires</h5>
+            </div>
+            <div class="card-body">{{ geo_graphs.ca_by_country|safe }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if geo_graphs.zone_performance %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Performance par Zone Géographique</h5>
+            </div>
+            <div class="card-body">{{ geo_graphs.zone_performance|safe }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row mb-4">
+    {% if geo_graphs.classification %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">Répartition par Classification</h5>
+            </div>
+            <div class="card-body">{{ geo_graphs.classification|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+    {% if geo_graphs.score_distribution %}
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">Distribution des Scores Globaux</h5>
+            </div>
+            <div class="card-body">{{ geo_graphs.score_distribution|safe }}</div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}

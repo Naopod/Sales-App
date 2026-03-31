@@ -71,125 +71,151 @@ def plot_revenue_by_currency(df: pd.DataFrame, output_path: Optional[Path] = Non
     return fig
 
 
-def plot_monthly_stacked_area(df: pd.DataFrame, output_path: Optional[Path] = None) -> Optional[plt.Figure]:
+def plot_monthly_stacked_area(df: pd.DataFrame, output_path: Optional[Path] = None, granularity: str = "month") -> Optional[plt.Figure]:
     """
-    Graph 2: Aire empilée - CA mensuel par devise.
-    
+    Graph 2: Aire empilée - CA par devise selon la granularité.
+
     Args:
         df: DataFrame nettoyé
         output_path: Chemin de sauvegarde (optionnel)
-    
+        granularity: 'month', 'quarter' ou 'year'
+
     Returns:
         Figure matplotlib ou None
     """
     if "Nom Devise" not in df.columns or "Montant" not in df.columns:
         return None
-    
-    # Créer colonne Month_Period
+
     df_temp = df.copy()
-    if "Month" in df_temp.columns and df_temp["Month"].notna().any():
-        df_temp["Month_Period"] = pd.to_datetime(df_temp["Month"] + "-01").dt.to_period("M")
-    elif "Date Fact." in df_temp.columns:
-        df_temp["Month_Period"] = pd.to_datetime(df_temp["Date Fact."], errors="coerce").dt.to_period("M")
+
+    # Créer la colonne de période selon la granularité
+    if "Date Fact." in df_temp.columns:
+        dates = pd.to_datetime(df_temp["Date Fact."], errors="coerce")
+    elif "Month" in df_temp.columns and df_temp["Month"].notna().any():
+        dates = pd.to_datetime(df_temp["Month"] + "-01", errors="coerce")
     else:
         return None
-    
-    if "Month_Period" not in df_temp.columns or df_temp["Month_Period"].isna().all():
+
+    if granularity == "quarter":
+        df_temp["_period"] = dates.dt.to_period("Q")
+        xlabel = "Trimestre"
+        title = "Évolution trimestrielle du CA par devise"
+    elif granularity == "year":
+        df_temp["_period"] = dates.dt.to_period("A")
+        xlabel = "Année"
+        title = "Évolution annuelle du CA par devise"
+    else:
+        df_temp["_period"] = dates.dt.to_period("M")
+        xlabel = "Mois"
+        title = "Évolution mensuelle du CA par devise"
+
+    if df_temp["_period"].isna().all():
         return None
-    
+
     pivot = df_temp.pivot_table(
-        index="Month_Period",
+        index="_period",
         columns="Nom Devise",
         values="Montant",
         aggfunc="sum",
         fill_value=0
     )
-    
+
     if pivot.empty:
         return None
-    
+
     # Trier colonnes: EUR en premier
     cols = pivot.columns.tolist()
     if "EUR" in cols:
         cols.remove("EUR")
         cols = ["EUR"] + sorted(cols)
         pivot = pivot[cols]
-    
+
     fig, ax = plt.subplots(figsize=(14, 7))
-    
+
     pivot.plot.area(ax=ax, alpha=0.7, linewidth=2)
-    
-    ax.set_xlabel("Mois", fontsize=12, fontweight='bold')
+
+    ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
     ax.set_ylabel("Chiffre d'affaires (€)", fontsize=12, fontweight='bold')
-    ax.set_title("Évolution mensuelle du CA par devise", fontsize=14, fontweight='bold', pad=20)
+    ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
     ax.legend(title="Devise", bbox_to_anchor=(1.05, 1), loc='upper left', frameon=True)
     ax.grid(axis='y', alpha=0.3)
     ax.ticklabel_format(style='plain', axis='y')
-    
+
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    
+
     if output_path:
         fig.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
         return None
-    
+
     return fig
 
 
-def plot_non_eur_pct_over_time(df: pd.DataFrame, output_path: Optional[Path] = None) -> Optional[plt.Figure]:
+def plot_non_eur_pct_over_time(df: pd.DataFrame, output_path: Optional[Path] = None, granularity: str = "month") -> Optional[plt.Figure]:
     """
-    Graph 3: Courbe - Part non-EUR (%) dans le temps.
-    
+    Graph 3: Courbe - Part non-EUR (%) dans le temps selon la granularité.
+
     Args:
         df: DataFrame nettoyé
         output_path: Chemin de sauvegarde (optionnel)
-    
+        granularity: 'month', 'quarter' ou 'year'
+
     Returns:
         Figure matplotlib ou None
     """
     if "Nom Devise" not in df.columns or "Montant" not in df.columns:
         return None
-    
-    # Créer colonne Month_Period
+
     df_temp = df.copy()
-    if "Month" in df_temp.columns and df_temp["Month"].notna().any():
-        df_temp["Month_Period"] = pd.to_datetime(df_temp["Month"] + "-01").dt.to_period("M")
-    elif "Date Fact." in df_temp.columns:
-        df_temp["Month_Period"] = pd.to_datetime(df_temp["Date Fact."], errors="coerce").dt.to_period("M")
+
+    if "Date Fact." in df_temp.columns:
+        dates = pd.to_datetime(df_temp["Date Fact."], errors="coerce")
+    elif "Month" in df_temp.columns and df_temp["Month"].notna().any():
+        dates = pd.to_datetime(df_temp["Month"] + "-01", errors="coerce")
     else:
         return None
-    
-    if "Month_Period" not in df_temp.columns or df_temp["Month_Period"].isna().all():
+
+    if granularity == "quarter":
+        df_temp["_period"] = dates.dt.to_period("Q")
+        xlabel = "Trimestre"
+    elif granularity == "year":
+        df_temp["_period"] = dates.dt.to_period("A")
+        xlabel = "Année"
+    else:
+        df_temp["_period"] = dates.dt.to_period("M")
+        xlabel = "Mois"
+
+    if df_temp["_period"].isna().all():
         return None
-    
-    monthly_total = df_temp.groupby("Month_Period")["Montant"].sum()
-    monthly_non_eur = df_temp[df_temp["Nom Devise"] != "EUR"].groupby("Month_Period")["Montant"].sum()
-    
-    non_eur_pct = (monthly_non_eur / monthly_total * 100).fillna(0)
-    
+
+    period_total = df_temp.groupby("_period")["Montant"].sum()
+    period_non_eur = df_temp[df_temp["Nom Devise"] != "EUR"].groupby("_period")["Montant"].sum()
+
+    non_eur_pct = (period_non_eur / period_total * 100).fillna(0)
+
     if non_eur_pct.empty:
         return None
-    
+
     fig, ax = plt.subplots(figsize=(14, 6))
-    
-    ax.plot(non_eur_pct.index.astype(str), non_eur_pct.values, 
+
+    ax.plot(non_eur_pct.index.astype(str), non_eur_pct.values,
             marker='o', linewidth=2.5, markersize=6, color=COLORS['non_EUR'])
-    
-    ax.set_xlabel("Mois", fontsize=12, fontweight='bold')
+
+    ax.set_xlabel(xlabel, fontsize=12, fontweight='bold')
     ax.set_ylabel("Part non-EUR (%)", fontsize=12, fontweight='bold')
     ax.set_title("Évolution de la part du CA en devises étrangères", fontsize=14, fontweight='bold', pad=20)
     ax.grid(True, alpha=0.3)
     ax.set_ylim(0, max(non_eur_pct.values) * 1.1 if len(non_eur_pct) > 0 else 100)
-    
+
     plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
-    
+
     if output_path:
         fig.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
         return None
-    
+
     return fig
 
 

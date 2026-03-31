@@ -37,4 +37,9 @@ urlpatterns = [
         name="ajax_compare_families",
     ),
     # === COPILOT: END NEW URLS ===
+    path(
+        "dataset/<int:pk>/ajax/tab/",
+        views.ajax_tab,
+        name="ajax_tab",
+    ),
 ]
