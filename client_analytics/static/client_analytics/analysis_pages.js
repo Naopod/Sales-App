@@ -404,7 +404,13 @@
                 }
                 
                 // Reload all already-loaded AJAX tabs with the new granularity
-                document.querySelectorAll('[data-ajax-tab][data-ajax-loaded="true"]').forEach(pane => {
+                if (window.showPageLoader) window.showPageLoader('Changement de période…');
+                const panesToReload = document.querySelectorAll('[data-ajax-tab][data-ajax-loaded="true"]');
+                let pending = panesToReload.length;
+                if (pending === 0 && window.hidePageLoader) {
+                    setTimeout(window.hidePageLoader, 500);
+                }
+                panesToReload.forEach(pane => {
                     delete pane.dataset.ajaxLoaded;
                     if (window._ajaxTabSync) {
                         window._ajaxTabSync.reloadPane(pane);
@@ -1094,6 +1100,13 @@
             })
             .catch(() => {
                 pane.innerHTML = '<div class="alert alert-danger mt-4"><i class="bi bi-exclamation-triangle"></i> Erreur réseau lors du chargement.</div>';
+            })
+            .finally(() => {
+                // Masquer le loader si plus aucun onglet n'est en cours de chargement
+                const stillLoading = document.querySelectorAll('[data-ajax-tab]:not([data-ajax-loaded])');
+                // Un onglet non chargé = placeholder visible = en cours
+                const spinners = document.querySelectorAll('[data-ajax-tab] .ajax-tab-placeholder');
+                if (spinners.length === 0 && window.hidePageLoader) window.hidePageLoader();
             });
     }
 
@@ -1130,6 +1143,133 @@
         document.addEventListener('DOMContentLoaded', initAjaxTabLoading);
     } else {
         initAjaxTabLoading();
+    }
+})();
+
+// ==========================================
+// GLOBAL PAGE LOADER
+// Spinner plein écran sur:
+//  - clics sur .period-btn (rechargement granularité)
+//  - submit de tout formulaire d'analyse (.analysis-form)
+//  - submit du formulaire anomalies (#bmForm)
+// ==========================================
+(function() {
+    'use strict';
+
+    // ----- Injection de l'overlay dans le body -----
+    function ensureOverlay() {
+        let el = document.getElementById('pageLoaderOverlay');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'pageLoaderOverlay';
+            el.className = 'page-loader-overlay';
+            el.innerHTML = '<div class="page-loader-spinner"></div><div class="page-loader-text" id="pageLoaderText">Calcul en cours…</div>';
+            document.body.appendChild(el);
+        }
+        return el;
+    }
+
+    function showLoader(text) {
+        const overlay = ensureOverlay();
+        const textEl = overlay.querySelector('#pageLoaderText');
+        if (textEl) textEl.textContent = text || 'Calcul en cours…';
+        overlay.classList.add('active');
+    }
+
+    function hideLoader() {
+        const overlay = document.getElementById('pageLoaderOverlay');
+        if (overlay) overlay.classList.remove('active');
+    }
+
+    // Expose globally so AJAX handlers can call it
+    window.showPageLoader = showLoader;
+    window.hidePageLoader = hideLoader;
+
+    function init() {
+        ensureOverlay();
+
+        // === 1. Period buttons (stats page) ===
+        // Ces boutons déclenchent des reloads AJAX des onglets → on affiche
+        // le loader et on le masque quand les fetches sont terminés.
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            // Les <a> period-btn naviguent → loader simple avant navigation
+            if (btn.tagName === 'A') {
+                btn.addEventListener('click', function() {
+                    showLoader('Changement de période…');
+                });
+            } else {
+                // Les <button> period-btn rechargent les onglets AJAX
+                btn.addEventListener('click', function() {
+                    showLoader('Changement de période…');
+                    // On masque après un délai max (les AJAX reloads gèrent leur propre spinner)
+                    setTimeout(hideLoader, 4000);
+                });
+            }
+        });
+
+        // === 2. Formulaires d'analyse avec classe .analysis-form (stats, etc.) ===
+        document.querySelectorAll('form.analysis-form').forEach(form => {
+            if (form.hasAttribute('data-loader-handled')) return;
+            form.setAttribute('data-loader-handled', 'true');
+            form.addEventListener('submit', function() {
+                showLoader('Analyse en cours…');
+            });
+        });
+
+        // === 3. Bouton clustering (form POST) ===
+        document.querySelectorAll('form[method="post"]').forEach(form => {
+            if (form.hasAttribute('data-loader-handled')) return;
+            const btn = form.querySelector('button[type="submit"]');
+            if (!btn) return;
+            form.setAttribute('data-loader-handled', 'true');
+            form.addEventListener('submit', function() {
+                showLoader('Analyse en cours…');
+                // Remplace le texte du bouton
+                btn.disabled = true;
+                const icon = btn.querySelector('i');
+                if (icon) icon.className = '';
+                const original = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Calcul…';
+                // Restaurer si erreur (ex. validation)
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                    hideLoader();
+                }, 30000);
+            });
+        });
+
+        // === 4. Formulaire anomalies / monitoring comportemental (GET) ===
+        const bmForm = document.getElementById('bmForm');
+        if (bmForm && !bmForm.hasAttribute('data-loader-handled')) {
+            bmForm.setAttribute('data-loader-handled', 'true');
+            bmForm.addEventListener('submit', function() {
+                showLoader('Analyse comportementale…');
+            });
+        }
+
+        // === 5. Boutons "Analyser" avec data-loader-text ===
+        document.querySelectorAll('[data-loader-text]').forEach(el => {
+            if (el.hasAttribute('data-loader-handled')) return;
+            el.setAttribute('data-loader-handled', 'true');
+            el.addEventListener('click', function() {
+                showLoader(this.getAttribute('data-loader-text') || 'Calcul…');
+            });
+        });
+
+        // Cacher le loader quand la page est complètement chargée
+        // (au cas où on revient en arrière)
+        window.addEventListener('pageshow', hideLoader);
+    }
+
+    // Masquer si déjà affiché au chargement (ex: back navigation)
+    document.addEventListener('DOMContentLoaded', function() {
+        hideLoader();
+        init();
+    });
+    if (document.readyState !== 'loading') {
+        hideLoader();
+        init();
     }
 })();
 
