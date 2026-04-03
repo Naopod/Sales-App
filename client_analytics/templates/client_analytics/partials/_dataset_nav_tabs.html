@@ -32,6 +32,13 @@
                     <span class="tab-subtitle">Portefeuille client</span>
                 </div>
             </a>
+            <a class="analysis-tab" href="{% url 'client_analytics:projection' dataset.pk %}">
+                <div class="tab-icon"><i class="bi bi-graph-up-arrow"></i></div>
+                <div class="tab-content">
+                    <span class="tab-title">Projection</span>
+                    <span class="tab-subtitle">Évolution portefeuille</span>
+                </div>
+            </a>
         </div>
         <a href="{% url 'client_analytics:home' %}" class="btn-back-home">
             <i class="bi bi-arrow-left-circle"></i>
@@ -42,16 +49,35 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // ── Nav collapse ──────────────────────────────────────────────
     const navToggleBtn = document.getElementById('navToggleBtn');
-    const analysisNav = document.getElementById('analysisNav');
-    const isCollapsed = localStorage.getItem('navCollapsed') === 'true';
-    if (isCollapsed) {
+    const analysisNav  = document.getElementById('analysisNav');
+    if (localStorage.getItem('navCollapsed') === 'true') {
         analysisNav.classList.add('collapsed');
     }
     navToggleBtn?.addEventListener('click', function() {
         analysisNav.classList.toggle('collapsed');
-        const collapsed = analysisNav.classList.contains('collapsed');
-        localStorage.setItem('navCollapsed', collapsed);
+        localStorage.setItem('navCollapsed', analysisNav.classList.contains('collapsed'));
     });
+
+    // ── Active tab detection ──────────────────────────────────────
+    // Compare chaque lien au pathname courant. On préfère la
+    // correspondance la plus longue (évite qu'Overview matche tout).
+    const current = window.location.pathname;
+    let bestMatch = null;
+    let bestLen   = 0;
+
+    document.querySelectorAll('a.analysis-tab').forEach(link => {
+        const linkPath = new URL(link.href).pathname;
+        if (current.startsWith(linkPath) && linkPath.length > bestLen) {
+            bestLen   = linkPath.length;
+            bestMatch = link;
+        }
+    });
+
+    if (bestMatch) {
+        bestMatch.classList.add('active');
+        bestMatch.setAttribute('aria-current', 'page');
+    }
 });
 </script>

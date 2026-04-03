@@ -1,124 +1,746 @@
 {% extends 'client_analytics/base.html' %}
 {% load static %}
 {% load custom_filters %}
-
-{% block title %}Détection d'Anomalies - {{ dataset.name }}{% endblock %}
-
+{% block title %}Monitoring Comportemental — {{ dataset.name }}{% endblock %}
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
 {% endblock %}
-
 {% block dataset_nav %}
 {% include 'client_analytics/partials/_dataset_nav_tabs.html' %}
 {% endblock %}
-
 {% block content %}
-
-<script>
-    document.body.classList.add('analysis-page');
-</script>
-
+<script>document.body.classList.add('analysis-page');</script>
 <div class="page-header">
-    <div class="row align-items-center">
-        <div class="col-lg-8">
-            <div class="header-content">
-                <span class="header-badge">
-                    <i class="bi bi-database-fill"></i> Dataset
-                </span>
-                <h1 class="page-title">{{ dataset.name }}</h1>
-                <p class="page-subtitle">
-                    <i class="bi bi-exclamation-triangle"></i> Détection d’anomalies — Portefeuille (client sélectionné)
-                </p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="period-selector-wrapper mb-4">
-    <div class="period-selector">
-        <a class="period-btn {% if granularity == 'month' %}active{% endif %}" href="?granularity=month{% if all_clients %}&all=1{% endif %}{% for c in selected_clients %}&client={{ c|urlencode }}{% endfor %}">
-            <i class="bi bi-calendar-month"></i> Mois
-        </a>
-        <a class="period-btn {% if granularity == 'quarter' %}active{% endif %}" href="?granularity=quarter{% if all_clients %}&all=1{% endif %}{% for c in selected_clients %}&client={{ c|urlencode }}{% endfor %}">
-            <i class="bi bi-calendar3"></i> Trimestre
-        </a>
-        <a class="period-btn {% if granularity == 'year' %}active{% endif %}" href="?granularity=year{% if all_clients %}&all=1{% endif %}{% for c in selected_clients %}&client={{ c|urlencode }}{% endfor %}">
-            <i class="bi bi-calendar-year"></i> Année Fiscale
-        </a>
-    </div>
-</div>
-
-<div class="card mb-4">
-    <div class="card-header">
-        <h5 class="mb-0"><i class="bi bi-person-check"></i> Sélection des clients</h5>
-    </div>
-    <div class="card-body">
-        <form method="get" class="row g-2 align-items-end">
-            <input type="hidden" name="granularity" value="{{ granularity }}">
-            <div class="col-lg-8">
-                <label class="form-label">Clients (multi-sélection)</label>
-                <select name="client" class="form-select" multiple size="8" {% if all_clients %}disabled{% endif %}>
-                    {% for opt in client_options %}
-                        <option value="{{ opt.value }}" {% if opt.value in selected_clients %}selected{% endif %}>
-                            {{ opt.label }}
-                        </option>
-                    {% endfor %}
-                </select>
-                <div class="form-text">Maintiens Ctrl (Windows) pour sélectionner plusieurs clients.</div>
-            </div>
-            <div class="col-lg-4 d-flex gap-2">
-                <div class="w-100">
-                    <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" name="all" value="1" id="allClients" {% if all_clients %}checked{% endif %}>
-                        <label class="form-check-label" for="allClients">Tous les clients</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100 mb-2">Afficher</button>
-                    <a class="btn btn-outline-secondary w-100" href="?granularity={{ granularity }}">Réinitialiser</a>
-                </div>
-            </div>
-        </form>
-    </div>
-</div>
-
-{% if selected_clients %}
-<div class="card border-info mb-4 mt-4">
-    <div class="card-header bg-info text-white">
-        <h5 class="mb-0"><i class="bi bi-tree"></i> Détection d'anomalies (Isolation Forest)</h5>
-    </div>
-    <div class="card-body">
-        {% if iforest_html %}
-            <div class="mb-3">
-                {{ iforest_html|safe }}
-            </div>
-        {% else %}
-            <div class="alert alert-warning mb-0">Graphique Isolation Forest non disponible.</div>
-        {% endif %}
-    </div>
-</div>
-{% endif %}
-
-{% if all_clients %}
-  <div class="card border-danger mb-4">
-      <div class="card-header bg-danger text-white">
-          <h5 class="mb-0"><i class="bi bi-people"></i> Anomalies — tous les clients (vue globale)</h5>
+  <div class="row align-items-center">
+    <div class="col-lg-8">
+      <div class="header-content">
+        <span class="header-badge"><i class="bi bi-database-fill"></i> Dataset</span>
+        <h1 class="page-title">{{ dataset.name }}</h1>
+        <p class="page-subtitle">
+          <i class="bi bi-activity"></i> Monitoring comportemental client — granularité mensuelle
+        </p>
       </div>
-      <div class="card-body">
-          {% include 'client_analytics/partials/_client_anomalies_block.html' with anom=anom %}
-
-          {% if anom and anom.graphs and anom.graphs.top_anomalies_bar %}
-          <div class="mt-3">
-              <img
-                  class="img-fluid"
-                  alt="Graphique top anomalies (vue globale)"
-                  src="data:image/png;base64,{{ anom.graphs.top_anomalies_bar }}"
-              />
-          </div>
-          {% endif %}
-      </div>
+    </div>
+    <div class="col-lg-4 text-end d-flex align-items-center justify-content-end gap-2">
+      <span class="badge bg-info text-dark fs-6 px-3 py-2">
+        <i class="bi bi-calendar-month me-1"></i> Mensuel
+      </span>
+      <button class="btn btn-outline-secondary btn-sm px-3 py-2 fw-600"
+              type="button"
+              data-bs-toggle="offcanvas"
+              data-bs-target="#bmMethodologyOffcanvas"
+              aria-controls="bmMethodologyOffcanvas"
+              title="Comprendre la méthodologie">
+        <i class="bi bi-question-circle-fill me-1"></i> Méthodologie
+      </button>
+    </div>
   </div>
-{% else %}
-  <div class="card border-primary mb-4">
-  <!-- Bloc Anomalies — portefeuille des clients sélectionnés supprimé -->
+</div>
+<div class="offcanvas offcanvas-end"
+     tabindex="-1"
+     id="bmMethodologyOffcanvas"
+     aria-labelledby="bmMethodologyOffcanvasLabel"
+     style="width: min(760px, 95vw);">
+  <div class="offcanvas-header border-bottom" style="background:var(--bg-elevated);">
+    <h5 class="offcanvas-title d-flex align-items-center gap-2" id="bmMethodologyOffcanvasLabel">
+      <span style="background:var(--accent);color:#fff;border-radius:8px;padding:4px 10px;font-size:0.95rem;">
+        <i class="bi bi-cpu-fill me-1"></i> Moteur de Monitoring Comportemental
+      </span>
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+  </div>
+  <div class="offcanvas-body" style="font-size:0.875rem;line-height:1.65;overflow-y:auto;">
+    <div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+      <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+      <div>
+        L'objectif est de <strong>détecter automatiquement tout client dont le comportement d'achat s'écarte de son historique</strong>, de quantifier l'intensité du changement et d'en expliquer les raisons — le tout <strong>sans aucun seuil fixé manuellement</strong> : tout est appris sur l'historique propre à chaque client.
+      </div>
+    </div>
+    <h6 class="fw-700 mb-2 mt-3" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">1</span>
+      Agrégation des données — matrice (Client × Mois)
+    </h6>
+    <p>
+      Pour chaque client et chaque mois calendaire, le moteur calcule <strong>7 indicateurs comportementaux</strong> à partir des lignes de transactions brutes :
+    </p>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered" style="font-size:0.8rem;">
+        <thead style="background:var(--bg-tertiary);">
+          <tr>
+            <th>Signal</th><th>Formule</th><th>Poids</th><th>Direction "danger"</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>CA</strong> — Chiffre d'affaires</td>
+            <td><code>Σ Montant</code></td>
+            <td class="text-center fw-700" style="color:#0066cc;">30 %</td>
+            <td>↓ baisse = mauvais</td>
+          </tr>
+          <tr>
+            <td><strong>Qté</strong> — Quantité achetée</td>
+            <td><code>Σ Quantité</code></td>
+            <td class="text-center fw-700" style="color:#0066cc;">15 %</td>
+            <td>↓ baisse = mauvais</td>
+          </tr>
+          <tr>
+            <td><strong>PU</strong> — Prix unitaire moyen</td>
+            <td><code>CA ÷ Quantité</code></td>
+            <td class="text-center fw-700">8 %</td>
+            <td>toute déviation = signal</td>
+          </tr>
+          <tr>
+            <td><strong>Commandes</strong> — Fréquence</td>
+            <td><code>Nb bons distincts</code></td>
+            <td class="text-center fw-700" style="color:#0066cc;">15 %</td>
+            <td>↓ baisse = mauvais</td>
+          </tr>
+          <tr>
+            <td><strong>Familles</strong> — Diversité produits</td>
+            <td><code>Nb familles distinctes</code></td>
+            <td class="text-center fw-700" style="color:#0066cc;">15 %</td>
+            <td>↓ rétrécissement = mauvais</td>
+          </tr>
+          <tr>
+            <td><strong>HHI</strong> — Concentration</td>
+            <td><code>Σ (part_famille²) × 10 000</code></td>
+            <td class="text-center fw-700">12 %</td>
+            <td>↑ hausse = concentration = mauvais</td>
+          </tr>
+          <tr>
+            <td><strong>Activité</strong> — Jours actifs</td>
+            <td><code>Nb jours distincts avec achat</code></td>
+            <td class="text-center fw-700">5 %</td>
+            <td>↓ baisse = mauvais</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="alert alert-light border mb-3" style="font-size:0.8rem;">
+      <strong>HHI (Herfindahl-Hirschman Index) :</strong> mesure de concentration de marché.
+      Un HHI de 10 000 = le client n'achète qu'une seule famille. Un HHI faible = achats diversifiés.
+      Une hausse soudaine du HHI signifie que le client se replie sur peu de références — signe de désengagement progressif.
+    </div>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">2</span>
+      Z-score robuste MAD — mesure de l'écart à la normale
+    </h6>
+    <p>
+      Pour chaque signal et chaque client, on compare la valeur du mois courant à l'<strong>historique glissant des 6 mois précédents</strong>. On utilise le <strong>Z-score MAD</strong> (Median Absolute Deviation), bien plus robuste aux outliers que l'écart-type classique.
+    </p>
+    <div style="background:var(--bg-tertiary);border-radius:8px;padding:1rem;font-family:monospace;font-size:0.82rem;margin-bottom:0.75rem;border-left:4px solid var(--accent);">
+      <div><strong>Baseline (sans fuite) :</strong></div>
+      <div class="ms-3 mt-1">
+        médiane_hist = médiane( valeurs des 6 mois <em>précédents</em> )<br>
+        MAD_hist = médiane( |valeur_i − médiane_hist| ) sur les 6 mois précédents
+      </div>
+      <div class="mt-2"><strong>Z-score :</strong></div>
+      <div class="ms-3 mt-1">
+        z = 0.6745 × (valeur_courante − médiane_hist) ÷ MAD_hist
+      </div>
+    </div>
+    <div class="row g-2 mb-3">
+      <div class="col-md-6">
+        <div class="border rounded p-2" style="font-size:0.8rem;">
+          <strong>Constante 0.6745</strong><br>
+          Facteur de cohérence qui rend la MAD comparable à l'écart-type pour une loi normale.
+          Ainsi z = 1 ≈ 1 écart-type, z = 3.5 ≈ 3.5 σ = très rare.
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="border rounded p-2" style="font-size:0.8rem;">
+          <strong>Sans fuite de données</strong><br>
+          La baseline utilise uniquement <code>shift(1)</code> — les mois passés —
+          jamais la valeur courante. Pas de biais statistique.
+        </div>
+      </div>
+    </div>
+    <div class="alert alert-secondary mb-3" style="font-size:0.8rem;">
+      <strong>Interprétation :</strong>
+      |z| &lt; 1 → normal &nbsp;|&nbsp;
+      |z| ∈ [1, 2] → légère déviation &nbsp;|&nbsp;
+      |z| ∈ [2, 3] → signal notable &nbsp;|&nbsp;
+      |z| &gt; 3 → forte anomalie<br>
+      <strong>Cas MAD = 0</strong> (client historiquement très régulier) : toute déviation reçoit z = ±999 — l'alerte est maximale car le comportement était parfaitement stable.
+    </div>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">3</span>
+      CUSUM bilatéral — détection de changements structurels
+    </h6>
+    <p>
+      Le Z-score capture les <em>anomalies ponctuelles</em>. Le <strong>CUSUM (Cumulative Sum Control Chart)</strong> détecte les <em>changements de régime persistants</em> — quand la tendance dévie continûment mois après mois, même si chaque mois individuel n'est pas suffisamment anormal.
+    </p>
+    <div style="background:var(--bg-tertiary);border-radius:8px;padding:1rem;font-family:monospace;font-size:0.82rem;margin-bottom:0.75rem;border-left:4px solid #f97316;">
+      <div><strong>CUSUM bilatéral (appliqué sur les z-scores du CA) :</strong></div>
+      <div class="ms-3 mt-1">
+        S⁺ᵢ = max(0, S⁺ᵢ₋₁ + zᵢ − K) &nbsp;&nbsp; ← accumule les hausses<br>
+        S⁻ᵢ = max(0, S⁻ᵢ₋₁ − zᵢ − K) &nbsp;&nbsp; ← accumule les baisses<br>
+        <br>
+        Alerte si S⁺ ou S⁻ ≥ H
+      </div>
+      <div class="mt-2" style="color:var(--text-secondary);">
+        K = 0.5 (slack — ignore les micro-déviations) &nbsp;|&nbsp; H = 4.0 (seuil de décision)
+      </div>
+    </div>
+    <div class="row g-2 mb-3">
+      <div class="col-md-4">
+        <div class="border rounded p-2" style="font-size:0.79rem;">
+          <strong>K = 0.5 (slack)</strong><br>
+          Le CUSUM ignore les déviations inférieures à 0.5σ.
+          Cela évite les fausses alarmes sur les fluctuations naturelles.
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-2" style="font-size:0.79rem;">
+          <strong>H = 4.0 (seuil)</strong><br>
+          Une accumulation de 4 unités déclenche l'alerte.
+          Avec K=0.5, cela représente ~8 mois de légère déviation continue, ou 2-3 mois d'écart net.
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-2" style="font-size:0.79rem;">
+          <strong>Remise à zéro</strong><br>
+          S revient à 0 dès que la tendance se corrige.
+          Pas de mémoire permanente — le CUSUM est sensible aux changements récents.
+        </div>
+      </div>
+    </div>
+    <div class="alert alert-warning mb-3" style="font-size:0.8rem;">
+      <i class="bi bi-lightning-charge-fill me-1"></i>
+      <strong>Badge "CUSUM ⚡" dans le tableau</strong> : le client présente un changement structurel soutenu sur plusieurs mois consécutifs — pas une anomalie isolée, mais une <em>nouvelle tendance de fond</em>.
+    </div>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">4</span>
+      Score d'alerte composite — de 0 à 100
+    </h6>
+    <p>
+      Les z-scores des 7 signaux et la valeur CUSUM sont combinés en un <strong>score unique de 0 à 100</strong>.
+    </p>
+    <div style="background:var(--bg-tertiary);border-radius:8px;padding:1rem;font-family:monospace;font-size:0.82rem;margin-bottom:0.75rem;border-left:4px solid var(--accent);">
+      <div><strong>1. Contribution de chaque signal :</strong></div>
+      <div class="ms-3 mt-1">
+        bad_z = max(0, −z)    &nbsp;← pour CA/Qté/Commandes/Familles/Activité (baisses = danger)<br>
+        bad_z = max(0,  z)    &nbsp;← pour HHI (hausse = danger)<br>
+        bad_z = |z|           &nbsp;← pour PU (toute déviation = signal)<br>
+        contribution = poids × min(bad_z, 3) ÷ 3
+      </div>
+      <div class="mt-2"><strong>2. Score brut pondéré :</strong></div>
+      <div class="ms-3 mt-1">
+        score_z = Σ(contributions) × 70
+      </div>
+      <div class="mt-2"><strong>3. Bonus CUSUM :</strong></div>
+      <div class="ms-3 mt-1">
+        cusum_ratio = min( max(S⁺, S⁻) ÷ (2×H), 1 )<br>
+        score_cusum = cusum_ratio × 30
+      </div>
+      <div class="mt-2"><strong>4. Score final :</strong></div>
+      <div class="ms-3 mt-1">
+        <strong>Score = score_z + score_cusum &nbsp;∈ [0, 100]</strong>
+      </div>
+    </div>
+    <div class="row g-2 mb-3">
+      <div class="col-md-4 text-center">
+        <div class="bm-kpi-card bm-kpi-green">
+          <div class="bm-kpi-num" style="font-size:1.4rem;">0 – 30</div>
+          <div class="bm-kpi-label"><i class="bi bi-check-circle-fill me-1"></i>Stable</div>
+          <div style="font-size:0.72rem;margin-top:0.3rem;color:var(--text-muted);">Comportement normal</div>
+        </div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div class="bm-kpi-card bm-kpi-orange">
+          <div class="bm-kpi-num" style="font-size:1.4rem;">30 – 60</div>
+          <div class="bm-kpi-label"><i class="bi bi-exclamation-triangle-fill me-1"></i>Alerte</div>
+          <div style="font-size:0.72rem;margin-top:0.3rem;color:var(--text-muted);">Surveiller de près</div>
+        </div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div class="bm-kpi-card bm-kpi-red">
+          <div class="bm-kpi-num" style="font-size:1.4rem;">60 – 100</div>
+          <div class="bm-kpi-label"><i class="bi bi-exclamation-circle-fill me-1"></i>Critique</div>
+          <div style="font-size:0.72rem;margin-top:0.3rem;color:var(--text-muted);">Action requise</div>
+        </div>
+      </div>
+    </div>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">5</span>
+      Attribution — explication en langage naturel
+    </h6>
+    <p>
+      Pour chaque client en alerte, le moteur identifie les <strong>3 signaux les plus contributeurs</strong> au score et génère automatiquement une phrase explicative en français.
+    </p>
+    <div style="background:var(--bg-tertiary);border-radius:8px;padding:1rem;font-size:0.8rem;margin-bottom:0.75rem;">
+      <div class="fw-600 mb-2">Logique d'attribution :</div>
+      <ol class="mb-0">
+        <li>Pour chaque signal, calcule <code>bad_z</code> (l'intensité du problème dans la direction dangereuse)</li>
+        <li>Trie les signaux par <code>bad_z</code> décroissant</li>
+        <li>Prend les 3 premiers et calcule <code>Δ% = (valeur_actuelle − baseline) ÷ |baseline| × 100</code></li>
+        <li>Génère une phrase par signal depuis un template localisé, ex :<br>
+          <em>• "baisse significative du chiffre d'affaires (−23% vs baseline)"</em><br>
+          <em>• "diminution de la fréquence de commandes (−40%)"</em><br>
+          <em>• "concentration croissante sur peu de familles produits (+18%)"</em>
+        </li>
+        <li>Si CUSUM déclenché : préfixe "⚠️ CUSUM déclenché — changement structurel détecté"</li>
+      </ol>
+    </div>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">6</span>
+      Fenêtre de baseline &amp; historique minimum
+    </h6>
+    <div class="row g-2 mb-3">
+      <div class="col-md-4">
+        <div class="border rounded p-2 text-center" style="font-size:0.8rem;">
+          <div class="fw-700 fs-4" style="color:var(--accent);">6</div>
+          <div>mois de baseline glissante</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">pour le calcul MAD et CUSUM</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-2 text-center" style="font-size:0.8rem;">
+          <div class="fw-700 fs-4" style="color:var(--accent);">3</div>
+          <div>mois minimum requis</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">pour qu'un client soit analysé</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="border rounded p-2 text-center" style="font-size:0.8rem;">
+          <div class="fw-700 fs-4" style="color:var(--accent);">2</div>
+          <div>mois min pour le deep-dive</div>
+          <div style="font-size:0.72rem;color:var(--text-muted);">sparklines et historique score</div>
+        </div>
+      </div>
+    </div>
+    <p style="font-size:0.8rem;">
+      La baseline est calculée sur les <strong>6 mois précédant</strong> le mois analysé (jamais le mois courant — pas de fuite). Si le client a moins de 6 mois d'historique, la fenêtre est réduite proportionnellement (<code>min_periods=3</code>).
+    </p>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
+      <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">∑</span>
+      Flux de calcul — vue d'ensemble
+    </h6>
+    <div style="font-size:0.8rem;background:var(--bg-tertiary);border-radius:8px;padding:1rem;">
+      <div class="d-flex flex-column gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary">1</span>
+          <span><strong>Données brutes</strong> → agrégation mensuelle par client (CA, Qté, PU, Commandes, Familles, HHI, Activité)</span>
+        </div>
+        <div class="text-center text-muted">↓</div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary">2</span>
+          <span>Pour chaque signal : <strong>Z-score MAD</strong> sur historique glissant 6 mois (sans fuite)</span>
+        </div>
+        <div class="text-center text-muted">↓</div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary">3</span>
+          <span><strong>CUSUM bilatéral</strong> sur le z-score du CA (détection tendances persistantes)</span>
+        </div>
+        <div class="text-center text-muted">↓</div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary">4</span>
+          <span><strong>Score composite</strong> 0-100 = 70 % z-scores pondérés + 30 % CUSUM</span>
+        </div>
+        <div class="text-center text-muted">↓</div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary">5</span>
+          <span><strong>Classification</strong> : Stable (0-30) / Alerte (30-60) / Critique (60-100)</span>
+        </div>
+        <div class="text-center text-muted">↓</div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary">6</span>
+          <span><strong>Attribution</strong> : top 3 signaux → phrase explicative + Δ% vs baseline</span>
+        </div>
+      </div>
+    </div>
+    <h6 class="fw-700 mb-2 mt-4" style="color:var(--text-secondary);">
+      <i class="bi bi-info-circle me-1"></i> Limites &amp; points d'attention
+    </h6>
+    <ul style="font-size:0.8rem;" class="mb-4">
+      <li><strong>Historique court (&lt; 6 mois) :</strong> la baseline est moins stable, les z-scores peuvent être bruiteux. Un client avec 2-3 mois de données sera dans le tableau mais avec une fiabilité réduite.</li>
+      <li><strong>Saisonnalité :</strong> le moteur compare le mois courant à une baseline glissante. Si votre secteur a une forte saisonnalité annuelle (ex. pic décembre), les mois de pointe peuvent générer de faux positifs. Une version future intégrera la décomposition saisonnière STL.</li>
+      <li><strong>Nouveaux clients :</strong> les clients avec moins de 3 mois d'historique sont exclus de l'analyse (historique insuffisant pour calculer une baseline).</li>
+      <li><strong>Colonnes manquantes :</strong> si les colonnes Famille, Quantité ou N° Bon sont absentes du dataset, les signaux correspondants (HHI, Qté, PU, Commandes) sont ignorés et le score est calculé sur les signaux disponibles.</li>
+      <li><strong>CUSUM :</strong> sensible uniquement au CA (signal le plus représentatif). Une baisse de diversité produit seule sans impact CA peut ne pas déclencher le CUSUM.</li>
+    </ul>
+  </div>
+</div>
+{% if portfolio.error %}
+<div class="alert alert-warning d-flex align-items-center gap-2 mb-4">
+  <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+  <div><strong>Impossible de calculer le portfolio :</strong> {{ portfolio.error }}</div>
+</div>
 {% endif %}
-
+{% if portfolio.counts %}
+<div class="bm-kpi-bar">
+  <div class="bm-kpi-card bm-kpi-red">
+    <div class="bm-kpi-num">{{ portfolio.counts.red|default:0 }}</div>
+    <div class="bm-kpi-label"><i class="bi bi-exclamation-circle-fill me-1"></i>Alerte critique</div>
+  </div>
+  <div class="bm-kpi-card bm-kpi-orange">
+    <div class="bm-kpi-num">{{ portfolio.counts.orange|default:0 }}</div>
+    <div class="bm-kpi-label"><i class="bi bi-exclamation-triangle-fill me-1"></i>À surveiller</div>
+  </div>
+  <div class="bm-kpi-card bm-kpi-green">
+    <div class="bm-kpi-num">{{ portfolio.counts.green|default:0 }}</div>
+    <div class="bm-kpi-label"><i class="bi bi-check-circle-fill me-1"></i>Stable</div>
+  </div>
+  <div class="bm-kpi-card">
+    <div class="bm-kpi-num" style="color:var(--text-primary)">{{ portfolio.portfolio|length }}</div>
+    <div class="bm-kpi-label">Clients analysés</div>
+  </div>
+  {% if portfolio.latest_period %}
+  <div class="bm-kpi-card">
+    <div class="bm-kpi-num" style="font-size:1.1rem;color:var(--text-secondary)">{{ portfolio.latest_period }}</div>
+    <div class="bm-kpi-label">Dernière période</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+<div class="row g-4">
+  <div class="col-xl-5 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0"><i class="bi bi-people-fill me-2"></i>Portefeuille clients</h5>
+        <div class="input-group input-group-sm" style="max-width:200px;">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="text" id="bmSearch" class="form-control" placeholder="Rechercher…">
+        </div>
+      </div>
+      <div class="card-body p-0" style="overflow-y:auto;max-height:680px;">
+        {% if portfolio.portfolio %}
+        <table class="table table-hover mb-0" id="bmTable">
+          <thead class="sticky-top" style="background:var(--bg-elevated);z-index:1;">
+            <tr>
+              <th class="ps-3">Client</th>
+              <th class="text-center">Score</th>
+              <th class="text-center">Statut</th>
+              <th class="text-center">CA Δ%</th>
+              <th class="text-center">Trend</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in portfolio.portfolio %}
+            <tr class="bm-row-{{ row.classification }} bm-client-row"
+                data-client="{{ row.client_id }}"
+                data-score="{{ row.alert_score }}"
+                style="cursor:pointer;">
+              <td class="ps-3 py-2">
+                <div class="fw-600" style="font-size:0.85rem;word-break:break-word;">{{ row.client_id }}</div>
+                {% if row.top_signal %}
+                <div style="font-size:0.7rem;color:var(--text-secondary);">
+                  Signal: <em>{{ row.top_signal }}</em>
+                  {% if row.top_signal_z %}<span class="ms-1">(z={{ row.top_signal_z }})</span>{% endif %}
+                </div>
+                {% endif %}
+              </td>
+              <td class="text-center align-middle" style="min-width:110px;">
+                <div class="bm-score-bar-wrap">
+                  <div class="bm-score-bar-bg">
+                    <div class="bm-score-bar-fill"
+                         style="width:{{ row.alert_score }}%;background:{% if row.classification == 'red' %}#ef4444{% elif row.classification == 'orange' %}#f97316{% else %}#22c55e{% endif %};">
+                    </div>
+                  </div>
+                  <span class="bm-score-val" style="color:{% if row.classification == 'red' %}#ef4444{% elif row.classification == 'orange' %}#f97316{% else %}#22c55e{% endif %};">
+                    {{ row.alert_score }}
+                  </span>
+                </div>
+              </td>
+              <td class="text-center align-middle">
+                {% if row.classification == 'red' %}
+                  <span class="bm-badge-red"><i class="bi bi-exclamation-circle-fill"></i> Critique</span>
+                {% elif row.classification == 'orange' %}
+                  <span class="bm-badge-orange"><i class="bi bi-exclamation-triangle-fill"></i> Alerte</span>
+                {% else %}
+                  <span class="bm-badge-green"><i class="bi bi-check-circle-fill"></i> Stable</span>
+                {% endif %}
+                {% if row.cusum_alert %}
+                  <div class="mt-1" style="font-size:0.68rem;color:#f97316;font-weight:600;">CUSUM ⚡</div>
+                {% endif %}
+              </td>
+              <td class="text-center align-middle" style="font-size:0.85rem;font-weight:600;">
+                {% if row.ca_pct_change is not None %}
+                  {% if row.ca_pct_change < 0 %}
+                    <span style="color:#ef4444;">{{ row.ca_pct_change }}%</span>
+                  {% elif row.ca_pct_change > 0 %}
+                    <span style="color:#22c55e;">+{{ row.ca_pct_change }}%</span>
+                  {% else %}
+                    <span style="color:var(--text-secondary);">0%</span>
+                  {% endif %}
+                {% else %}
+                  <span style="color:var(--text-muted);">—</span>
+                {% endif %}
+              </td>
+              <td class="text-center align-middle">
+                {% if row.ca_trend %}
+                <div class="bm-sparkline" id="spark-{{ forloop.counter }}"
+                     data-values="{{ row.ca_trend|join:',' }}">
+                </div>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+          Aucun client analysable (historique insuffisant ou colonnes manquantes).
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-7 col-lg-6">
+    <div class="card h-100" id="bmDeepDiveCard">
+      <div class="card-header">
+        <h5 class="mb-0" id="bmDeepDiveTitle">
+          <i class="bi bi-person-lines-fill me-2"></i>
+          Analyse détaillée
+          <span id="bmDeepDiveClientName" class="text-muted ms-2" style="font-size:0.9rem;">
+            — sélectionner un client dans le tableau
+          </span>
+        </h5>
+      </div>
+      <div class="card-body" id="bmDeepDiveBody">
+        <div id="bmDeepDivePlaceholder" class="text-center py-5 text-muted">
+          <i class="bi bi-cursor-fill fs-1 d-block mb-3" style="opacity:0.3;"></i>
+          <p class="mb-0">Cliquez sur un client dans le tableau pour afficher<br>son profil comportemental détaillé.</p>
+        </div>
+        <div id="bmDeepDiveLoader" class="text-center py-5 d-none">
+          <div class="spinner-border text-primary" role="status" style="width:3rem;height:3rem;">
+            <span class="visually-hidden">Chargement…</span>
+          </div>
+          <p class="mt-3 text-muted">Analyse comportementale en cours…</p>
+        </div>
+        <div id="bmDeepDiveContent" class="d-none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function() {
+'use strict';
+const DATASET_PK = {{ dataset.pk }};
+const SIGNALS_META = {
+    ca:          { label: "Chiffre d'affaires", unit: "€" },
+    qty:         { label: "Quantité",            unit: "" },
+    pu:          { label: "Prix unitaire moy.",  unit: "€" },
+    nb_orders:   { label: "Nb commandes",        unit: "" },
+    nb_families: { label: "Familles produits",   unit: "" },
+    hhi:         { label: "Concentration (HHI)", unit: "" },
+    active_days: { label: "Jours d'activité",    unit: "j" },
+};
+// ── Sparklines ──────────────────────────────────────────────────────────────
+function buildSparklines() {
+    document.querySelectorAll('.bm-sparkline[data-values]').forEach(el => {
+        if (el.dataset.built) return;
+        el.dataset.built = '1';
+        const raw = el.getAttribute('data-values');
+        if (!raw) return;
+        const vals = raw.split(',').map(Number).filter(v => !isNaN(v));
+        if (!vals.length) return;
+        const maxV = Math.max(...vals) || 1;
+        el.innerHTML = vals.map(v => {
+            const h = Math.max(2, Math.round((v / maxV) * 26));
+            return `<span style="height:${h}px;"></span>`;
+        }).join('');
+    });
+}
+// ── Recherche dans le tableau ────────────────────────────────────────────────
+const searchInput = document.getElementById('bmSearch');
+if (searchInput) {
+    searchInput.addEventListener('input', function() {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('.bm-client-row').forEach(tr => {
+            const name = (tr.dataset.client || '').toLowerCase();
+            tr.style.display = name.includes(q) ? '' : 'none';
+        });
+    });
+}
+// ── Clic sur une ligne → deep-dive ──────────────────────────────────────────
+function setActiveRow(clientId) {
+    document.querySelectorAll('.bm-client-row').forEach(r => {
+        r.style.background = r.dataset.client === clientId
+            ? 'var(--bg-tertiary)' : '';
+        r.style.fontWeight = r.dataset.client === clientId ? '600' : '';
+    });
+}
+function fmt(v, unit, decimals) {
+    if (v == null) return '—';
+    const n = parseFloat(v);
+    if (isNaN(n)) return '—';
+    const s = n.toLocaleString('fr-FR', { maximumFractionDigits: decimals ?? 1 });
+    return unit ? `${s} ${unit}` : s;
+}
+function deltaHtml(cur, base, higherIsBad) {
+    if (cur == null || base == null || base === 0) return '';
+    const pct = ((cur - base) / Math.abs(base)) * 100;
+    const arrow = pct > 0 ? '▲' : '▼';
+    let cls;
+    if (higherIsBad) {
+        cls = pct > 5 ? 'warn' : (pct < -5 ? 'up' : '');
+    } else {
+        cls = pct < -5 ? 'down' : (pct > 5 ? 'up' : '');
+    }
+    return `<div class="bm-sig-delta ${cls}">${arrow} ${pct > 0 ? '+' : ''}${pct.toFixed(1)}% vs baseline</div>`;
+}
+function renderDeepDive(data) {
+    const cls = data.classification;
+    const color = cls === 'red' ? '#ef4444' : cls === 'orange' ? '#f97316' : '#22c55e';
+    const badgeCls = `bm-badge-${cls}`;
+    const badgeIcon = cls === 'red'
+        ? '<i class="bi bi-exclamation-circle-fill"></i>'
+        : cls === 'orange'
+            ? '<i class="bi bi-exclamation-triangle-fill"></i>'
+            : '<i class="bi bi-check-circle-fill"></i>';
+    const badgeLabel = cls === 'red' ? 'Critique' : cls === 'orange' ? 'Alerte' : 'Stable';
+    // Score gauge arc (SVG simple)
+    const score = data.alert_score;
+    const scoreAngle = (score / 100) * 180;
+    const r = 40, cx = 60, cy = 55;
+    const toRad = a => a * Math.PI / 180;
+    function arcPath(startDeg, endDeg, r, cx, cy) {
+        const s = { x: cx + r * Math.cos(toRad(180 + startDeg)), y: cy + r * Math.sin(toRad(180 + startDeg)) };
+        const e = { x: cx + r * Math.cos(toRad(180 + endDeg)),   y: cy + r * Math.sin(toRad(180 + endDeg))   };
+        const large = endDeg - startDeg > 180 ? 1 : 0;
+        return `M ${s.x} ${s.y} A ${r} ${r} 0 ${large} 1 ${e.x} ${e.y}`;
+    }
+    const arcFill = arcPath(0, scoreAngle, r, cx, cy);
+    const arcBg   = arcPath(0, 180,       r, cx, cy);
+    // Signal cards
+    const sigCards = Object.entries(SIGNALS_META).map(([key, meta]) => {
+        const sd = (data.signals_data || {})[key];
+        if (!sd) return '';
+        const vals = sd.values || [];
+        const cur = vals.length ? vals[vals.length - 1] : null;
+        const base = (data.baseline_values || {})[key];
+        const higherIsBad = key === 'hhi';
+        return `
+        <div class="bm-signal-card">
+          <div class="bm-sig-label">${meta.label}</div>
+          <div class="bm-sig-val">${fmt(cur, meta.unit, key === 'pu' ? 2 : 0)}</div>
+          ${deltaHtml(cur, base, higherIsBad)}
+        </div>`;
+    }).join('');
+    // CUSUM badge
+    const cusumHtml = data.cusum_alert
+        ? `<span class="bm-cusum-alert ms-2"><i class="bi bi-lightning-charge-fill me-1"></i>CUSUM déclenché — changement structurel</span>`
+        : '';
+    // Alert score history mini-chart (Chart.js inline)
+    const chartId = `bmScoreChart_${Date.now()}`;
+    const alertHistory = data.alert_score_history || [];
+    const periods = data.periods || [];
+    const html = `
+    <div class="d-flex align-items-start gap-4 flex-wrap mb-4">
+      <div class="text-center" style="min-width:120px;">
+        <svg width="120" height="70" viewBox="0 0 120 70">
+          <path d="${arcBg}" fill="none" stroke="var(--border-default)" stroke-width="10" stroke-linecap="round"/>
+          <path d="${arcFill}" fill="none" stroke="${color}" stroke-width="10" stroke-linecap="round"/>
+          <text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="18" font-weight="700" fill="${color}">${score}</text>
+          <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="9" fill="var(--text-secondary)">/ 100</text>
+        </svg>
+        <div class="mt-1"><span class="${badgeCls}">${badgeIcon} ${badgeLabel}</span></div>
+        ${cusumHtml ? `<div class="mt-2">${cusumHtml}</div>` : ''}
+      </div>
+      <div class="flex-grow-1" style="min-width:220px;">
+        <div class="mb-2" style="font-size:0.8rem;color:var(--text-secondary);">
+          <i class="bi bi-calendar3 me-1"></i> Dernière période : <strong>${data.latest_month || '—'}</strong>
+          &nbsp;|&nbsp; <i class="bi bi-database me-1"></i> ${data.nb_months} mois d'historique
+        </div>
+        <div class="bm-attribution">${data.attribution || 'Aucune attribution disponible.'}</div>
+      </div>
+    </div>
+    <div class="bm-signal-grid">${sigCards}</div>
+    <div class="mb-3">
+      <div class="fw-600 mb-2" style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-secondary);">
+        <i class="bi bi-graph-up me-1"></i>Score d'alerte — historique mensuel
+      </div>
+      <canvas id="${chartId}" height="90"></canvas>
+    </div>`;
+    const container = document.getElementById('bmDeepDiveContent');
+    container.innerHTML = html;
+    container.classList.remove('d-none');
+    // Render Chart.js score history
+    if (alertHistory.length > 1 && window.Chart) {
+        const ctx = document.getElementById(chartId);
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: periods,
+                    datasets: [{
+                        data: alertHistory,
+                        borderColor: color,
+                        backgroundColor: color + '22',
+                        borderWidth: 2,
+                        pointRadius: 3,
+                        fill: true,
+                        tension: 0.35,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            min: 0, max: 100,
+                            grid: { color: 'var(--border-default)' },
+                            ticks: { color: 'var(--text-secondary)', font: { size: 10 } },
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: {
+                                color: 'var(--text-secondary)',
+                                font: { size: 9 },
+                                maxRotation: 45,
+                                maxTicksLimit: 12,
+                            },
+                        }
+                    }
+                }
+            });
+        }
+    }
+}
+function loadClient(clientId) {
+    if (!clientId) return;
+    // Mettre à jour le titre
+    document.getElementById('bmDeepDiveClientName').textContent = `— ${clientId}`;
+    // Afficher le loader
+    document.getElementById('bmDeepDivePlaceholder').classList.add('d-none');
+    document.getElementById('bmDeepDiveContent').classList.add('d-none');
+    document.getElementById('bmDeepDiveLoader').classList.remove('d-none');
+    setActiveRow(clientId);
+    fetch(`/dataset/${DATASET_PK}/ajax/behavioral-client/?client=${encodeURIComponent(clientId)}`)
+        .then(r => r.json())
+        .then(resp => {
+            document.getElementById('bmDeepDiveLoader').classList.add('d-none');
+            if (resp.success) {
+                renderDeepDive(resp.data);
+            } else {
+                document.getElementById('bmDeepDiveContent').innerHTML =
+                    `<div class="alert alert-warning"><i class="bi bi-exclamation-triangle me-2"></i>${resp.error || 'Erreur inconnue'}</div>`;
+                document.getElementById('bmDeepDiveContent').classList.remove('d-none');
+            }
+        })
+        .catch(err => {
+            document.getElementById('bmDeepDiveLoader').classList.add('d-none');
+            document.getElementById('bmDeepDiveContent').innerHTML =
+                '<div class="alert alert-danger"><i class="bi bi-wifi-off me-2"></i>Erreur réseau</div>';
+            document.getElementById('bmDeepDiveContent').classList.remove('d-none');
+        });
+}
+// Bind clicks
+document.querySelectorAll('.bm-client-row').forEach(row => {
+    row.addEventListener('click', function() {
+        loadClient(this.dataset.client);
+    });
+});
+// Pré-sélection via URL ?client=
+const preselect = '{{ selected_client|escapejs }}';
+if (preselect) {
+    loadClient(preselect);
+}
+// Init sparklines
+document.addEventListener('DOMContentLoaded', buildSparklines);
+if (document.readyState !== 'loading') buildSparklines();
+})();
+</script>
 {% endblock %}

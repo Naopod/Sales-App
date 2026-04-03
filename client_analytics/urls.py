@@ -36,6 +36,21 @@ urlpatterns = [
         views.ajax_compare_families,
         name="ajax_compare_families",
     ),
+    path(
+        "dataset/<int:pk>/ajax/behavioral-client/",
+        views.ajax_behavioral_client,
+        name="ajax_behavioral_client",
+    ),
+    path(
+        "dataset/<int:pk>/projection/",
+        views.projection,
+        name="projection",
+    ),
+    path(
+        "dataset/<int:pk>/ajax/projection-client/",
+        views.ajax_projection_client,
+        name="ajax_projection_client",
+    ),
     # === COPILOT: END NEW URLS ===
     path(
         "dataset/<int:pk>/ajax/tab/",

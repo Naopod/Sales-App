@@ -12,11 +12,8 @@ from .services import (
     analysis_clustering,
 )
 from .services import analysis_products, analysis_geographic, analysis_clients
-from .services import analysis_anomalies
-from .services import anomaly_detection
-from .services.visualizations.viz_by_period import (
-    create_isolation_forest_time_anomaly_plot,
-)
+from .services import analysis_behavioral_monitoring
+from .services import analysis_projection
 import pandas as pd
 
 import logging
@@ -516,205 +513,60 @@ def ajax_tab(request, pk):
 
 
 def anomalies(request, pk):
-    """Page Détection d'Anomalies (portefeuille client)."""
+    """Page Monitoring Comportemental Client — granularité mensuelle fixe."""
     dataset = get_object_or_404(Dataset, pk=pk)
-
-    granularity_param = request.GET.get("granularity", "month")
-    if granularity_param in ["fiscal_year", "fiscal"]:
-        granularity = "year"
-    elif granularity_param in ["month", "quarter", "year"]:
-        granularity = granularity_param
-    else:
-        granularity = "month"
-
-    all_clients = (request.GET.get("all") or "").strip() in {
-        "1",
-        "true",
-        "True",
-        "yes",
-        "on",
-    }
-
-    # Support multi-sélection: ?client=A&client=B ...
-    selected_clients = [
-        c.strip() for c in request.GET.getlist("client") if (c or "").strip()
-    ]
-    # rétro-compat si jamais un client unique arrive via ?client=...
-    if not selected_clients:
-        single = (request.GET.get("client") or "").strip()
-        if single:
-            selected_clients = [single]
-
-    selected_client = selected_clients[0] if len(selected_clients) == 1 else ""
 
     df_processed = dataset_io.load_dataset_df(dataset)
     if df_processed is None:
         messages.error(request, "Erreur lors du chargement du dataset")
         return redirect("client_analytics:home")
 
-    # Options pour le sélecteur client
+    # Portfolio overview (tous les clients, mensuel)
+    portfolio = {}
     try:
-        client_options = analysis_clients.get_client_options(
-            df_processed, max_clients=500
-        )
-    except Exception as e:
-        logger.exception("[anomalies] ERROR get_client_options")
-        client_options = []
-
-    anom = None
-    if all_clients:
-        try:
-            anom = analysis_anomalies.analyze_client_anomalies(
-                df_processed,
-                time_granularity=granularity,
-                z_thresh=3.5,
-                include_scatter=False,
-            )
-        except Exception as e:
-            logger.exception("[anomalies] ERROR analyze_client_anomalies")
-            anom = {
-                "error": str(e),
-                "kpis": {},
-                "top_anomalies_latest": [],
-                "graphs": {},
-                "meta": {},
-            }
-
-    anom_client = None
-    anom_clients = []
-    anom_clients_graph = None
-    if selected_clients and not all_clients:
-        for client_id in selected_clients:
-            try:
-                report = analysis_anomalies.analyze_client_anomalies_for_client(
-                    df_processed,
-                    client_id=client_id,
-                    time_granularity=granularity,
-                    z_thresh=3.5,
-                )
-            except Exception as e:
-                logger.exception(
-                    "[anomalies] ERROR analyze_client_anomalies_for_client (client=%s)",
-                    client_id,
-                )
-                report = {"error": str(e), "client": {"id": str(client_id)}}
-            anom_clients.append(report)
-
-        if len(anom_clients) == 1:
-            anom_client = anom_clients[0]
-
-    # Graphiques (Matplotlib base64)
-    try:
-        from .services.visualizations.viz_anomalies_client import (
-            plot_client_timeline,
-            plot_multi_clients_anomaly_counts,
-            plot_top_anomalies,
-            plot_anomaly_scores_timeline,
-        )
-
-        if anom_client and not anom_client.get("error"):
-            # Timeline des métriques avec anomalies
-            png = plot_client_timeline(
-                anom_client.get("series") or [],
-                client_id=str(
-                    ((anom_client.get("client") or {}).get("id"))
-                    or selected_client
-                    or ""
-                ),
-                granularity=granularity,
-            )
-            if png:
-                anom_client.setdefault("graphs", {})["timeline"] = png
-
-            # Timeline des scores d'anomalie ML
-            png_scores = plot_anomaly_scores_timeline(
-                anom_client.get("series") or [],
-                client_id=str(
-                    ((anom_client.get("client") or {}).get("id"))
-                    or selected_client
-                    or ""
-                ),
-                granularity=granularity,
-            )
-            if png_scores:
-                anom_client.setdefault("graphs", {})["scores_ml"] = png_scores
-
-        if len(anom_clients) > 1:
-            anom_clients_graph = plot_multi_clients_anomaly_counts(
-                anom_clients, granularity=granularity
-            )
-
-        if (
-            all_clients
-            and anom
-            and not (anom.get("error") if isinstance(anom, dict) else False)
-        ):
-            rows = (
-                (anom.get("top_anomalies_latest") or [])
-                if isinstance(anom, dict)
-                else []
-            )
-            if not rows:
-                rows = (
-                    (anom.get("top_anomalies_all") or [])
-                    if isinstance(anom, dict)
-                    else []
-                )
-            png = plot_top_anomalies(
-                rows,
-                granularity=granularity,
-                title="Top anomalies (vue globale)",
-            )
-            if png and isinstance(anom, dict):
-                anom.setdefault("graphs", {})["top_anomalies_bar"] = png
+        portfolio = analysis_behavioral_monitoring.analyze_portfolio(df_processed)
     except Exception:
-        logger.exception("[anomalies] ERROR generating graphs")
+        logger.exception("[anomalies] ERROR analyze_portfolio")
+        portfolio = {
+            "error": "Erreur lors du calcul du portfolio",
+            "portfolio": [],
+            "counts": {},
+        }
+
+    # Pré-sélection d'un client via GET ?client=...
+    selected_client = (request.GET.get("client") or "").strip()
 
     context = {
         "dataset": dataset,
-        "anom": anom,
-        "client_options": client_options,
+        "portfolio": portfolio,
         "selected_client": selected_client,
-        "selected_clients": selected_clients,
-        "all_clients": all_clients,
-        "anom_client": anom_client,
-        "anom_clients": anom_clients,
-        "anom_clients_graph": anom_clients_graph,
     }
-
-    # Ajout Isolation Forest (analyse sur le client sélectionné)
-    # Analyse Isolation Forest uniquement si un client est sélectionné
-    if 'selected_clients' in locals() and selected_clients and not all_clients:
-        try:
-            df_iforest = df_processed.copy()
-            client_col = "Client" if "Client" in df_iforest.columns else None
-            if client_col:
-                df_iforest = df_iforest[df_iforest[client_col].isin(selected_clients)]
-            time_col = (
-                "Month" if "Month" in df_iforest.columns else df_iforest.columns[0]
-            )
-            value_col = (
-                "Montant"
-                if "Montant" in df_iforest.columns
-                else df_iforest.select_dtypes(include="number").columns[0]
-            )
-            html_iforest, anomalies_df = create_isolation_forest_time_anomaly_plot(
-                df_iforest, time_col, value_col, return_anomalies=True
-            )
-            context["iforest_html"] = html_iforest
-            context["iforest_anomalies"] = (
-                anomalies_df.to_dict("records") if anomalies_df is not None else []
-            )
-            context["iforest_time_col"] = time_col
-            context["iforest_value_col"] = value_col
-        except Exception as e:
-            logger.exception("[anomalies] Isolation Forest error")
-            context["iforest_html"] = None
-            context["iforest_anomalies"] = []
-            context["iforest_time_col"] = None
-            context["iforest_value_col"] = None
-
     return render(request, "client_analytics/anomalies.html", context)
+
+
+def ajax_behavioral_client(request, pk):
+    """AJAX — profil comportemental détaillé d'un client (mensuel)."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+    client_id = (request.GET.get("client") or "").strip()
+    if not client_id:
+        return JsonResponse({"success": False, "error": "client manquant"}, status=400)
+
+    df_processed = dataset_io.load_dataset_df(dataset)
+    if df_processed is None:
+        return JsonResponse(
+            {"success": False, "error": "Dataset introuvable"}, status=404
+        )
+
+    try:
+        result = analysis_behavioral_monitoring.analyze_client(df_processed, client_id)
+    except Exception as e:
+        logger.exception("[behavioral] ERROR analyze_client (client=%s)", client_id)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+    if result.get("error"):
+        return JsonResponse({"success": False, "error": result["error"]}, status=422)
+
+    return JsonResponse({"success": True, "data": result})
 
 
 def clustering(request, pk):
@@ -1005,3 +857,85 @@ def ajax_compare_families(request, pk):
     except Exception as e:
         logger.exception("[ajax_compare_families] ERROR")
         return JsonResponse({"error": str(e)}, status=500)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# PROJECTION DE PORTEFEUILLE CLIENT
+# ═══════════════════════════════════════════════════════════════════
+
+
+def projection(request, pk):
+    """Page Projection de Portefeuille — STL + HistGBM Quantile Ensemble."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+
+    df_processed = dataset_io.load_dataset_df(dataset)
+    if df_processed is None:
+        messages.error(request, "Erreur lors du chargement du dataset")
+        return redirect("client_analytics:home")
+
+    import json
+
+    proj_result = {}
+    try:
+        proj_result = analysis_projection.analyze_portfolio_projection(df_processed)
+    except Exception:
+        logger.exception("[projection] ERROR analyze_portfolio_projection")
+        proj_result = {
+            "error": "Erreur lors du calcul des projections",
+            "portfolio": {},
+            "clients": [],
+        }
+
+    portfolio = proj_result.get("portfolio", {})
+    clients = proj_result.get("clients", [])
+    model_info = proj_result.get("model_info", {})
+    error = proj_result.get("error")
+
+    # Sérialiser pour JS
+    timeline_history_json = json.dumps(portfolio.get("timeline_history", []))
+    timeline_forecast_json = json.dumps(portfolio.get("timeline_forecast", []))
+    clients_json = json.dumps(clients)
+    by_horizon_json = json.dumps(portfolio.get("by_horizon", {}))
+    current_ca_js = json.dumps(portfolio.get("current_ca", 0))
+
+    context = {
+        "dataset": dataset,
+        "portfolio": portfolio,
+        "clients": clients,
+        "model_info": model_info,
+        "projection_error": error,
+        "timeline_history_json": timeline_history_json,
+        "timeline_forecast_json": timeline_forecast_json,
+        "clients_json": clients_json,
+        "by_horizon_json": by_horizon_json,
+        "current_ca_js": current_ca_js,
+    }
+    return render(request, "client_analytics/projection.html", context)
+
+
+@require_http_methods(["GET"])
+def ajax_projection_client(request, pk):
+    """AJAX — projection détaillée pour un client unique."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+    client_id = (request.GET.get("client") or "").strip()
+    if not client_id:
+        return JsonResponse({"success": False, "error": "client manquant"}, status=400)
+
+    df_processed = dataset_io.load_dataset_df(dataset)
+    if df_processed is None:
+        return JsonResponse(
+            {"success": False, "error": "Dataset introuvable"}, status=404
+        )
+
+    try:
+        result = analysis_projection.analyze_client_projection(df_processed, client_id)
+    except Exception as e:
+        logger.exception(
+            "[projection] ERROR analyze_client_projection (client=%s)", client_id
+        )
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+    if result.get("error"):
+        return JsonResponse({"success": False, "error": result["error"]}, status=422)
+
+    return JsonResponse({"success": True, "data": result})
