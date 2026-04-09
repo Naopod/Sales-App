@@ -92,7 +92,17 @@
         setTimeout(() => { window.location.href = overviewUrl; }, 800);
     }
 
+    let startTime = Date.now();
+    const MAX_WAIT_MS = 5 * 60 * 1000; // 5 minutes max
+
     function pollStatus() {
+        // Timeout safety: if processing takes more than 5 minutes, show error
+        if (Date.now() - startTime > MAX_WAIT_MS) {
+            clearInterval(pollInterval);
+            showError();
+            return;
+        }
+
         fetch(statusUrl)
             .then(r => r.json())
             .then(data => {
@@ -122,6 +132,7 @@
                 showDone();
                 return;
             }
+            startTime = Date.now();
             updateProgress(10, 'Traitement lancé...');
             // Poll every 3 seconds
             pollInterval = setInterval(pollStatus, 3000);

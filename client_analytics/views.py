@@ -938,8 +938,16 @@ def _process_dataset_background(pk):
 
         logger.info("[processing] START dataset %s: %s", pk, file_path)
 
-        # Read raw Excel (skipfooter=2 like notebook)
-        df = pd.read_excel(file_path, skipfooter=2)
+        if not file_path or not os.path.exists(file_path):
+            logger.error("[processing] File not found: %s", file_path)
+            Dataset.objects.filter(pk=pk).update(processing_status='error')
+            return
+
+        # Read raw Excel using openpyxl engine (fast), then drop last 2 rows
+        # NOTE: skipfooter=2 forces the slow Python engine — avoid it!
+        df = pd.read_excel(file_path, engine='openpyxl')
+        if len(df) > 2:
+            df = df.iloc[:-2]
         logger.info("[processing] Read %d rows, %d cols", *df.shape)
 
         # Apply full processing pipeline
@@ -982,8 +990,8 @@ def start_dataset_processing(request, pk):
     if dataset.processing_status == 'done':
         return JsonResponse({"status": "done"})
 
-    # Allow retry from error state
-    if dataset.processing_status == 'error':
+    # Allow retry from error state or stuck processing state
+    if dataset.processing_status in ('error', 'processing'):
         Dataset.objects.filter(pk=pk).update(processing_status='pending')
 
     # Atomic transition: only one request can start processing
