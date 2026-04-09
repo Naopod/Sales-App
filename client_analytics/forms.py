@@ -7,6 +7,15 @@ import pandas as pd
 from django.core.files.base import ContentFile
 from io import BytesIO
 
+# Workaround: openpyxl bug with 'biltinId' typo in some Excel files
+from openpyxl.styles.named_styles import _NamedCellStyle
+_original_ncs_init = _NamedCellStyle.__init__
+def _patched_ncs_init(self, *args, **kwargs):
+    if 'biltinId' in kwargs:
+        kwargs['builtinId'] = kwargs.pop('biltinId')
+    _original_ncs_init(self, *args, **kwargs)
+_NamedCellStyle.__init__ = _patched_ncs_init
+
 
 class UploadDatasetForm(forms.ModelForm):
     """Form for uploading a new dataset"""
