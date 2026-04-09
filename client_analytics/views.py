@@ -932,6 +932,7 @@ def ajax_projection_client(request, pk):
 def _process_dataset_background(pk):
     """Background thread: read raw file, process, overwrite with processed data."""
     from django.db import connection
+    import gc
     try:
         dataset = Dataset.objects.get(pk=pk)
         file_path = dataset.get_file_path()
@@ -944,23 +945,28 @@ def _process_dataset_background(pk):
             return
 
         # Read raw Excel using openpyxl engine (fast), then drop last 2 rows
-        # NOTE: skipfooter=2 forces the slow Python engine — avoid it!
         df = pd.read_excel(file_path, engine='openpyxl')
         if len(df) > 2:
             df = df.iloc[:-2]
         logger.info("[processing] Read %d rows, %d cols", *df.shape)
 
-        # Apply full processing pipeline
+        # Apply full processing pipeline (df is modified in-place as much as possible)
         df_final = data_processing.process_raw_data(df)
+        del df  # Free raw DataFrame memory
+        gc.collect()
         logger.info("[processing] Processed → %d rows, %d cols", *df_final.shape)
 
         # Overwrite file with processed data
         output = BytesIO()
         df_final.to_excel(output, index=False, engine='openpyxl')
+        del df_final  # Free processed DataFrame memory
+        gc.collect()
         output.seek(0)
 
         file_name = os.path.basename(dataset.file.name)
         dataset.file.save(file_name, ContentFile(output.read()), save=False)
+        del output
+        gc.collect()
         dataset.processing_status = 'done'
         dataset.save(update_fields=['processing_status', 'file'])
 
