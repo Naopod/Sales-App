@@ -42,9 +42,9 @@ class UploadDatasetForm(forms.ModelForm):
             if ext not in ['.xlsx', '.xls']:
                 raise ValidationError("Seuls les fichiers Excel (.xlsx, .xls) sont acceptés.")
 
-            # Check file size (10MB max)
-            if file.size > 10 * 1024 * 1024:
-                raise ValidationError("Le fichier ne doit pas dépasser 10MB.")
+            # Check file size (50MB max)
+            if file.size > 50 * 1024 * 1024:
+                raise ValidationError("Le fichier ne doit pas dépasser 50MB.")
 
         return file
 

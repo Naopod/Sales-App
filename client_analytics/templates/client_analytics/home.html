@@ -108,7 +108,7 @@
                                 {% if upload_form.file.errors %}
                                 <div class="text-danger small mt-1">{{ upload_form.file.errors }}</div>
                                 {% endif %}
-                                <div class="form-text">Max 10MB • Formats: .xlsx, .xls</div>
+                                <div class="form-text">Max 50MB • Formats: .xlsx, .xls</div>
                             </div>
 
                             <!-- Progress bar (hidden by default) -->
@@ -209,8 +209,8 @@
             alert('Seuls les fichiers Excel (.xlsx, .xls) sont acceptés.');
             return;
         }
-        if (file.size > 10 * 1024 * 1024) {
-            alert('Le fichier ne doit pas dépasser 10MB.');
+        if (file.size > 50 * 1024 * 1024) {
+            alert('Le fichier ne doit pas dépasser 50MB.');
             return;
         }
 
