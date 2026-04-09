@@ -29,187 +29,226 @@
                     {{ dataset.name }}
                 </h1>
                 <p class="page-subtitle">
-                    <i class="bi bi-diagram-3-fill"></i> Segmentation K-Means & Clustering
+                    <i class="bi bi-diagram-3-fill"></i> Segmentation K-Means automatique
                 </p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Form -->
+{% if error %}
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle"></i> <strong>Erreur :</strong> {{ error }}
+</div>
+{% endif %}
+
+{% if kpis %}
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-danger">{{ kpis.nb_clusters }}</h2>
+                <p class="text-muted mb-0 small">K optimal</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-success">{{ kpis.silhouette_score }}</h2>
+                <p class="text-muted mb-0 small">Silhouette</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-warning">{{ kpis.davies_bouldin_score }}</h2>
+                <p class="text-muted mb-0 small">Davies-Bouldin</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-info">{{ kpis.calinski_harabasz_score }}</h2>
+                <p class="text-muted mb-0 small">Calinski-Harabasz</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-primary">{{ kpis.nb_clients }}</h2>
+                <p class="text-muted mb-0 small">Clients</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-2">
+        <div class="card text-center">
+            <div class="card-body">
+                <h2 class="text-secondary">{{ kpis.nb_features }}</h2>
+                <p class="text-muted mb-0 small">Features</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Elbow + Silhouette -->
+{% if graphs.elbow_silhouette %}
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header bg-danger text-white">
-                <h5 class="mb-0"><i class="bi bi-gear"></i> Configuration du Clustering</h5>
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Sélection du K optimal</h5>
             </div>
             <div class="card-body">
-                <form method="post">
-                    {% csrf_token %}
-                    
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label"><strong>Variables pour le Clustering</strong></label>
-                            <select name="feature_columns" id="feature_columns" class="form-select" multiple size="10" required>
-                                {% for col in numeric_columns %}
-                                <option value="{{ col }}">{{ col }}</option>
-                                {% endfor %}
-                            </select>
-                            <div class="form-text">Sélectionner plusieurs variables (Ctrl+clic). Uniquement variables numériques.</div>
-                        </div>
-
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="n_clusters" class="form-label"><strong>Nombre de Clusters (k)</strong></label>
-                                <input type="range" class="form-range" name="n_clusters" id="n_clusters" 
-                                       min="2" max="10" value="3" oninput="document.getElementById('k_value').textContent = this.value">
-                                <div class="text-center">
-                                    <span class="badge bg-danger fs-4" id="k_value">3</span>
-                                </div>
-                            </div>
-
-                            <div class="mb-3">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" name="standardize" id="standardize" checked>
-                                    <label class="form-check-label" for="standardize">
-                                        <strong>Standardiser les variables</strong>
-                                    </label>
-                                </div>
-                                <div class="form-text">Recommandé si les variables ont des échelles différentes</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-danger">
-                        <i class="bi bi-play-fill"></i> Lancer le Clustering
-                    </button>
-                </form>
+                {{ graphs.elbow_silhouette|safe }}
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 
-<!-- Results -->
-{% if results %}
-{% if results.success %}
-<div class="row">
-    <div class="col-12">
-        <div class="alert alert-success d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-check-circle"></i> Clustering effectué avec succès!</span>
-            <a href="{% url 'client_analytics:clustering_export' dataset.pk %}" class="btn btn-sm btn-success">
-                <i class="bi bi-download"></i> Exporter CSV avec Clusters
-            </a>
-        </div>
-    </div>
-</div>
-
-<!-- Metrics -->
+<!-- PCA + Distribution -->
 <div class="row mb-4">
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-danger">{{ results.n_clusters }}</h2>
-                <p class="text-muted mb-0">Nombre de Clusters</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-warning">{{ results.inertia|floatformat:2 }}</h2>
-                <p class="text-muted mb-0">Inertia</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card text-center">
-            <div class="card-body">
-                {% if results.silhouette %}
-                <h2 class="text-success">{{ results.silhouette|floatformat:4 }}</h2>
-                {% else %}
-                <h2 class="text-muted">N/A</h2>
-                {% endif %}
-                <p class="text-muted mb-0">Silhouette Score</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- PCA Visualization -->
-<div class="row mb-4">
-    <div class="col-12">
+    {% if graphs.clustering_pca %}
+    <div class="col-lg-8">
         <div class="card">
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0"><i class="bi bi-scatter-chart"></i> Visualisation PCA 2D</h5>
             </div>
             <div class="card-body">
-                {{ results.pca_plot_html|safe }}
-                <div class="small text-muted mt-2">
-                    <strong>Variance expliquée:</strong> 
-                    PC1: {{ results.pca_variance_explained.0|floatformat:2 }}%, 
-                    PC2: {{ results.pca_variance_explained.1|floatformat:2 }}%
-                </div>
+                {{ graphs.clustering_pca|safe }}
             </div>
         </div>
+    </div>
+    {% endif %}
+
+    {% if graphs.cluster_distribution %}
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Distribution</h5>
+            </div>
+            <div class="card-body">
+                {{ graphs.cluster_distribution|safe }}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Cluster Profiles -->
+{% if results.profiles %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h4 class="mb-3"><i class="bi bi-person-lines-fill"></i> Profils des Clusters</h4>
     </div>
 </div>
 
-<!-- Cluster Sizes -->
 <div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Tailles des Clusters</h5>
+    {% for profile in results.profiles %}
+    <div class="col-lg-{% widthratio 12 kpis.nb_clusters 1 %}{% if kpis.nb_clusters > 4 %}3{% endif %} mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-danger text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-people-fill"></i>
+                    Cluster {{ profile.id }}
+                    <span class="badge bg-light text-dark float-end">{{ profile.nb_clients }} clients ({{ profile.pct }}%)</span>
+                </h5>
             </div>
             <div class="card-body">
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Cluster</th>
-                            <th>Taille</th>
-                            <th>Pourcentage</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for size_info in results.cluster_sizes %}
-                        <tr>
-                            <td><span class="badge bg-danger">Cluster {{ size_info.cluster }}</span></td>
-                            <td>{{ size_info.size }}</td>
-                            <td>
-                                {% widthratio size_info.size results.cluster_labels|length 100 %}%
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+                <!-- KPIs -->
+                <h6 class="text-muted mb-2"><i class="bi bi-cash-coin"></i> Comportement d'achat</h6>
+                <table class="table table-sm table-borderless mb-3">
+                    <tr>
+                        <td class="text-muted small">CA Total moyen</td>
+                        <td class="text-end fw-bold">{{ profile.ca_total_moyen|floatformat:0 }} €</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Panier moyen</td>
+                        <td class="text-end fw-bold">{{ profile.panier_moyen|floatformat:0 }} €</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Nb commandes moy.</td>
+                        <td class="text-end fw-bold">{{ profile.nb_commandes_moyen|floatformat:1 }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Quantité moyenne</td>
+                        <td class="text-end fw-bold">{{ profile.qty_total_moyen|floatformat:0 }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Délai moyen</td>
+                        <td class="text-end fw-bold">{{ profile.delai_moyen|floatformat:0 }} j</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted small">Familles achetées</td>
+                        <td class="text-end fw-bold">{{ profile.nb_familles_moyen|floatformat:1 }}</td>
+                    </tr>
                 </table>
+
+                <!-- Top Familles -->
+                {% if profile.top_familles %}
+                <h6 class="text-muted mb-2"><i class="bi bi-box-seam"></i> Top Familles (CA moy.)</h6>
+                <ul class="list-unstyled small mb-3">
+                    {% for fam in profile.top_familles %}
+                    <li class="d-flex justify-content-between">
+                        <span class="text-truncate" style="max-width: 70%;">{{ fam.nom }}</span>
+                        <span class="fw-bold">{{ fam.ca_moyen|floatformat:0 }} €</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+
+                <!-- Top Pays -->
+                {% if profile.top_pays %}
+                <h6 class="text-muted mb-2"><i class="bi bi-globe2"></i> Top Pays</h6>
+                <ul class="list-unstyled small mb-0">
+                    {% for pays in profile.top_pays %}
+                    <li class="d-flex justify-content-between">
+                        <span>{{ pays.pays }}</span>
+                        <span class="fw-bold">{{ pays.count }} ({{ pays.pct }}%)</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
             </div>
         </div>
     </div>
+    {% endfor %}
+</div>
+{% endif %}
 
-    <!-- Centroids -->
-    <div class="col-md-6">
+<!-- Métriques détaillées -->
+{% if results.k_metrics %}
+<div class="row mb-4">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header bg-warning">
-                <h5 class="mb-0"><i class="bi bi-star"></i> Centroïdes</h5>
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-table"></i> Métriques par K</h5>
             </div>
             <div class="card-body">
-                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                    <table class="table table-sm table-striped">
-                        <thead class="sticky-top bg-white">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
                             <tr>
-                                <th>Cluster</th>
-                                {% for col in results.feature_columns %}
-                                <th class="small">{{ col }}</th>
-                                {% endfor %}
+                                <th>K</th>
+                                <th>Inertie</th>
+                                <th>Silhouette</th>
+                                <th>Davies-Bouldin</th>
+                                <th>Calinski-Harabasz</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for centroid in results.centroids %}
-                            <tr>
-                                <td><span class="badge bg-danger">{{ centroid.cluster }}</span></td>
-                                {% for col in results.feature_columns %}
-                                <td class="small">{{ centroid|get_item:col|floatformat:2 }}</td>
-                                {% endfor %}
+                            {% for m in results.k_metrics %}
+                            <tr {% if m.k == kpis.nb_clusters %}class="table-success fw-bold"{% endif %}>
+                                <td>{{ m.k }}{% if m.k == kpis.nb_clusters %} ⭐{% endif %}</td>
+                                <td>{{ m.inertia|floatformat:0 }}</td>
+                                <td>{{ m.silhouette|floatformat:4 }}</td>
+                                <td>{{ m.davies_bouldin|floatformat:4 }}</td>
+                                <td>{{ m.calinski_harabasz|floatformat:0 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -219,26 +258,12 @@
         </div>
     </div>
 </div>
-
-{% else %}
-<div class="alert alert-danger">
-    <i class="bi bi-exclamation-triangle"></i> <strong>Erreur:</strong> {{ results.error }}
-</div>
-{% endif %}
 {% endif %}
 
-{% if not numeric_columns %}
-<div class="alert alert-warning">
-    <i class="bi bi-exclamation-circle"></i> Aucune variable numérique trouvée dans ce dataset. Le clustering nécessite des variables numériques.
-</div>
 {% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// Custom filter for dict access in template
-// Note: In production, use a custom template filter
-</script>
-
 <script src="{% static 'client_analytics/analysis_pages.js' %}"></script>
 {% endblock %}

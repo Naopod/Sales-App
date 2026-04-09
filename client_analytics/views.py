@@ -570,7 +570,7 @@ def ajax_behavioral_client(request, pk):
 
 
 def clustering(request, pk):
-    """Clustering page"""
+    """Clustering page - Automatic K-Means clustering"""
     dataset = get_object_or_404(Dataset, pk=pk)
 
     # Load dataframe (already processed during upload in forms.py)
@@ -580,52 +580,15 @@ def clustering(request, pk):
         messages.error(request, "Erreur lors du chargement du dataset")
         return redirect("client_analytics:home")
 
-    # Get numeric columns
-    overview_analysis = analysis_overview.generate_overview_analysis(df)
-    column_types = overview_analysis.get("column_types", {})
-    numeric_columns = column_types.get("numeric", [])
-
-    results = None
-
-    if request.method == "POST":
-        feature_columns = request.POST.getlist("feature_columns")
-        n_clusters = int(request.POST.get("n_clusters", 3))
-        standardize = request.POST.get("standardize") == "on"
-
-        if not feature_columns:
-            messages.error(request, "Veuillez sélectionner au moins une variable")
-        else:
-            # Perform clustering using analysis_clustering
-            clustering_result = analysis_clustering.generate_clustering_analysis(
-                df[feature_columns + ["Cpt Client"]].dropna()
-                if "Cpt Client" in df.columns
-                else df[feature_columns].dropna()
-            )
-
-            results = {
-                "success": True,
-                "cluster_labels": clustering_result.get("results", {}).get(
-                    "cluster_stats", {}
-                ),
-                "graphs": clustering_result.get("graphs", {}),
-                "kpis": clustering_result.get("kpis", {}),
-            }
-
-            if results["success"]:
-                # Store results in session for export
-                request.session["clustering_results"] = {
-                    "dataset_pk": pk,
-                    "cluster_labels": results["cluster_labels"],
-                    "valid_indices": results["valid_indices"],
-                }
-                messages.success(request, "Clustering effectué avec succès!")
-            else:
-                messages.error(request, f'Erreur: {results["error"]}')
+    # Auto-execute clustering
+    clustering_result = analysis_clustering.generate_clustering_analysis(df)
 
     context = {
         "dataset": dataset,
-        "numeric_columns": numeric_columns,
-        "results": results,
+        "kpis": clustering_result.get("kpis", {}),
+        "results": clustering_result.get("results", {}),
+        "graphs": clustering_result.get("graphs", {}),
+        "error": clustering_result.get("error"),
     }
     return render(request, "client_analytics/clustering.html", context)
 
