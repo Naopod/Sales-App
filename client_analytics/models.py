@@ -9,6 +9,13 @@ class Dataset(models.Model):
         ('upload', 'Upload'),
     ]
 
+    PROCESSING_STATUS_CHOICES = [
+        ('done', 'Done'),
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('error', 'Error'),
+    ]
+
     name = models.CharField(max_length=255, help_text="Dataset name")
     source_type = models.CharField(
         max_length=10,
@@ -19,6 +26,12 @@ class Dataset(models.Model):
     file = models.FileField(
         upload_to='datasets/',
         help_text="Uploaded Excel file"
+    )
+    processing_status = models.CharField(
+        max_length=10,
+        choices=PROCESSING_STATUS_CHOICES,
+        default='done',
+        help_text="File processing status"
     )
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)

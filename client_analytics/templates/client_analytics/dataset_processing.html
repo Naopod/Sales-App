@@ -1,0 +1,160 @@
+{% extends "client_analytics/base.html" %}
+
+{% block title %}Traitement en cours - {{ dataset.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16 text-center">
+
+    <!-- Spinner -->
+    <div id="processing-spinner" class="mb-8">
+        <div class="inline-flex items-center justify-center w-20 h-20 rounded-full"
+             style="background: var(--bg-tertiary); border: 3px solid var(--border-default);">
+            <svg class="animate-spin h-10 w-10 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Title -->
+    <h1 id="processing-title" class="text-2xl font-bold mb-3" style="color: var(--text-primary);">
+        Traitement des données en cours...
+    </h1>
+
+    <!-- Status message -->
+    <p id="processing-message" class="text-base mb-6" style="color: var(--text-secondary);">
+        Le fichier <strong>{{ dataset.name }}</strong> est en cours de nettoyage et de transformation.
+        <br>Cela peut prendre 1 à 2 minutes.
+    </p>
+
+    <!-- Progress bar -->
+    <div class="w-full max-w-md mx-auto mb-8">
+        <div class="h-2 rounded-full overflow-hidden" style="background: var(--bg-tertiary);">
+            <div id="progress-bar" class="h-full rounded-full bg-indigo-500 transition-all duration-1000"
+                 style="width: 5%;"></div>
+        </div>
+        <p id="progress-text" class="text-sm mt-2" style="color: var(--text-muted);">Démarrage...</p>
+    </div>
+
+    <!-- Error state (hidden by default) -->
+    <div id="error-block" class="hidden max-w-md mx-auto p-4 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+        <p class="text-red-700 dark:text-red-300 font-medium mb-3">
+            <i class="bi bi-exclamation-triangle-fill mr-2"></i>
+            Une erreur est survenue lors du traitement.
+        </p>
+        <button onclick="retryProcessing()" class="px-4 py-2 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-colors">
+            <i class="bi bi-arrow-clockwise mr-1"></i> Réessayer
+        </button>
+    </div>
+
+</div>
+
+<script>
+(function() {
+    const datasetPk = {{ dataset.pk }};
+    const statusUrl = `/dataset/${datasetPk}/api/status/`;
+    const startUrl = `/dataset/${datasetPk}/api/start-processing/`;
+    const overviewUrl = `/dataset/${datasetPk}/`;
+
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const titleEl = document.getElementById('processing-title');
+    const messageEl = document.getElementById('processing-message');
+    const spinnerEl = document.getElementById('processing-spinner');
+    const errorBlock = document.getElementById('error-block');
+
+    let progress = 5;
+    let pollInterval = null;
+
+    function updateProgress(pct, text) {
+        progress = Math.min(pct, 95);
+        progressBar.style.width = progress + '%';
+        if (text) progressText.textContent = text;
+    }
+
+    function showError() {
+        spinnerEl.classList.add('hidden');
+        errorBlock.classList.remove('hidden');
+        titleEl.textContent = 'Erreur de traitement';
+        messageEl.innerHTML = 'Le traitement du dataset a échoué. Vous pouvez réessayer.';
+        progressBar.classList.remove('bg-indigo-500');
+        progressBar.classList.add('bg-red-500');
+        progressBar.style.width = '100%';
+        progressText.textContent = 'Échec';
+    }
+
+    function showDone() {
+        updateProgress(100, 'Terminé !');
+        progressBar.style.width = '100%';
+        titleEl.textContent = 'Traitement terminé !';
+        messageEl.textContent = 'Redirection vers votre dataset...';
+        setTimeout(() => { window.location.href = overviewUrl; }, 800);
+    }
+
+    function pollStatus() {
+        fetch(statusUrl)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'done') {
+                    clearInterval(pollInterval);
+                    showDone();
+                } else if (data.status === 'error') {
+                    clearInterval(pollInterval);
+                    showError();
+                } else if (data.status === 'processing') {
+                    // Simulate progress (we don't have real progress info)
+                    if (progress < 90) {
+                        updateProgress(progress + 3, 'Traitement en cours...');
+                    }
+                }
+            })
+            .catch(err => {
+                console.error('Poll error:', err);
+            });
+    }
+
+    // Start processing
+    fetch(startUrl)
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'done') {
+                showDone();
+                return;
+            }
+            updateProgress(10, 'Traitement lancé...');
+            // Poll every 3 seconds
+            pollInterval = setInterval(pollStatus, 3000);
+        })
+        .catch(err => {
+            console.error('Start error:', err);
+            showError();
+        });
+
+    // Also expose retry
+    window.retryProcessing = function() {
+        errorBlock.classList.add('hidden');
+        spinnerEl.classList.remove('hidden');
+        progressBar.classList.remove('bg-red-500');
+        progressBar.classList.add('bg-indigo-500');
+        titleEl.textContent = 'Traitement des données en cours...';
+        messageEl.innerHTML = 'Nouvelle tentative...';
+        progress = 5;
+        updateProgress(5, 'Redémarrage...');
+
+        // Reset status to pending, then re-trigger
+        fetch(startUrl)
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'done') {
+                    showDone();
+                    return;
+                }
+                updateProgress(10, 'Traitement lancé...');
+                pollInterval = setInterval(pollStatus, 3000);
+            })
+            .catch(() => showError());
+    };
+})();
+</script>
+{% endblock %}

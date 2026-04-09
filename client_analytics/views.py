@@ -15,6 +15,10 @@ from .services import analysis_products, analysis_geographic, analysis_clients
 from .services import analysis_behavioral_monitoring
 from .services import analysis_projection
 import pandas as pd
+import threading
+import os
+from io import BytesIO
+from django.core.files.base import ContentFile
 
 import logging
 
@@ -34,7 +38,7 @@ def home(request):
                 messages.success(
                     request, f'Dataset "{dataset.name}" uploadé avec succès!'
                 )
-                return redirect("client_analytics:dataset_overview", pk=dataset.pk)
+                return redirect("client_analytics:dataset_processing", pk=dataset.pk)
 
         elif "select" in request.POST:
             select_form = SelectDatasetForm(request.POST)
@@ -57,6 +61,10 @@ def workflow(request):
 def dataset_overview(request, pk):
     """Dataset overview page"""
     dataset = get_object_or_404(Dataset, pk=pk)
+
+    # Redirect to processing page if not yet processed
+    if dataset.processing_status != 'done':
+        return redirect("client_analytics:dataset_processing", pk=pk)
 
     # Load dataframe (already processed during upload in forms.py)
     df = dataset_io.load_dataset_df(dataset)
@@ -902,3 +910,84 @@ def ajax_projection_client(request, pk):
         return JsonResponse({"success": False, "error": result["error"]}, status=422)
 
     return JsonResponse({"success": True, "data": result})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# DATASET PROCESSING (background thread + AJAX polling)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _process_dataset_background(pk):
+    """Background thread: read raw file, process, overwrite with processed data."""
+    from django.db import connection
+    try:
+        dataset = Dataset.objects.get(pk=pk)
+        file_path = dataset.get_file_path()
+
+        logger.info("[processing] START dataset %s: %s", pk, file_path)
+
+        # Read raw Excel (skipfooter=2 like notebook)
+        df = pd.read_excel(file_path, skipfooter=2)
+        logger.info("[processing] Read %d rows, %d cols", *df.shape)
+
+        # Apply full processing pipeline
+        df_final = data_processing.process_raw_data(df)
+        logger.info("[processing] Processed → %d rows, %d cols", *df_final.shape)
+
+        # Overwrite file with processed data
+        output = BytesIO()
+        df_final.to_excel(output, index=False, engine='openpyxl')
+        output.seek(0)
+
+        file_name = os.path.basename(dataset.file.name)
+        dataset.file.save(file_name, ContentFile(output.read()), save=False)
+        dataset.processing_status = 'done'
+        dataset.save(update_fields=['processing_status', 'file'])
+
+        logger.info("[processing] DONE dataset %s", pk)
+
+    except Exception as e:
+        logger.exception("[processing] ERROR dataset %s: %s", pk, e)
+        try:
+            Dataset.objects.filter(pk=pk).update(processing_status='error')
+        except Exception:
+            pass
+    finally:
+        connection.close()
+
+
+def dataset_processing(request, pk):
+    """Page showing processing spinner with AJAX polling."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+    if dataset.processing_status == 'done':
+        return redirect("client_analytics:dataset_overview", pk=pk)
+    return render(request, "client_analytics/dataset_processing.html", {"dataset": dataset})
+
+
+def start_dataset_processing(request, pk):
+    """AJAX endpoint: trigger background processing (atomic)."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+    if dataset.processing_status == 'done':
+        return JsonResponse({"status": "done"})
+
+    # Allow retry from error state
+    if dataset.processing_status == 'error':
+        Dataset.objects.filter(pk=pk).update(processing_status='pending')
+
+    # Atomic transition: only one request can start processing
+    updated = Dataset.objects.filter(pk=pk, processing_status='pending').update(
+        processing_status='processing'
+    )
+    if updated:
+        t = threading.Thread(
+            target=_process_dataset_background, args=(pk,), daemon=True
+        )
+        t.start()
+        return JsonResponse({"status": "started"})
+
+    return JsonResponse({"status": dataset.processing_status})
+
+
+def check_dataset_status(request, pk):
+    """AJAX endpoint: return current processing status."""
+    dataset = get_object_or_404(Dataset, pk=pk)
+    return JsonResponse({"status": dataset.processing_status})

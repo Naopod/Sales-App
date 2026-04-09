@@ -13,6 +13,15 @@ import seaborn as sns
 import base64
 from io import BytesIO
 
+# Workaround: openpyxl bug with 'biltinId' typo in some Excel files
+from openpyxl.styles.named_styles import _NamedCellStyle
+_original_ncs_init = _NamedCellStyle.__init__
+def _patched_ncs_init(self, *args, **kwargs):
+    if 'biltinId' in kwargs:
+        kwargs['builtinId'] = kwargs.pop('biltinId')
+    _original_ncs_init(self, *args, **kwargs)
+_NamedCellStyle.__init__ = _patched_ncs_init
+
 def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     """
     Applique le traitement exact du notebook sur le fichier raw
