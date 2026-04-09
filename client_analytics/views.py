@@ -2,6 +2,7 @@
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from .models import Dataset
 from .forms import UploadDatasetForm, SelectDatasetForm
 from .services import dataset_io, data_processing, analysis_currency_dependency
@@ -17,8 +18,11 @@ from .services import analysis_projection
 import pandas as pd
 import threading
 import os
+import uuid
+import tempfile
 from io import BytesIO
 from django.core.files.base import ContentFile
+from django.conf import settings
 
 import logging
 
@@ -1000,3 +1004,98 @@ def check_dataset_status(request, pk):
     """AJAX endpoint: return current processing status."""
     dataset = get_object_or_404(Dataset, pk=pk)
     return JsonResponse({"status": dataset.processing_status})
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# CHUNKED FILE UPLOAD (for slow connections)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def _get_chunk_dir(upload_id):
+    """Return temp directory for chunks of a given upload."""
+    safe_id = str(upload_id).replace('..', '').replace('/', '').replace('\\', '')
+    return os.path.join(tempfile.gettempdir(), 'chunked_uploads', safe_id)
+
+
+@require_http_methods(["POST"])
+def upload_chunk(request):
+    """Receive a single chunk of a file upload. Each chunk is ~500KB."""
+    upload_id = request.POST.get('upload_id', '')
+    chunk_index = request.POST.get('chunk_index', '')
+    total_chunks = request.POST.get('total_chunks', '')
+
+    if not upload_id or not chunk_index or not total_chunks:
+        return JsonResponse({"error": "Missing parameters"}, status=400)
+
+    # Validate upload_id format (UUID)
+    try:
+        uuid.UUID(upload_id)
+    except ValueError:
+        return JsonResponse({"error": "Invalid upload_id"}, status=400)
+
+    chunk_file = request.FILES.get('chunk')
+    if not chunk_file:
+        return JsonResponse({"error": "No chunk file"}, status=400)
+
+    chunk_dir = _get_chunk_dir(upload_id)
+    os.makedirs(chunk_dir, exist_ok=True)
+
+    chunk_path = os.path.join(chunk_dir, f'chunk_{int(chunk_index):05d}')
+    with open(chunk_path, 'wb') as f:
+        for part in chunk_file.chunks():
+            f.write(part)
+
+    logger.info("[chunk] upload_id=%s chunk=%s/%s saved", upload_id, chunk_index, total_chunks)
+    return JsonResponse({"status": "ok", "chunk": int(chunk_index)})
+
+
+@require_http_methods(["POST"])
+def finalize_upload(request):
+    """Assemble chunks into a file, create Dataset, redirect to processing."""
+    upload_id = request.POST.get('upload_id', '')
+    file_name = request.POST.get('file_name', 'upload.xlsx')
+    dataset_name = request.POST.get('dataset_name', '')
+    total_chunks = int(request.POST.get('total_chunks', '0'))
+
+    if not upload_id or not dataset_name or total_chunks < 1:
+        return JsonResponse({"error": "Missing parameters"}, status=400)
+
+    try:
+        uuid.UUID(upload_id)
+    except ValueError:
+        return JsonResponse({"error": "Invalid upload_id"}, status=400)
+
+    chunk_dir = _get_chunk_dir(upload_id)
+
+    # Verify all chunks exist
+    for i in range(total_chunks):
+        chunk_path = os.path.join(chunk_dir, f'chunk_{i:05d}')
+        if not os.path.exists(chunk_path):
+            return JsonResponse({"error": f"Missing chunk {i}"}, status=400)
+
+    # Assemble file
+    assembled = BytesIO()
+    for i in range(total_chunks):
+        chunk_path = os.path.join(chunk_dir, f'chunk_{i:05d}')
+        with open(chunk_path, 'rb') as f:
+            assembled.write(f.read())
+    assembled.seek(0)
+
+    # Create Dataset
+    dataset = Dataset(
+        name=dataset_name,
+        source_type='upload',
+        processing_status='pending',
+    )
+    dataset.file.save(file_name, ContentFile(assembled.read()), save=True)
+
+    logger.info("[finalize] Dataset pk=%s created from %d chunks", dataset.pk, total_chunks)
+
+    # Cleanup chunks
+    import shutil
+    shutil.rmtree(chunk_dir, ignore_errors=True)
+
+    return JsonResponse({
+        "status": "ok",
+        "dataset_pk": dataset.pk,
+        "redirect_url": f"/dataset/{dataset.pk}/processing/",
+    })

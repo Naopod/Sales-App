@@ -60,4 +60,7 @@ urlpatterns = [
         views.ajax_tab,
         name="ajax_tab",
     ),
+    # Chunked upload
+    path("api/upload-chunk/", views.upload_chunk, name="upload_chunk"),
+    path("api/finalize-upload/", views.finalize_upload, name="finalize_upload"),
 ]

@@ -110,6 +110,17 @@
                                 {% endif %}
                                 <div class="form-text">Max 10MB • Formats: .xlsx, .xls</div>
                             </div>
+
+                            <!-- Progress bar (hidden by default) -->
+                            <div id="uploadProgress" class="mb-3" style="display:none;">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <small id="uploadStatusText" style="color:var(--text-secondary)">Upload en cours...</small>
+                                    <small id="uploadPercent" style="color:var(--text-secondary)">0%</small>
+                                </div>
+                                <div style="height:8px; border-radius:4px; overflow:hidden; background:var(--bg-tertiary);">
+                                    <div id="uploadBar" style="height:100%; width:0%; border-radius:4px; transition:width 0.3s; background:linear-gradient(90deg,#6366f1,#818cf8);"></div>
+                                </div>
+                            </div>
                             
                             <button type="submit" name="upload" class="btn-submit-primary w-100" id="uploadBtn">
                                 <i class="bi bi-upload"></i>
@@ -171,4 +182,121 @@
 
 {% block extra_js %}
 <script src="{% static 'client_analytics/home.js' %}"></script>
+<script>
+(function() {
+    const CHUNK_SIZE = 512 * 1024; // 512 KB per chunk
+    const form = document.getElementById('uploadForm');
+    if (!form) return;
+
+    const csrfToken = form.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    form.addEventListener('submit', function(e) {
+        const fileInput = form.querySelector('input[type="file"]');
+        const nameInput = form.querySelector('input[name="name"]');
+        const file = fileInput && fileInput.files[0];
+        const name = nameInput ? nameInput.value.trim() : '';
+
+        if (!file || !name) return; // let normal validation handle it
+
+        // For small files (< 1MB), use the normal form POST
+        if (file.size < 1 * 1024 * 1024) return;
+
+        // Large file: use chunked upload
+        e.preventDefault();
+
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['xlsx', 'xls'].includes(ext)) {
+            alert('Seuls les fichiers Excel (.xlsx, .xls) sont acceptés.');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            alert('Le fichier ne doit pas dépasser 10MB.');
+            return;
+        }
+
+        const uploadId = crypto.randomUUID();
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+        // Show progress, disable button
+        const progressDiv = document.getElementById('uploadProgress');
+        const bar = document.getElementById('uploadBar');
+        const pctText = document.getElementById('uploadPercent');
+        const statusText = document.getElementById('uploadStatusText');
+        const btn = document.getElementById('uploadBtn');
+
+        progressDiv.style.display = 'block';
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> <span>Upload en cours...</span>';
+
+        async function uploadChunk(index) {
+            const start = index * CHUNK_SIZE;
+            const end = Math.min(start + CHUNK_SIZE, file.size);
+            const blob = file.slice(start, end);
+
+            const fd = new FormData();
+            fd.append('upload_id', uploadId);
+            fd.append('chunk_index', index);
+            fd.append('total_chunks', totalChunks);
+            fd.append('chunk', blob, 'chunk');
+
+            const resp = await fetch('/api/upload-chunk/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: fd,
+            });
+            if (!resp.ok) throw new Error('Erreur chunk ' + index);
+            return resp.json();
+        }
+
+        async function doUpload() {
+            try {
+                // Upload chunks sequentially
+                for (let i = 0; i < totalChunks; i++) {
+                    await uploadChunk(i);
+                    const pct = Math.round(((i + 1) / totalChunks) * 90);
+                    bar.style.width = pct + '%';
+                    pctText.textContent = pct + '%';
+                    statusText.textContent = 'Envoi morceau ' + (i + 1) + '/' + totalChunks + '...';
+                }
+
+                // Finalize
+                statusText.textContent = 'Finalisation...';
+                bar.style.width = '95%';
+                pctText.textContent = '95%';
+
+                const fd = new FormData();
+                fd.append('upload_id', uploadId);
+                fd.append('file_name', file.name);
+                fd.append('dataset_name', name);
+                fd.append('total_chunks', totalChunks);
+
+                const resp = await fetch('/api/finalize-upload/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken },
+                    body: fd,
+                });
+                if (!resp.ok) throw new Error('Erreur finalisation');
+                const data = await resp.json();
+
+                bar.style.width = '100%';
+                pctText.textContent = '100%';
+                statusText.textContent = 'Terminé ! Redirection...';
+
+                // Redirect to processing page
+                window.location.href = data.redirect_url;
+
+            } catch (err) {
+                console.error('Upload error:', err);
+                statusText.textContent = 'Erreur: ' + err.message;
+                bar.style.background = '#ef4444';
+                bar.style.width = '100%';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-upload"></i> <span>Réessayer</span>';
+            }
+        }
+
+        doUpload();
+    });
+})();
+</script>
 {% endblock %}
