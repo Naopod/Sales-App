@@ -31,20 +31,29 @@ def home(request):
     select_form = SelectDatasetForm()
 
     if request.method == "POST":
+        logger.info("[home] POST received. POST keys: %s, FILES keys: %s",
+                     list(request.POST.keys()), list(request.FILES.keys()))
         if "upload" in request.POST:
             upload_form = UploadDatasetForm(request.POST, request.FILES)
+            logger.info("[home] Form created. is_valid=%s, errors=%s",
+                         upload_form.is_valid(), upload_form.errors)
             if upload_form.is_valid():
                 dataset = upload_form.save()
+                logger.info("[home] Dataset saved pk=%s, redirecting to processing", dataset.pk)
                 messages.success(
                     request, f'Dataset "{dataset.name}" uploadé avec succès!'
                 )
                 return redirect("client_analytics:dataset_processing", pk=dataset.pk)
+            else:
+                logger.warning("[home] Form INVALID: %s", upload_form.errors.as_json())
 
         elif "select" in request.POST:
             select_form = SelectDatasetForm(request.POST)
             if select_form.is_valid():
                 dataset = select_form.cleaned_data["existing_dataset"]
                 return redirect("client_analytics:dataset_overview", pk=dataset.pk)
+        else:
+            logger.warning("[home] POST but neither 'upload' nor 'select' in POST keys")
 
     context = {
         "upload_form": upload_form,
