@@ -6,7 +6,12 @@ Applique le même traitement que week_1_clean.ipynb sur Raw data High tech 2024.
 import pandas as pd
 import numpy as np
 import re
-import gc
+import matplotlib
+matplotlib.use('Agg')  # Backend non-interactif pour serveur
+import matplotlib.pyplot as plt
+import seaborn as sns
+import base64
+from io import BytesIO
 
 # Workaround: openpyxl bug with 'biltinId' typo in some Excel files
 from openpyxl.styles.named_styles import _NamedCellStyle
@@ -114,24 +119,22 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     # ÉTAPE 4 : SUPPRESSION DES DOUBLONS
     # ═══════════════════════════════════════════════════════════════════
 
-    df.drop_duplicates(inplace=True)
+    nb_avant = len(df)
+    df = df.drop_duplicates()
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 5 : FILTRAGE DES FAMILLES ET CLIENTS
     # ═══════════════════════════════════════════════════════════════════
 
+    nb_avant = len(df)
+
     if "Famille" in df.columns:
         familles_exclues = ["LIQ", "DEVL", "ZDIV", "POUD"]
-        mask = ~df["Famille"].isin(familles_exclues)
-        if "Cpt Client" in df.columns:
-            clients_exclus = ["13RLCA", "IENEWY"]
-            mask &= ~df["Cpt Client"].isin(clients_exclus)
-        df = df.loc[mask]
-    elif "Cpt Client" in df.columns:
-        clients_exclus = ["13RLCA", "IENEWY"]
-        df = df.loc[~df["Cpt Client"].isin(clients_exclus)]
+        df = df[~df["Famille"].isin(familles_exclues)]
 
-    gc.collect()
+    if "Cpt Client" in df.columns:
+        clients_exclus = ["13RLCA", "IENEWY"]
+        df = df[~df["Cpt Client"].isin(clients_exclus)]
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 6 : VARIABLES TEMPORELLES (Fiscal Avril->Mars)
@@ -198,17 +201,16 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     # ÉTAPE 7 : NETTOYAGE
     # ═══════════════════════════════════════════════════════════════════
 
-    # Combined mask to avoid multiple DataFrame copies
-    mask = pd.Series(True, index=df.index)
+    lignes_initiales = len(df)
 
+    # sécurité : si colonnes absentes, on évite de crasher
     if "Quantité" in df.columns:
-        mask &= df["Quantité"] > 0
+        df = df[df["Quantité"] != 0]
+        df = df[df["Quantité"] >= 0]
 
     if "Montant" in df.columns:
-        mask &= df["Montant"] > 0
-
-    df = df.loc[mask]
-    gc.collect()
+        df = df[df["Montant"] != 0]
+        df = df[df["Montant"] >= 0]
 
     # ═══════════════════════════════════════════════════════════════════
     # ÉTAPE 8 : RECALCUL PU NET
@@ -245,25 +247,16 @@ def process_raw_data(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     colonnes_existantes = [c for c in colonnes_finales if c in df.columns]
-    
-    # Drop all columns not needed to free memory, then reset index
-    cols_to_drop = [c for c in df.columns if c not in colonnes_existantes]
-    if cols_to_drop:
-        df.drop(columns=cols_to_drop, inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    gc.collect()
-
-    # Reorder columns to match expected order
-    df = df[colonnes_existantes]
+    df_final = df[colonnes_existantes].copy()
 
     # AFFICHAGE DATAFRAME FINAL (seul print du module)
     print("\n" + "="*80)
     print("DATAFRAME FINAL APRÈS PROCESSING")
     print("="*80)
-    print(df.head(10))
+    print(df_final.head(10))
     print("="*80 + "\n")
 
-    return df
+    return df_final
 
 
 def filter_data_by_period(df: pd.DataFrame, period_type: str = 'month', period_value=None) -> pd.DataFrame:
