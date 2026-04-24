@@ -601,8 +601,30 @@ def clustering(request, pk):
         messages.error(request, "Erreur lors du chargement du dataset")
         return redirect("client_analytics:home")
 
-    # Auto-execute clustering
-    clustering_result = analysis_clustering.generate_clustering_analysis(df)
+    available_quarterly_years = (
+        analysis_clustering.get_quarterly_clustering_available_years(df)
+    )
+
+    mode = request.GET.get("mode", "global")
+    selected_year = request.GET.get("year")
+    if mode in {"quarterly_2024", "quarterly_notebook"}:
+        mode = "quarterly_notebook"
+        if request.GET.get("mode") == "quarterly_2024" and selected_year is None:
+            selected_year = "2024"
+        elif selected_year is None and available_quarterly_years:
+            selected_year = str(available_quarterly_years[-1])
+        clustering_result = analysis_clustering.generate_quarterly_clustering_analysis(
+            df,
+            year=selected_year,
+        )
+    else:
+        mode = "global"
+        selected_year = None
+        clustering_result = analysis_clustering.generate_clustering_analysis(df)
+
+    resolved_selected_year = clustering_result.get("kpis", {}).get("annee_analysee")
+    if resolved_selected_year is None and selected_year and str(selected_year).isdigit():
+        resolved_selected_year = int(selected_year)
 
     context = {
         "dataset": dataset,
@@ -610,6 +632,9 @@ def clustering(request, pk):
         "results": clustering_result.get("results", {}),
         "graphs": clustering_result.get("graphs", {}),
         "error": clustering_result.get("error"),
+        "mode": mode,
+        "selected_year": resolved_selected_year,
+        "available_quarterly_years": available_quarterly_years,
     }
     return render(request, "client_analytics/clustering.html", context)
 

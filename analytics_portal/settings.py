@@ -116,6 +116,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 
+# Notebook quarterly clustering: closed business periods by calendar year.
+# Add a new year here to reuse the same quarterly notebook logic with
+# year-specific closures, e.g.:
+# 2025: [("2025-08-01", "2025-08-24")]
+CLUSTERING_NOTEBOOK_CLOSED_PERIODS_BY_YEAR = {
+    2024: [("2024-08-01", "2024-08-26")],
+}
+
 # Security Settings for Production
 if not DEBUG:
     SECURE_SSL_REDIRECT = True
