@@ -33,6 +33,9 @@ SIGNALS: dict[str, tuple[str, str, float, bool]] = {
 CUSUM_K = 0.5   # slack factor
 CUSUM_H = 4.0   # decision threshold
 BASELINE_WINDOW = 6   # months used for rolling baseline
+MIN_ANALYZABLE_MONTHS = 4  # current month + at least 3 prior months for baseline
+MIN_RELIABLE_MONTHS = 6
+ZSCORE_CAP = 6.0
 
 # Alert score thresholds
 THRESH_GREEN  = 30
@@ -124,11 +127,14 @@ def _robust_zscore_series(s: pd.Series, window: int = BASELINE_WINDOW, min_perio
     median = hist.rolling(window=window, min_periods=min_periods).median()
     mad = (hist - median).abs().rolling(window=window, min_periods=min_periods).median()
     z = 0.6745 * (s - median) / mad.replace(0, np.nan)
-    # MAD==0 edge case
-    z = z.where(mad != 0).fillna(
-        (s - median).apply(lambda v: 0.0 if v == 0 else (999.0 if v > 0 else -999.0))
-    )
-    return z
+    zero_mad = median.notna() & mad.eq(0)
+    delta = s - median
+    fallback = pd.Series(np.nan, index=s.index, dtype=float)
+    fallback.loc[zero_mad & delta.eq(0)] = 0.0
+    fallback.loc[zero_mad & delta.gt(0)] = ZSCORE_CAP
+    fallback.loc[zero_mad & delta.lt(0)] = -ZSCORE_CAP
+    z = z.where(~zero_mad, fallback)
+    return z.clip(lower=-ZSCORE_CAP, upper=ZSCORE_CAP)
 
 
 def _compute_zscores(client_feat: pd.DataFrame) -> pd.DataFrame:
@@ -147,6 +153,73 @@ def _compute_zscores(client_feat: pd.DataFrame) -> pd.DataFrame:
             pass  # negative z on CA means lower revenue (bad)
         zscores[sig] = z
     return zscores
+
+
+def _latest_stable_baseline_signals(client_feat: pd.DataFrame) -> list[str]:
+    """Signals where latest baseline has zero dispersion and current value moved."""
+    stable = []
+    for sig in SIGNALS:
+        if sig not in client_feat.columns:
+            continue
+        s = pd.to_numeric(client_feat[sig], errors="coerce")
+        hist = s.shift(1)
+        median = hist.rolling(window=BASELINE_WINDOW, min_periods=3).median()
+        mad = (hist - median).abs().rolling(window=BASELINE_WINDOW, min_periods=3).median()
+        if len(s) == 0:
+            continue
+        latest_idx = s.index[-1]
+        if (
+            pd.notna(median.loc[latest_idx])
+            and pd.notna(mad.loc[latest_idx])
+            and float(mad.loc[latest_idx]) == 0.0
+            and pd.notna(s.loc[latest_idx])
+            and float(s.loc[latest_idx] - median.loc[latest_idx]) != 0.0
+        ):
+            stable.append(sig)
+    return stable
+
+
+def _reliability_meta(client_feat: pd.DataFrame, zscores_df: pd.DataFrame) -> dict[str, Any]:
+    nb_months = int(len(client_feat))
+    latest_valid_z = int(zscores_df.iloc[-1].notna().sum()) if not zscores_df.empty else 0
+    stable_signals = _latest_stable_baseline_signals(client_feat)
+
+    if nb_months < MIN_ANALYZABLE_MONTHS:
+        level = "excluded"
+        label = "Historique insuffisant"
+        reason = f"{nb_months} mois disponibles, {MIN_ANALYZABLE_MONTHS} requis."
+    elif nb_months < MIN_RELIABLE_MONTHS or latest_valid_z < 3:
+        level = "low"
+        label = "Fiabilité faible"
+        reason = "Baseline courte ou peu de signaux calculables."
+    elif stable_signals:
+        level = "medium"
+        label = "Fiabilité moyenne"
+        reason = "Baseline très stable : z-score plafonné sur certains signaux."
+    else:
+        level = "high"
+        label = "Fiabilité forte"
+        reason = "Historique suffisant et dispersion exploitable."
+
+    return {
+        "level": level,
+        "label": label,
+        "reason": reason,
+        "latest_valid_z": latest_valid_z,
+        "stable_baseline_signals": stable_signals,
+    }
+
+
+def _format_z_for_display(z: float | None) -> tuple[float | None, str | None]:
+    if z is None or pd.isna(z):
+        return None, None
+    z = float(z)
+    rounded = round(z, 2)
+    if z >= ZSCORE_CAP:
+        return rounded, f">= {int(ZSCORE_CAP)}"
+    if z <= -ZSCORE_CAP:
+        return rounded, f"<= -{int(ZSCORE_CAP)}"
+    return rounded, str(rounded)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -306,9 +379,23 @@ def analyze_portfolio(df: pd.DataFrame) -> dict[str, Any]:
     client_col = col_map["client"]
     clients = feat.index.get_level_values(0).unique()
     results = []
+    excluded_clients = []
 
     for client_id in clients:
         try:
+            client_feat = feat.xs(client_id, level=0).sort_index()
+            if len(client_feat) < MIN_ANALYZABLE_MONTHS:
+                excluded_clients.append(
+                    {
+                        "client_id": str(client_id),
+                        "nb_months": int(len(client_feat)),
+                        "reason": (
+                            f"Historique insuffisant: {len(client_feat)} mois "
+                            f"disponibles, {MIN_ANALYZABLE_MONTHS} requis."
+                        ),
+                    }
+                )
+                continue
             row = _compute_single_client(feat, client_id)
             if row:
                 results.append(row)
@@ -327,6 +414,7 @@ def analyze_portfolio(df: pd.DataFrame) -> dict[str, Any]:
         "counts": counts,
         "latest_period": latest_period,
         "col_map": col_map,
+        "excluded_clients": excluded_clients,
     }
 
 
@@ -336,10 +424,11 @@ def _compute_single_client(feat: pd.DataFrame, client_id) -> dict | None:
         client_feat = feat.xs(client_id, level=0).sort_index()
     except KeyError:
         return None
-    if len(client_feat) < 2:
+    if len(client_feat) < MIN_ANALYZABLE_MONTHS:
         return None
 
     zscores_df = _compute_zscores(client_feat)
+    reliability = _reliability_meta(client_feat, zscores_df)
     ca_z = zscores_df.get("ca", pd.Series(dtype=float))
     s_pos, s_neg = _cusum(ca_z)
 
@@ -358,6 +447,7 @@ def _compute_single_client(feat: pd.DataFrame, client_id) -> dict | None:
         key=lambda s: abs(latest_z.get(s, 0) or 0),
         default=None,
     )
+    top_z_value, top_z_label = _format_z_for_display(latest_z.get(best_sig) if best_sig else None)
 
     # CA baseline (mean of previous months)
     ca_hist = pd.to_numeric(client_feat["ca"], errors="coerce")
@@ -382,10 +472,12 @@ def _compute_single_client(feat: pd.DataFrame, client_id) -> dict | None:
         "baseline_ca": round(baseline_ca, 0) if baseline_ca is not None else None,
         "ca_pct_change": ca_pct_change,
         "top_signal": SIGNALS[best_sig][0] if best_sig else None,
-        "top_signal_z": round(float(latest_z.get(best_sig, 0) or 0), 2) if best_sig else None,
+        "top_signal_z": top_z_value,
+        "top_signal_z_label": top_z_label,
         "cusum_alert": cusum_breached,
         "ca_trend": ca_trend,
         "nb_months": len(client_feat),
+        "reliability": reliability,
     }
 
 
@@ -412,10 +504,16 @@ def analyze_client(df: pd.DataFrame, client_id: str) -> dict[str, Any]:
     except KeyError:
         return {"error": f"Client '{client_id}' non trouvé"}
 
-    if len(client_feat) < 2:
-        return {"error": "Historique insuffisant (minimum 2 mois requis)"}
+    if len(client_feat) < MIN_ANALYZABLE_MONTHS:
+        return {
+            "error": (
+                f"Historique insuffisant ({len(client_feat)} mois disponibles, "
+                f"{MIN_ANALYZABLE_MONTHS} requis pour une baseline fiable)"
+            )
+        }
 
     zscores_df = _compute_zscores(client_feat)
+    reliability = _reliability_meta(client_feat, zscores_df)
     ca_z = zscores_df.get("ca", pd.Series(dtype=float))
     s_pos, s_neg = _cusum(ca_z)
 
@@ -473,6 +571,7 @@ def analyze_client(df: pd.DataFrame, client_id: str) -> dict[str, Any]:
         "cusum_alert": cusum_breached,
         "latest_month": periods[-1] if periods else "",
         "nb_months": len(client_feat),
+        "reliability": reliability,
         "periods": periods,
         "signals_data": signals_data,
         "cusum": {

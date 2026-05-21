@@ -1,5 +1,8 @@
 {% load custom_filters %}
     <h2 class="mb-4 mt-4"><i class="bi bi-people-fill"></i> Analyses clients</h2>
+    <p class="text-muted mb-4">
+        Cette section mesure la concentration du chiffre d'affaires par client, identifie les comptes les plus contributeurs et aide à évaluer le niveau de dépendance du portefeuille.
+    </p>
     
     {% if client_analysis %}
     
@@ -57,6 +60,9 @@
                     <h5 class="mb-0">📊 Concentration Clients - Analyse de Pareto</h5>
                 </div>
                 <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Lecture : les barres classent les clients par CA décroissant et la courbe cumulée montre la part de CA captée au fil du classement. Une courbe qui monte très vite indique une forte concentration sur quelques clients.
+                    </p>
                     {{ client_graphs.concentration|safe }}
                 </div>
             </div>
@@ -138,42 +144,44 @@
     </div>
     {% endif %}
 
-    <!-- Portefeuille client complet (Client 360) - après les visualisations globales -->
-    <div class="card border-primary mb-4 mt-4">
-        <div class="card-header bg-primary text-white">
-            <h5 class="mb-0"><i class="bi bi-person-badge"></i> Portefeuille client complet (Client 360)</h5>
-        </div>
-        <div class="card-body">
-            <form method="get" class="row g-2 align-items-end">
-                <input type="hidden" name="tab" value="clients">
-                <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
-                <div class="col-lg-8">
-                    <label class="form-label">Sélectionner un client</label>
-                    <select class="form-select" name="client">
-                        <option value="">"" Choisir ""</option>
-                        {% for opt in client_options %}
-                            <option value="{{ opt.value }}" {% if selected_client and opt.value == selected_client %}selected{% endif %}>
-                                {{ opt.label }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                    <div class="form-text">Rechargement via GET (pas d'AJAX).</div>
-                </div>
-                <div class="col-lg-4">
-                    <button class="btn btn-primary w-100" type="submit">
-                        <i class="bi bi-search"></i> Afficher
-                    </button>
-                </div>
-            </form>
-
-            {% if selected_client %}
-            <div class="mt-4">
-                {% if granularity == 'quarter' %}
-                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_quarter %}
-                {% elif granularity == 'year' %}
-                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_fiscal %}
-                {% else %}
-                    {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_month %}
-                {% endif %}
+    <!-- Portefeuille client complet (Client 360) -->
+    <section class="client360-master-section mb-4 mt-4">
+        <div class="client360-master-header">
+            <div>
+                <span class="client360-eyebrow"><i class="bi bi-person-badge"></i> Portefeuille client 360</span>
+                <h3>Dashboard client</h3>
             </div>
+            <span class="client360-master-period">{{ granularity|default:'month' }}</span>
+        </div>
+
+        <form method="get" action="{% url 'client_analytics:ajax_client_portfolio' dataset.pk %}" class="client360-client-form">
+            <input type="hidden" name="tab" value="clients">
+            <input type="hidden" name="granularity" value="{{ granularity|default:'month' }}">
+            <label>
+                <span>Client</span>
+                <select class="form-select" name="client">
+                    <option value="">Choisir</option>
+                    {% for opt in client_options %}
+                        <option value="{{ opt.value }}" {% if selected_client and opt.value == selected_client %}selected{% endif %}>
+                            {{ opt.label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            <button class="btn btn-primary" type="submit">
+                <i class="bi bi-search"></i> Afficher
+            </button>
+        </form>
+
+        <div class="mt-4 client-portfolio-results">
+        {% if selected_client %}
+            {% if granularity == 'quarter' %}
+                {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_quarter %}
+            {% elif granularity == 'year' %}
+                {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_fiscal %}
+            {% else %}
+                {% include 'client_analytics/partials/_client360_block.html' with client_portfolio=client_portfolio_month %}
             {% endif %}
+        {% endif %}
+        </div>
+    </section>

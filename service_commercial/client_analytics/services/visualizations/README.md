@@ -9,7 +9,6 @@ visualizations/
 ├── __init__.py                 # Exports centralisés
 ├── viz_overview.py            # Graphiques pour Overview
 ├── viz_by_period.py           # Graphiques pour Analyse par périodes
-├── viz_time_series.py         # Graphiques pour Série temporelle
 ├── viz_products.py            # Graphiques pour Produits
 ├── viz_clients.py             # Graphiques pour Clients
 ├── viz_geographic.py          # Graphiques pour Géographique
@@ -30,10 +29,6 @@ Visualisations pour l'onglet **Overview**
 Visualisations pour **Analyse par périodes**
 - Affichage principalement sous forme de tableaux
 - Pas de graphiques complexes pour l'instant
-
-### `viz_time_series.py`
-Visualisations pour **Analyse de séries temporelles**
-- `create_stl_decomposition_plot(df_agg)` - Décomposition STL (Tendance, Saisonnalité, Résidus)
 
 ### `viz_products.py`
 Visualisations pour **Analyse produits**
@@ -60,23 +55,10 @@ Visualisations pour **Dépendance aux devises**
 - `plot_non_eur_pct_over_time(df, output_path)` - Évolution % non-EUR
 - `plot_country_currency_heatmap(df, output_path)` - Heatmap pays × devises
 - `plot_pareto_non_eur_clients(df, output_path, top_n)` - Pareto top clients non-EUR
-- `plot_non_eur_by_family(df, output_path)` - Scatter/Bubble famille produit
 
 ---
 
 ## 🔧 Utilisation
-
-### Import depuis un fichier analysis_*
-
-```python
-# Dans analysis_time_series.py
-from .visualizations.viz_time_series import create_stl_decomposition_plot
-
-# Utilisation
-stl_plot = create_stl_decomposition_plot(df_agg)
-if stl_plot:
-    graphs['stl_decomposition'] = stl_plot
-```
 
 ### Import depuis currency_dependency.py
 
@@ -87,7 +69,6 @@ from .visualizations.viz_currency import (
     plot_non_eur_pct_over_time,
     plot_country_currency_heatmap,
     plot_pareto_non_eur_clients,
-    plot_non_eur_by_family
 )
 
 # Utilisation
@@ -102,7 +83,6 @@ if fig:
 
 ### Plotly (HTML)
 Fonctions retournant du HTML Plotly pour intégration directe dans templates Django :
-- `create_stl_decomposition_plot()` → `str` (HTML)
 - `create_clustering_pca_plot()` → `str` (HTML)
 
 ### Matplotlib (Figure ou None)

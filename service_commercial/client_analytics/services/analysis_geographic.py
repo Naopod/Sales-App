@@ -155,9 +155,9 @@ def analyze_geographic_data(df_final: pd.DataFrame,
     try:
         from .visualizations import viz_geographic
 
-        chart = viz_geographic.create_world_map(stats_pays)
+        chart = viz_geographic.create_leaflet_map(stats_pays)
         if chart:
-            geo_graphs['world_map'] = chart
+            geo_graphs['leaflet_map'] = chart
 
         chart = viz_geographic.create_geographic_ca_chart(stats_pays)
         if chart:
@@ -170,10 +170,6 @@ def analyze_geographic_data(df_final: pd.DataFrame,
         chart = viz_geographic.create_classification_chart(stats_pays)
         if chart:
             geo_graphs['classification'] = chart
-
-        chart = viz_geographic.create_score_distribution_chart(stats_pays)
-        if chart:
-            geo_graphs['score_distribution'] = chart
 
     except Exception:
         logger.exception('[analysis_geographic] Error generating charts')

@@ -1,1 +1,1 @@
-# Client Analytics Application
+# Sales Analytics Application

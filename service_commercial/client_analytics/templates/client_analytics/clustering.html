@@ -6,6 +6,191 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
+<style>
+.cluster-workbench {
+    display: grid;
+    gap: 18px;
+}
+.cluster-filter-panel {
+    background: var(--bg-elevated, #fff);
+    border: 1px solid var(--border-default, rgba(0,0,0,.12));
+    border-radius: 8px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+}
+.cluster-mode-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+.cluster-mode-toggle input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.cluster-mode-toggle label {
+    min-height: 64px;
+    border: 1px solid var(--border-default, rgba(0,0,0,.14));
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    background: rgba(255,255,255,.72);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+.cluster-mode-toggle input:checked + label {
+    border-color: #0f766e;
+    background: rgba(15, 118, 110, .10);
+    box-shadow: inset 0 0 0 1px rgba(15, 118, 110, .20);
+}
+.cluster-form-hint {
+    font-size: .78rem;
+    color: var(--text-muted, #64748b);
+    margin-top: 5px;
+}
+.cluster-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+.cluster-kpi {
+    border: 1px solid var(--border-default, rgba(0,0,0,.12));
+    border-radius: 8px;
+    background: var(--bg-elevated, #fff);
+    padding: 16px;
+}
+.cluster-kpi span {
+    color: var(--text-muted, #64748b);
+    font-size: .85rem;
+    font-weight: 700;
+}
+.cluster-kpi strong {
+    display: block;
+    margin-top: 5px;
+    font-size: 1.45rem;
+}
+.cluster-profile-card {
+    border: 1px solid var(--border-default, rgba(0,0,0,.12));
+    border-radius: 8px;
+    background: var(--bg-elevated, #fff);
+    height: 100%;
+    overflow: hidden;
+}
+.cluster-profile-card__head {
+    padding: 15px 16px;
+    border-bottom: 1px solid var(--border-default, rgba(0,0,0,.12));
+    background: linear-gradient(90deg, rgba(15, 118, 110, .12), rgba(14, 165, 233, .08));
+}
+.cluster-profile-card__body {
+    padding: 16px;
+}
+.cluster-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, .10);
+    color: #0f766e;
+    font-size: .78rem;
+    font-weight: 800;
+}
+.cluster-member-list,
+.cluster-selected-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.cluster-member-list li,
+.cluster-selected-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid rgba(148, 163, 184, .18);
+}
+.cluster-member-list li:last-child,
+.cluster-selected-list li:last-child {
+    border-bottom: 0;
+}
+.cluster-temporal-step {
+    border-left: 3px solid #0f766e;
+    padding-left: 14px;
+}
+.cluster-selection-panel {
+    border: 1px solid var(--border-default, rgba(0,0,0,.12));
+    border-radius: 8px;
+    background: var(--bg-elevated, #fff);
+    padding: 16px;
+    height: 100%;
+}
+.cluster-change-card {
+    border: 1px solid var(--border-default, rgba(0,0,0,.12));
+    border-radius: 8px;
+    background: var(--bg-elevated, #fff);
+    height: 100%;
+    padding: 16px;
+}
+.cluster-change-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.cluster-change-route {
+    color: var(--text-muted, #64748b);
+    font-size: .82rem;
+    font-weight: 700;
+}
+.cluster-change-metric {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 9px 0;
+    border-top: 1px solid rgba(148, 163, 184, .18);
+}
+.cluster-change-metric:first-of-type {
+    border-top: 0;
+}
+.cluster-delta {
+    font-weight: 800;
+    color: #0f766e;
+    white-space: nowrap;
+}
+.cluster-empty-note {
+    border: 1px dashed rgba(100, 116, 139, .38);
+    border-radius: 8px;
+    padding: 16px;
+    color: var(--text-muted, #64748b);
+    background: rgba(148, 163, 184, .07);
+}
+.cluster-method-step {
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 10px;
+    margin-bottom: 18px;
+}
+.cluster-method-step span {
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: var(--accent, #0f766e);
+    color: #fff;
+    font-weight: 800;
+}
+@media (max-width: 900px) {
+    .cluster-mode-toggle,
+    .cluster-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
 {% endblock %}
 
 {% block dataset_nav %}
@@ -13,172 +198,451 @@
 {% endblock %}
 
 {% block content %}
-
 <script>
     document.body.classList.add('analysis-page');
 </script>
 
 <div class="page-header">
-    <div class="row">
-        <div class="col-12">
+    <div class="row align-items-center">
+        <div class="col-lg-8">
             <div class="header-content">
                 <span class="header-badge">
                     <i class="bi bi-database-fill"></i> Dataset
                 </span>
-                <h1 class="page-title">
-                    {{ dataset.name }}
-                </h1>
+                <h1 class="page-title">{{ dataset.name }}</h1>
                 <p class="page-subtitle">
-                    <i class="bi bi-diagram-3-fill"></i> Segmentation K-Means automatique
+                    <i class="bi bi-diagram-3-fill"></i> Segmentation business des clients et produits
                 </p>
+            </div>
+        </div>
+        <div class="col-lg-4 text-end d-flex align-items-center justify-content-end gap-2">
+            <span class="badge bg-primary text-white fs-6 px-3 py-2">
+                <i class="bi bi-stars me-1"></i> {{ kpis.mode_label|default:"Clustering" }}
+            </span>
+            <button class="btn btn-outline-secondary btn-sm px-3 py-2 fw-600"
+                    type="button"
+                    data-bs-toggle="offcanvas"
+                    data-bs-target="#clusterMethodOffcanvas"
+                    aria-controls="clusterMethodOffcanvas"
+                    title="Comprendre la m&eacute;thodologie">
+                <i class="bi bi-question-circle-fill me-1"></i> M&eacute;thodologie
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end"
+     tabindex="-1"
+     id="clusterMethodOffcanvas"
+     aria-labelledby="clusterMethodOffcanvasLabel"
+     style="width: min(720px, 95vw);">
+    <div class="offcanvas-header border-bottom" style="background:var(--bg-elevated);">
+        <h5 class="offcanvas-title d-flex align-items-center gap-2" id="clusterMethodOffcanvasLabel">
+            <span style="background:var(--accent);color:#fff;border-radius:8px;padding:4px 10px;font-size:0.95rem;">
+                <i class="bi bi-cpu-fill me-1"></i> Moteur de Clustering
+            </span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
+    </div>
+    <div class="offcanvas-body" style="font-size:.875rem;line-height:1.65;">
+        <div class="alert alert-info d-flex gap-2 align-items-start mb-4">
+            <i class="bi bi-info-circle-fill fs-5 mt-1 flex-shrink-0"></i>
+            <div>
+                Le clustering regroupe les clients ou produits qui ont des comportements commerciaux proches sur la p&eacute;riode choisie. L'objectif est de lire des segments actionnables, pas de montrer une sortie statistique brute.
+            </div>
+        </div>
+
+        <div class="cluster-method-step">
+            <span>1</span>
+            <div>
+                <h6 class="fw-700 mb-1" style="color:var(--accent);">Construction des indicateurs</h6>
+                <p class="mb-0">Pour chaque client ou produit, le moteur calcule le CA, les quantit&eacute;s, la fr&eacute;quence, le panier moyen, les prix unitaires, la diversit&eacute; et quelques signaux de d&eacute;lai ou de devise lorsque ces colonnes existent.</p>
+            </div>
+        </div>
+        <div class="cluster-method-step">
+            <span>2</span>
+            <div>
+                <h6 class="fw-700 mb-1" style="color:var(--accent);">Comparaison &eacute;quitable</h6>
+                <p class="mb-0">Les indicateurs sont nettoy&eacute;s puis normalis&eacute;s pour qu'un montant tr&egrave;s &eacute;lev&eacute; ne masque pas tous les autres signaux. Les volumes et montants sont compress&eacute;s avant segmentation.</p>
+            </div>
+        </div>
+        <div class="cluster-method-step">
+            <span>3</span>
+            <div>
+                <h6 class="fw-700 mb-1" style="color:var(--accent);">Segmentation statique</h6>
+                <p class="mb-0">En mode statique, les donn&eacute;es sont filtr&eacute;es sur la plage s&eacute;lectionn&eacute;e, puis les groupes sont form&eacute;s sur ce p&eacute;rim&egrave;tre. Les libell&eacute;s &eacute;conomiques sont d&eacute;duits des centro&iuml;des et des m&eacute;dianes de chaque groupe.</p>
+            </div>
+        </div>
+        <div class="cluster-method-step">
+            <span>4</span>
+            <div>
+                <h6 class="fw-700 mb-1" style="color:var(--accent);">Suivi temporel</h6>
+                <p class="mb-0">En mode temporel, un clustering est recalcul&eacute; p&eacute;riode par p&eacute;riode. Les groupes sont align&eacute;s d'une p&eacute;riode &agrave; l'autre pour suivre les migrations, puis le moteur identifie les variables qui ont le plus boug&eacute; lorsqu'un client ou produit change de groupe.</p>
             </div>
         </div>
     </div>
 </div>
 
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-lg-5">
-                <label for="clusteringMode" class="form-label fw-semibold">Mode de clustering</label>
-                <select class="form-select" id="clusteringMode" name="mode">
-                    <option value="global" {% if mode == 'global' %}selected{% endif %}>Clustering global</option>
-                    <option value="quarterly_notebook" {% if mode == 'quarterly_notebook' %}selected{% endif %}>Clustering trimestriel du notebook</option>
+<div class="cluster-workbench">
+    <section class="cluster-filter-panel">
+        <form method="get" class="row g-3 align-items-end" id="clusterForm">
+            <div class="col-12">
+                <div class="cluster-mode-toggle" role="group" aria-label="Mode de clustering">
+                    <div>
+                        <input type="radio" id="modeStatic" name="mode" value="static" {% if mode == 'static' %}checked{% endif %}>
+                        <label for="modeStatic">
+                            <i class="bi bi-bullseye fs-4"></i>
+                            <span>
+                                <strong>Clustering Statique</strong><br>
+                                <small class="text-muted">Segmenter clients ou produits sur la plage choisie.</small>
+                            </span>
+                        </label>
+                    </div>
+                    <div>
+                        <input type="radio" id="modeTemporal" name="mode" value="temporal" {% if mode == 'temporal' %}checked{% endif %}>
+                        <label for="modeTemporal">
+                            <i class="bi bi-arrow-left-right fs-4"></i>
+                            <span>
+                                <strong>Clustering temporel</strong><br>
+                                <small class="text-muted">Observer les migrations entre groupes.</small>
+                            </span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3">
+                <label class="form-label fw-semibold" for="entityType">&Agrave; segmenter</label>
+                <select class="form-select" id="entityType" name="entity">
+                    <option value="clients" {% if entity_type == 'clients' %}selected{% endif %}>Clients</option>
+                    <option value="products" {% if entity_type == 'products' %}selected{% endif %}>Produits</option>
                 </select>
             </div>
 
-            <div class="col-lg-4">
-                <label for="clusteringYear" class="form-label fw-semibold">Annee notebook</label>
-                <select class="form-select" id="clusteringYear" name="year">
-                    {% for year in available_quarterly_years %}
-                    <option value="{{ year }}" {% if selected_year == year %}selected{% endif %}>{{ year }}</option>
+            <div class="col-lg-3">
+                <label class="form-label fw-semibold" for="granularity">Lecture par</label>
+                <select class="form-select" id="granularity" name="granularity">
+                    <option value="month" {% if granularity == 'month' %}selected{% endif %}>Mois</option>
+                    <option value="quarter" {% if granularity == 'quarter' %}selected{% endif %}>Trimestre</option>
+                    <option value="year" {% if granularity == 'year' %}selected{% endif %}>Ann&eacute;e fiscale</option>
+                </select>
+            </div>
+
+            <div class="col-lg-3">
+                <label class="form-label fw-semibold" for="periodStart">De</label>
+                <select class="form-select" id="periodStart" name="period_start">
+                    {% for p in period_choices %}
+                    <option value="{{ p }}" {% if period_start == p %}selected{% endif %}>{{ p }}</option>
                     {% empty %}
-                    <option value="">Aucune annee disponible</option>
+                    <option value="">Aucune p&eacute;riode</option>
                     {% endfor %}
                 </select>
             </div>
 
             <div class="col-lg-3">
+                <label class="form-label fw-semibold" for="periodEnd">&Agrave;</label>
+                <select class="form-select" id="periodEnd" name="period_end">
+                    {% for p in period_choices %}
+                    <option value="{{ p }}" {% if period_end == p %}selected{% endif %}>{{ p }}</option>
+                    {% empty %}
+                    <option value="">Aucune p&eacute;riode</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-lg-9 cluster-temporal-only">
+                <label class="form-label fw-semibold" for="trackedEntities">Suivre une s&eacute;lection</label>
+                <select class="form-select" id="trackedEntities" name="tracked" multiple size="4">
+                    {% for option in results.tracking.options %}
+                    <option value="{{ option.value }}" {% if option.value in tracked_entities %}selected{% endif %}>{{ option.label }}</option>
+                    {% empty %}
+                    <option value="" disabled>Aucune s&eacute;lection disponible sur cette plage</option>
+                    {% endfor %}
+                </select>
+                <div class="cluster-form-hint">
+                    Laisser vide suit automatiquement les principaux &eacute;l&eacute;ments en CA.
+                </div>
+            </div>
+
+            <div class="col-lg-3 ms-auto">
                 <button type="submit" class="btn btn-primary w-100">
-                    <i class="bi bi-funnel-fill"></i> Appliquer
+                    <i class="bi bi-stars"></i> Segmenter
                 </button>
             </div>
         </form>
+    </section>
 
-        <div class="mt-3 pt-3 border-top">
-            {% if mode == 'quarterly_notebook' %}
-            <p class="text-muted mb-0">
-                Portage direct de la cellule <strong>CLUSTERING TRIMESTRIEL 2024 + VACANCES</strong> du notebook
-                <strong>week_1_clean.ipynb</strong>.
-            </p>
-            {% else %}
-            <p class="text-muted mb-0">Le clustering est calcule sur l'ensemble du dataset traite.</p>
+    {% if error %}
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    {% if kpis %}
+    <section class="cluster-kpi-grid">
+        <div class="cluster-kpi">
+            <span>Mode</span>
+            <strong>{{ kpis.mode_label }}</strong>
+        </div>
+        <div class="cluster-kpi">
+            <span>P&eacute;rim&egrave;tre</span>
+            <strong>{{ kpis.period_label }}</strong>
+        </div>
+        <div class="cluster-kpi">
+            <span>{{ kpis.entity_label }}</span>
+            <strong>{{ kpis.entity_count }}</strong>
+        </div>
+        <div class="cluster-kpi">
+            <span>Groupes d&eacute;tect&eacute;s</span>
+            <strong>{{ kpis.clusters }}</strong>
+        </div>
+    </section>
+
+    {% if mode == 'static' %}
+    <div class="row g-4">
+        {% if graphs.scatter %}
+        <div class="col-xl-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-map"></i> Carte des groupes</h5>
+                </div>
+                <div class="card-body">{{ graphs.scatter|safe }}</div>
+            </div>
+        </div>
+        {% endif %}
+        {% if graphs.distribution %}
+        <div class="col-xl-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart"></i> R&eacute;partition</h5>
+                </div>
+                <div class="card-body">{{ graphs.distribution|safe }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="row g-4">
+        {% if graphs.temporal_counts %}
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart"></i> Taille des groupes</h5>
+                </div>
+                <div class="card-body">{{ graphs.temporal_counts|safe }}</div>
+            </div>
+        </div>
+        {% endif %}
+        {% if graphs.temporal_ca %}
+        <div class="col-xl-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> CA par groupe</h5>
+                </div>
+                <div class="card-body">{{ graphs.temporal_ca|safe }}</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if graphs.journey or results.tracking.selected %}
+    <section>
+        <h3 class="mb-3"><i class="bi bi-signpost-split"></i> Parcours des &eacute;l&eacute;ments suivis</h3>
+        <div class="row g-4">
+            {% if graphs.journey %}
+            <div class="col-xl-8">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">Passages entre groupes</h5>
+                    </div>
+                    <div class="card-body">{{ graphs.journey|safe }}</div>
+                </div>
+            </div>
             {% endif %}
+            <div class="col-xl-4">
+                <div class="cluster-selection-panel">
+                    <h5 class="mb-2"><i class="bi bi-pin-map"></i> S&eacute;lection suivie</h5>
+                    <p class="text-muted small mb-3">
+                        Chaque ligne montre dans quel groupe se trouve l'&eacute;l&eacute;ment suivi &agrave; chaque p&eacute;riode.
+                    </p>
+                    <ul class="cluster-selected-list">
+                        {% for item in results.tracking.selected %}
+                        <li><span class="text-truncate">{{ item }}</span><i class="bi bi-check-circle text-success"></i></li>
+                        {% empty %}
+                        <li><span>Aucune s&eacute;lection disponible</span></li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
         </div>
-    </div>
-</div>
+    </section>
+    {% endif %}
 
-{% if error %}
-<div class="alert alert-danger">
-    <i class="bi bi-exclamation-triangle"></i> <strong>Erreur :</strong> {{ error }}
-</div>
-{% endif %}
+    {% if results.tracking.changes %}
+    <section>
+        <h3 class="mb-3"><i class="bi bi-sliders2"></i> Ce qui explique les changements de groupe</h3>
+        <div class="row g-4">
+            {% for change in results.tracking.changes %}
+            <div class="col-xl-4 col-lg-6">
+                <article class="cluster-change-card">
+                    <div class="cluster-change-head">
+                        <div>
+                            <h5 class="mb-1 text-truncate">{{ change.entity }}</h5>
+                            <div class="cluster-change-route">{{ change.from_period }} &rarr; {{ change.to_period }}</div>
+                        </div>
+                        <span class="cluster-pill">{{ change.from_cluster }} &rarr; {{ change.to_cluster }}</span>
+                    </div>
+                    {% for metric in change.metrics %}
+                    <div class="cluster-change-metric">
+                        <div>
+                            <strong>{{ metric.metric }}</strong>
+                            <div class="text-muted small">{{ metric.before|floatformat:1 }} &rarr; {{ metric.after|floatformat:1 }}</div>
+                        </div>
+                        <div class="cluster-delta">
+                            {% if metric.delta >= 0 %}+{% endif %}{{ metric.delta|floatformat:1 }}
+                            {% if metric.pct %}
+                            <div class="text-muted small text-end">{% if metric.pct >= 0 %}+{% endif %}{{ metric.pct|floatformat:0 }}%</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </article>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% elif mode == 'temporal' and results.tracking.selected %}
+    <div class="cluster-empty-note">
+        Aucun changement de groupe observ&eacute; sur la s&eacute;lection suivie pour cette plage.
+    </div>
+    {% endif %}
 
-{% if mode == 'quarterly_notebook' and kpis %}
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-danger">{{ kpis.k_fixed }}</h2>
-                <p class="text-muted mb-0 small">K fixe</p>
-            </div>
+    {% if graphs.transition_heatmap %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Premi&egrave;re matrice de transition</h5>
         </div>
+        <div class="card-body">{{ graphs.transition_heatmap|safe }}</div>
     </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-success">{{ kpis.silhouette_moyenne }}</h2>
-                <p class="text-muted mb-0 small">Silhouette moyenne</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-primary">{{ kpis.nb_trimestres }}</h2>
-                <p class="text-muted mb-0 small">Trimestres {{ kpis.annee_analysee }}</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-secondary">{{ kpis.nb_clients }}</h2>
-                <p class="text-muted mb-0 small">Clients {{ kpis.annee_analysee }}</p>
-            </div>
-        </div>
-    </div>
-</div>
+    {% endif %}
+    {% endif %}
 
-<div class="row mb-4">
-    <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0"><i class="bi bi-table"></i> Silhouette moyenne par K</h5>
+    {% if results.profiles %}
+    <section>
+        <h3 class="mb-3"><i class="bi bi-lightbulb"></i> Lecture &eacute;conomique des groupes</h3>
+        <div class="row g-4">
+            {% for profile in results.profiles %}
+            <div class="col-xl-4 col-lg-6">
+                <article class="cluster-profile-card">
+                    <div class="cluster-profile-card__head">
+                        <span class="cluster-pill">{{ profile.cluster_label }}</span>
+                        <h5 class="mt-2 mb-1">{{ profile.name }}</h5>
+                        <div class="text-muted small">{{ profile.count }} &eacute;l&eacute;ments - {{ profile.share }}% du p&eacute;rim&egrave;tre</div>
+                    </div>
+                    <div class="cluster-profile-card__body">
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <small class="text-muted">CA total</small>
+                                <div class="fw-bold">{{ profile.ca_total|floatformat:0 }} &euro;</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">CA m&eacute;dian</small>
+                                <div class="fw-bold">{{ profile.ca_median|floatformat:0 }} &euro;</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Commandes m&eacute;d.</small>
+                                <div class="fw-bold">{{ profile.orders_median|floatformat:1 }}</div>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted">Panier / PU m&eacute;d.</small>
+                                <div class="fw-bold">{{ profile.basket_median|floatformat:0 }} &euro;</div>
+                            </div>
+                        </div>
+                        <p class="mb-2">{{ profile.reading }}</p>
+                        <p class="text-muted mb-3">{{ profile.action }}</p>
+                        {% if profile.top_members %}
+                        <h6 class="mb-2">Top du groupe</h6>
+                        <ul class="cluster-member-list">
+                            {% for item in profile.top_members %}
+                            <li>
+                                <span class="text-truncate">{{ item.Entity }}</span>
+                                <strong>{{ item.CA_Total|floatformat:0 }} &euro;</strong>
+                            </li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                    </div>
+                </article>
             </div>
-            <div class="card-body">
-                {{ results.k_scores_html|safe }}
-            </div>
+            {% endfor %}
         </div>
-    </div>
-    <div class="col-lg-6">
-        <div class="card h-100">
-            <div class="card-header bg-light">
-                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Parametres notebook</h5>
-            </div>
-            <div class="card-body">
-                <p class="mb-2"><strong>Annee analysee :</strong> {{ kpis.annee_analysee }}</p>
-                <p class="mb-2"><strong>Perimetre :</strong> trimestres {{ results.trimestres|join:", " }}</p>
-                <p class="mb-2"><strong>Vacances exclues :</strong>
-                    {% if results.closed_periods %}
-                    {{ results.closed_periods|join:", " }}
-                    {% else %}
-                    Aucune
-                    {% endif %}
-                </p>
-                <p class="mb-0"><strong>Top familles utilisees :</strong> {{ kpis.nb_top_familles }}</p>
-            </div>
-        </div>
-    </div>
-</div>
+    </section>
+    {% endif %}
 
-{% if results.quarterly_summaries %}
-<div class="row mb-4">
-    <div class="col-12">
+    {% if mode == 'temporal' and results.transitions %}
+    <section>
+        <h3 class="mb-3"><i class="bi bi-arrow-left-right"></i> Migrations entre groupes</h3>
+        <div class="row g-4">
+            {% for transition in results.transitions %}
+            <div class="col-xl-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5 class="mb-0">{{ transition.from }} &rarr; {{ transition.to }}</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="cluster-temporal-step mb-3">
+                            <strong>{{ transition.stable_pct }}%</strong> restent dans un groupe &eacute;quivalent.
+                            <span class="text-muted">{{ transition.migrants }} migrations observ&eacute;es sur {{ transition.total }} &eacute;l&eacute;ments suivis.</span>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-striped align-middle">
+                                <tbody>
+                                    {% for row in transition.matrix_records %}
+                                    <tr>
+                                        {% for key, value in row.items %}
+                                        {% if forloop.first %}
+                                        <th>{{ value }}</th>
+                                        {% else %}
+                                        <td class="text-end">{{ value }}</td>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% if mode == 'static' and results.summary_table %}
+    <section>
+        <h3 class="mb-3"><i class="bi bi-list-columns"></i> D&eacute;tail du p&eacute;rim&egrave;tre</h3>
         <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-calendar3"></i> Synthese par trimestre</h5>
-            </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-striped table-sm">
+                    <table class="table table-sm table-hover align-middle">
                         <thead>
                             <tr>
-                                <th>Trimestre</th>
-                                <th>Transactions</th>
-                                <th>Jours ouverts</th>
-                                <th>Clients totaux</th>
-                                <th>Clients actifs</th>
+                                <th>{{ results.entity_label_singular }}</th>
+                                <th>Groupe</th>
+                                <th class="text-end">CA</th>
+                                <th class="text-end">Commandes</th>
+                                <th class="text-end">Quantit&eacute;</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for item in results.quarterly_summaries %}
+                            {% for row in results.summary_table %}
                             <tr>
-                                <td>{{ item.trimestre }}</td>
-                                <td>{{ item.transactions }}</td>
-                                <td>{{ item.jours_ouverts }}</td>
-                                <td>{{ item.nb_clients_total }}</td>
-                                <td>{{ item.nb_clients_actifs }}</td>
+                                <td><strong>{{ row|get_item:results.entity_label_singular }}</strong></td>
+                                <td>{{ row.Groupe }}</td>
+                                <td class="text-end">{{ row.CA|floatformat:0 }} &euro;</td>
+                                <td class="text-end">{{ row.Commandes|floatformat:0 }}</td>
+                                <td class="text-end">{{ row.Quantite|floatformat:0 }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -186,328 +650,65 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
-{% endif %}
-
-{% if results.quarter_distributions %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-diagram-3"></i> Distribution des clusters par trimestre</h4>
-    </div>
-    {% for item in results.quarter_distributions %}
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">{{ item.trimestre }}</h5>
-            </div>
-            <div class="card-body">
-                {{ item.table_html|safe }}
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-{% if results.comparisons %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-bar-chart"></i> Comparaison Cluster 0 vs Cluster 1</h4>
-    </div>
-    {% for item in results.comparisons %}
-    <div class="col-lg-6 mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0">{{ item.trimestre }}</h5>
-            </div>
-            <div class="card-body">
-                {% if item.table_html %}
-                {{ item.table_html|safe }}
-                {% else %}
-                <p class="text-muted mb-0">{{ item.message }}</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-{% if graphs.transition_heatmap %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-dark text-white">
-                <h5 class="mb-0"><i class="bi bi-grid-3x3-gap"></i> Heatmaps de transition</h5>
-            </div>
-            <div class="card-body text-center">
-                <img
-                    src="data:image/png;base64,{{ graphs.transition_heatmap }}"
-                    alt="Heatmaps de transition trimestrielle"
-                    class="img-fluid rounded"
-                >
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% if results.transition_tables %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-arrow-left-right"></i> Matrices de transition</h4>
-    </div>
-    {% for item in results.transition_tables %}
-    <div class="col-12 mb-4">
-        <div class="card">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">{{ item.label }} - {{ item.nb_clients }} clients</h5>
-            </div>
-            <div class="card-body">
-                <p class="text-muted">
-                    Stables: {{ item.stables }} | Migrants: {{ item.migrants }}
-                </p>
-                <div class="row">
-                    <div class="col-lg-6">
-                        <h6>Effectifs</h6>
-                        {{ item.effectifs_html|safe }}
-                    </div>
-                    <div class="col-lg-6">
-                        <h6>Pourcentages</h6>
-                        {{ item.pourcentages_html|safe }}
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-{% endif %}
-
-{% if mode != 'quarterly_notebook' and kpis %}
-<!-- KPI Cards -->
-<div class="row mb-4">
-    <div class="col-md-2">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-danger">{{ kpis.nb_clusters }}</h2>
-                <p class="text-muted mb-0 small">K optimal</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-success">{{ kpis.silhouette_score }}</h2>
-                <p class="text-muted mb-0 small">Silhouette</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-warning">{{ kpis.davies_bouldin_score }}</h2>
-                <p class="text-muted mb-0 small">Davies-Bouldin</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-info">{{ kpis.calinski_harabasz_score }}</h2>
-                <p class="text-muted mb-0 small">Calinski-Harabasz</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-primary">{{ kpis.nb_clients }}</h2>
-                <p class="text-muted mb-0 small">Clients</p>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-2">
-        <div class="card text-center">
-            <div class="card-body">
-                <h2 class="text-secondary">{{ kpis.nb_features }}</h2>
-                <p class="text-muted mb-0 small">Features</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Elbow + Silhouette -->
-{% if graphs.elbow_silhouette %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Sélection du K optimal</h5>
-            </div>
-            <div class="card-body">
-                {{ graphs.elbow_silhouette|safe }}
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- PCA + Distribution -->
-<div class="row mb-4">
-    {% if graphs.clustering_pca %}
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="bi bi-scatter-chart"></i> Visualisation PCA 2D</h5>
-            </div>
-            <div class="card-body">
-                {{ graphs.clustering_pca|safe }}
-            </div>
-        </div>
-    </div>
+    </section>
     {% endif %}
-
-    {% if graphs.cluster_distribution %}
-    <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="bi bi-pie-chart"></i> Distribution</h5>
-            </div>
-            <div class="card-body">
-                {{ graphs.cluster_distribution|safe }}
-            </div>
-        </div>
-    </div>
     {% endif %}
 </div>
-
-<!-- Cluster Profiles -->
-{% if results.profiles %}
-<div class="row mb-4">
-    <div class="col-12">
-        <h4 class="mb-3"><i class="bi bi-person-lines-fill"></i> Profils des Clusters</h4>
-    </div>
-</div>
-
-<div class="row mb-4">
-    {% for profile in results.profiles %}
-    <div class="col-lg-{% widthratio 12 kpis.nb_clusters 1 %}{% if kpis.nb_clusters > 4 %}3{% endif %} mb-4">
-        <div class="card h-100">
-            <div class="card-header bg-danger text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-people-fill"></i>
-                    Cluster {{ profile.id }}
-                    <span class="badge bg-light text-dark float-end">{{ profile.nb_clients }} clients ({{ profile.pct }}%)</span>
-                </h5>
-            </div>
-            <div class="card-body">
-                <!-- KPIs -->
-                <h6 class="text-muted mb-2"><i class="bi bi-cash-coin"></i> Comportement d'achat</h6>
-                <table class="table table-sm table-borderless mb-3">
-                    <tr>
-                        <td class="text-muted small">CA Total moyen</td>
-                        <td class="text-end fw-bold">{{ profile.ca_total_moyen|floatformat:0 }} €</td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted small">Panier moyen</td>
-                        <td class="text-end fw-bold">{{ profile.panier_moyen|floatformat:0 }} €</td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted small">Nb commandes moy.</td>
-                        <td class="text-end fw-bold">{{ profile.nb_commandes_moyen|floatformat:1 }}</td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted small">Quantité moyenne</td>
-                        <td class="text-end fw-bold">{{ profile.qty_total_moyen|floatformat:0 }}</td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted small">Délai moyen</td>
-                        <td class="text-end fw-bold">{{ profile.delai_moyen|floatformat:0 }} j</td>
-                    </tr>
-                    <tr>
-                        <td class="text-muted small">Familles achetées</td>
-                        <td class="text-end fw-bold">{{ profile.nb_familles_moyen|floatformat:1 }}</td>
-                    </tr>
-                </table>
-
-                <!-- Top Familles -->
-                {% if profile.top_familles %}
-                <h6 class="text-muted mb-2"><i class="bi bi-box-seam"></i> Top Familles (CA moy.)</h6>
-                <ul class="list-unstyled small mb-3">
-                    {% for fam in profile.top_familles %}
-                    <li class="d-flex justify-content-between">
-                        <span class="text-truncate" style="max-width: 70%;">{{ fam.nom }}</span>
-                        <span class="fw-bold">{{ fam.ca_moyen|floatformat:0 }} €</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-
-                <!-- Top Pays -->
-                {% if profile.top_pays %}
-                <h6 class="text-muted mb-2"><i class="bi bi-globe2"></i> Top Pays</h6>
-                <ul class="list-unstyled small mb-0">
-                    {% for pays in profile.top_pays %}
-                    <li class="d-flex justify-content-between">
-                        <span>{{ pays.pays }}</span>
-                        <span class="fw-bold">{{ pays.count }} ({{ pays.pct }}%)</span>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    {% endfor %}
-</div>
-{% endif %}
-
-<!-- Métriques détaillées -->
-{% if results.k_metrics %}
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0"><i class="bi bi-table"></i> Métriques par K</h5>
-            </div>
-            <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover">
-                        <thead>
-                            <tr>
-                                <th>K</th>
-                                <th>Inertie</th>
-                                <th>Silhouette</th>
-                                <th>Davies-Bouldin</th>
-                                <th>Calinski-Harabasz</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for m in results.k_metrics %}
-                            <tr {% if m.k == kpis.nb_clusters %}class="table-success fw-bold"{% endif %}>
-                                <td>{{ m.k }}{% if m.k == kpis.nb_clusters %} ⭐{% endif %}</td>
-                                <td>{{ m.inertia|floatformat:0 }}</td>
-                                <td>{{ m.silhouette|floatformat:4 }}</td>
-                                <td>{{ m.davies_bouldin|floatformat:4 }}</td>
-                                <td>{{ m.calinski_harabasz|floatformat:0 }}</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% endif %}
 
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'client_analytics/analysis_pages.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('clusterForm');
+    if (!form) return;
+
+    const modeInputs = form.querySelectorAll('input[name="mode"]');
+    const temporalOnly = form.querySelectorAll('.cluster-temporal-only');
+    const granularitySelect = document.getElementById('granularity');
+    const periodData = {{ period_options_json|safe }};
+
+    function activeMode() {
+        return form.querySelector('input[name="mode"]:checked')?.value || 'static';
+    }
+
+    function syncMode() {
+        const temporal = activeMode() === 'temporal';
+        temporalOnly.forEach(el => el.style.display = temporal ? '' : 'none');
+    }
+
+    function fillSelect(select, values, selected, fallbackToEnd) {
+        if (!select) return;
+        const current = selected || select.value;
+        select.innerHTML = '';
+        if (!values.length) {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'Aucune periode';
+            select.appendChild(option);
+            return;
+        }
+        values.forEach(value => {
+            const option = document.createElement('option');
+            option.value = value;
+            option.textContent = value;
+            select.appendChild(option);
+        });
+        const fallback = fallbackToEnd ? values[values.length - 1] : values[0];
+        select.value = values.includes(current) ? current : fallback;
+    }
+
+    function syncPeriods() {
+        const values = periodData[granularitySelect.value] || [];
+        fillSelect(document.getElementById('periodStart'), values, '{{ period_start|default:""|escapejs }}', false);
+        fillSelect(document.getElementById('periodEnd'), values, '{{ period_end|default:""|escapejs }}', true);
+    }
+
+    modeInputs.forEach(input => input.addEventListener('change', syncMode));
+    granularitySelect?.addEventListener('change', syncPeriods);
+    syncMode();
+    syncPeriods();
+});
+</script>
 {% endblock %}

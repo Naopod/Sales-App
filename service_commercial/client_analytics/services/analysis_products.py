@@ -17,7 +17,7 @@ def _first_existing_column(df: pd.DataFrame, candidates: list[str]) -> str | Non
 
 
 def _minmax(series: pd.Series) -> pd.Series:
-    s = pd.to_numeric(series, errors='coerce')
+    s = pd.to_numeric(series, errors='coerce').replace([np.inf, -np.inf], np.nan)
     if s.isna().all():
         return pd.Series([0.0] * len(series), index=series.index)
     vmin = float(np.nanmin(s.values))
@@ -25,6 +25,145 @@ def _minmax(series: pd.Series) -> pd.Series:
     if vmax - vmin == 0:
         return pd.Series([0.5] * len(series), index=series.index)
     return (s - vmin) / (vmax - vmin)
+
+
+def _classe_abc(cumul: float) -> str:
+    if pd.isna(cumul):
+        return 'C'
+    if cumul <= 80:
+        return 'A'
+    if cumul <= 95:
+        return 'B'
+    return 'C'
+
+
+def _build_family_stats(base_df: pd.DataFrame, deviation_col: str | None = None) -> dict:
+    """Build family-level ABC and scoring tables for a dataframe scope."""
+    if base_df is None or base_df.empty or 'Famille' not in base_df.columns or 'Montant' not in base_df.columns:
+        empty = pd.DataFrame()
+        return {
+            'stats': empty,
+            'abc_summary': {},
+            'classe_a_df': empty,
+            'classe_b_df': empty,
+            'classe_c_df': empty,
+            'classe_a_ca': 0.0,
+            'classe_b_ca': 0.0,
+            'classe_c_ca': 0.0,
+            'classe_a_part': 0.0,
+            'classe_b_part': 0.0,
+            'classe_c_part': 0.0,
+            'top20_score_df': empty,
+        }
+
+    base = base_df.copy()
+    base['Montant'] = pd.to_numeric(base.get('Montant'), errors='coerce')
+    base['Quantité'] = pd.to_numeric(base.get('Quantité'), errors='coerce') if 'Quantité' in base.columns else 0
+
+    agg = {'Montant': 'sum'}
+    if 'Quantité' in base.columns:
+        agg['Quantité'] = 'sum'
+    if 'N° Bon' in base.columns:
+        agg['N° Bon'] = pd.Series.nunique
+    if 'Cpt Client' in base.columns:
+        agg['Cpt Client'] = pd.Series.nunique
+    if 'Lead_Time_Days' in base.columns:
+        agg['Lead_Time_Days'] = 'median'
+
+    stats = base.groupby('Famille', sort=False).agg(agg)
+    stats = stats.rename(
+        columns={
+            'Montant': 'CA_Total',
+            'Quantité': 'Qty_Total',
+            'N° Bon': 'Nb_Commandes',
+            'Cpt Client': 'Nb_Clients',
+            'Lead_Time_Days': 'LeadTime_Median',
+        }
+    )
+
+    if deviation_col and deviation_col in base.columns:
+        dev_p90 = base.groupby('Famille', sort=False)[deviation_col].quantile(0.90)
+        stats['Deviation_P90'] = pd.to_numeric(dev_p90, errors='coerce')
+        late_rate = base.groupby('Famille', sort=False).apply(
+            lambda x: (pd.to_numeric(x[deviation_col], errors='coerce') > 0).mean()
+        )
+        stats['Late_Rate_Pct'] = pd.to_numeric(late_rate, errors='coerce') * 100.0
+    else:
+        stats['Deviation_P90'] = np.nan
+        stats['Late_Rate_Pct'] = np.nan
+
+    stats = stats.reset_index()
+    stats['Qty_Total'] = pd.to_numeric(stats.get('Qty_Total'), errors='coerce')
+    stats['CA_Total'] = pd.to_numeric(stats.get('CA_Total'), errors='coerce')
+    stats['PU_Pondere'] = np.where(
+        stats['Qty_Total'].fillna(0) > 0,
+        stats['CA_Total'] / stats['Qty_Total'],
+        np.nan,
+    )
+
+    total_ca = float(stats['CA_Total'].fillna(0).sum())
+    stats = stats.sort_values('CA_Total', ascending=False, na_position='last')
+    stats['Part_Pct'] = np.where(total_ca > 0, (stats['CA_Total'] / total_ca) * 100.0, 0.0)
+    stats['Part_Cumul_Pct'] = stats['Part_Pct'].cumsum()
+    stats['Rang'] = np.arange(1, len(stats) + 1)
+    stats['Classe_ABC'] = stats['Part_Cumul_Pct'].apply(_classe_abc)
+
+    abc_df = (
+        stats.groupby('Classe_ABC', dropna=False)
+        .agg(CA_Total=('CA_Total', 'sum'), Nb_Familles=('Famille', 'count'), Part_CA_Pct=('Part_Pct', 'sum'))
+        .reset_index()
+    )
+    abc_summary = {
+        row['Classe_ABC']: {
+            'CA_Total': float(pd.to_numeric(row['CA_Total'], errors='coerce') or 0.0),
+            'Nb_Familles': int(row['Nb_Familles'] or 0),
+            'Part_CA_Pct': float(pd.to_numeric(row['Part_CA_Pct'], errors='coerce') or 0.0),
+        }
+        for _, row in abc_df.iterrows()
+    }
+
+    classe_a_df = stats[stats['Classe_ABC'] == 'A'].head(20)
+    classe_b_df = stats[stats['Classe_ABC'] == 'B'].head(20)
+    classe_c_df = stats[stats['Classe_ABC'] == 'C'].head(20)
+
+    score_ca = _minmax(stats['CA_Total'])
+    score_qty = _minmax(stats['Qty_Total'])
+    score_pu = _minmax(stats['PU_Pondere'])
+    if 'Late_Rate_Pct' in stats.columns and stats['Late_Rate_Pct'].notna().any():
+        service = 1.0 - _minmax(stats['Late_Rate_Pct'])
+    else:
+        service = pd.Series([0.5] * len(stats), index=stats.index)
+
+    score_global = (0.45 * score_ca + 0.20 * score_qty + 0.20 * score_pu + 0.15 * service) * 100.0
+    stats['Score_Global'] = (
+        pd.to_numeric(score_global, errors='coerce')
+        .replace([np.inf, -np.inf], np.nan)
+        .fillna(0)
+        .clip(lower=0, upper=100)
+        .round(2)
+    )
+    stats['Rank_Score'] = (
+        stats['Score_Global']
+        .rank(ascending=False, method='dense', na_option='bottom')
+        .fillna(len(stats) if len(stats) else 0)
+        .astype(int)
+    )
+    top20_score_df = stats.sort_values(['Score_Global', 'CA_Total'], ascending=False).head(20)
+
+    return {
+        'stats': stats,
+        'abc_summary': abc_summary,
+        'classe_a_df': classe_a_df,
+        'classe_b_df': classe_b_df,
+        'classe_c_df': classe_c_df,
+        'classe_a_ca': float(pd.to_numeric(classe_a_df['CA_Total'], errors='coerce').fillna(0).sum()),
+        'classe_b_ca': float(pd.to_numeric(classe_b_df['CA_Total'], errors='coerce').fillna(0).sum()),
+        'classe_c_ca': float(pd.to_numeric(classe_c_df['CA_Total'], errors='coerce').fillna(0).sum()),
+        'classe_a_part': float(pd.to_numeric(classe_a_df['Part_Pct'], errors='coerce').fillna(0).sum()),
+        'classe_b_part': float(pd.to_numeric(classe_b_df['Part_Pct'], errors='coerce').fillna(0).sum()),
+        'classe_c_part': float(pd.to_numeric(classe_c_df['Part_Pct'], errors='coerce').fillna(0).sum()),
+        'top20_score_df': top20_score_df,
+    }
 
 
 def analyze_product_families(
@@ -88,12 +227,16 @@ def analyze_product_families(
         # Mapping colonnes temps imposées
         if time_granularity == 'month':
             time_col = 'Month'
+            period_label = 'Mois'
         elif time_granularity == 'quarter':
             time_col = 'Fiscal_Quarter'
+            period_label = 'Trimestre'
         elif time_granularity == 'year':
             time_col = 'Fiscal_Year_Label'
+            period_label = 'Année fiscale'
         else:
             time_col = 'Month'
+            period_label = 'Mois'
 
         required_cols = ['Famille', 'Montant', 'Quantité', 'PU Net', 'N° Bon', 'Cpt Client', 'Country', 'Lead_Time_Days']
         missing_required = [c for c in required_cols if c not in df_final.columns]
@@ -129,94 +272,23 @@ def analyze_product_families(
             out['error'] = "Colonne 'Montant' manquante"
             return out
 
-        # Aggrégats par famille
+        # Agrégats par famille sur le périmètre complet
         base = df_final.copy()
         base['Montant'] = pd.to_numeric(base.get('Montant'), errors='coerce')
         base['Quantité'] = pd.to_numeric(base.get('Quantité'), errors='coerce')
-
-        agg = {
-            'Montant': 'sum',
-        }
-        if 'Quantité' in base.columns:
-            agg['Quantité'] = 'sum'
-        if 'N° Bon' in base.columns:
-            agg['N° Bon'] = pd.Series.nunique
-        if 'Cpt Client' in base.columns:
-            agg['Cpt Client'] = pd.Series.nunique
-        if 'Lead_Time_Days' in base.columns:
-            agg['Lead_Time_Days'] = 'median'
-
-        stats = base.groupby('Famille', sort=False).agg(agg)
-        stats = stats.rename(
-            columns={
-                'Montant': 'CA_Total',
-                'Quantité': 'Qty_Total',
-                'N° Bon': 'Nb_Commandes',
-                'Cpt Client': 'Nb_Clients',
-                'Lead_Time_Days': 'LeadTime_Median',
-            }
-        )
-
-        if deviation_col:
-            dev = pd.to_numeric(base[deviation_col], errors='coerce')
-            # P90 par famille
-            dev_p90 = base.groupby('Famille', sort=False)[deviation_col].quantile(0.90)
-            stats['Deviation_P90'] = pd.to_numeric(dev_p90, errors='coerce')
-            # Late rate % (déviation > 0)
-            late_rate = base.groupby('Famille', sort=False).apply(
-                lambda x: (pd.to_numeric(x[deviation_col], errors='coerce') > 0).mean()
-            )
-            stats['Late_Rate_Pct'] = pd.to_numeric(late_rate, errors='coerce') * 100.0
-        else:
-            stats['Deviation_P90'] = np.nan
-            stats['Late_Rate_Pct'] = np.nan
-
-        stats = stats.reset_index()
-
-        # Compléments
-        stats['Qty_Total'] = pd.to_numeric(stats.get('Qty_Total'), errors='coerce')
-        stats['CA_Total'] = pd.to_numeric(stats.get('CA_Total'), errors='coerce')
-        stats['PU_Pondere'] = np.where(stats['Qty_Total'].fillna(0) > 0, stats['CA_Total'] / stats['Qty_Total'], np.nan)
-
-        total_ca = float(stats['CA_Total'].fillna(0).sum())
-        stats = stats.sort_values('CA_Total', ascending=False, na_position='last')
-        stats['Part_Pct'] = np.where(total_ca > 0, (stats['CA_Total'] / total_ca) * 100.0, 0.0)
-        stats['Part_Cumul_Pct'] = stats['Part_Pct'].cumsum()
-        stats['Rang'] = np.arange(1, len(stats) + 1)
-
-        def _classe_abc(cumul: float) -> str:
-            if pd.isna(cumul):
-                return 'C'
-            if cumul <= 80:
-                return 'A'
-            if cumul <= 95:
-                return 'B'
-            return 'C'
-
-        stats['Classe_ABC'] = stats['Part_Cumul_Pct'].apply(_classe_abc)
-
-        # ABC summary -> dict
-        abc_df = (
-            stats.groupby('Classe_ABC', dropna=False)
-            .agg(CA_Total=('CA_Total', 'sum'), Nb_Familles=('Famille', 'count'), Part_CA_Pct=('Part_Pct', 'sum'))
-            .reset_index()
-        )
-        abc_summary = {row['Classe_ABC']: {
-            'CA_Total': float(pd.to_numeric(row['CA_Total'], errors='coerce') or 0.0),
-            'Nb_Familles': int(row['Nb_Familles'] or 0),
-            'Part_CA_Pct': float(pd.to_numeric(row['Part_CA_Pct'], errors='coerce') or 0.0),
-        } for _, row in abc_df.iterrows()}
-
-        classe_a_df = stats[stats['Classe_ABC'] == 'A'].head(20)
-        classe_b_df = stats[stats['Classe_ABC'] == 'B'].head(20)
-        classe_c_df = stats[stats['Classe_ABC'] == 'C'].head(20)
-
-        classe_a_ca = float(pd.to_numeric(classe_a_df['CA_Total'], errors='coerce').fillna(0).sum())
-        classe_b_ca = float(pd.to_numeric(classe_b_df['CA_Total'], errors='coerce').fillna(0).sum())
-        classe_c_ca = float(pd.to_numeric(classe_c_df['CA_Total'], errors='coerce').fillna(0).sum())
-        classe_a_part = float(pd.to_numeric(classe_a_df['Part_Pct'], errors='coerce').fillna(0).sum())
-        classe_b_part = float(pd.to_numeric(classe_b_df['Part_Pct'], errors='coerce').fillna(0).sum())
-        classe_c_part = float(pd.to_numeric(classe_c_df['Part_Pct'], errors='coerce').fillna(0).sum())
+        family_pack = _build_family_stats(base, deviation_col=deviation_col)
+        stats = family_pack['stats']
+        abc_summary = family_pack['abc_summary']
+        classe_a_df = family_pack['classe_a_df']
+        classe_b_df = family_pack['classe_b_df']
+        classe_c_df = family_pack['classe_c_df']
+        classe_a_ca = family_pack['classe_a_ca']
+        classe_b_ca = family_pack['classe_b_ca']
+        classe_c_ca = family_pack['classe_c_ca']
+        classe_a_part = family_pack['classe_a_part']
+        classe_b_part = family_pack['classe_b_part']
+        classe_c_part = family_pack['classe_c_part']
+        top20_score_df = family_pack['top20_score_df']
 
         # Segmentation volume x valeur (médianes)
         median_qty = float(pd.to_numeric(stats['Qty_Total'], errors='coerce').median()) if 'Qty_Total' in stats.columns else np.nan
@@ -259,20 +331,6 @@ def analyze_product_families(
             return ', '.join(fams[:limit]) + f"… (+{len(fams) - limit})"
 
         segment_summary_df['Familles_Preview'] = segment_summary_df['Familles'].apply(_families_preview)
-
-        # Score global (0-100)
-        score_ca = _minmax(stats['CA_Total'])
-        score_qty = _minmax(stats['Qty_Total'])
-        score_pu = _minmax(stats['PU_Pondere'])
-        if 'Late_Rate_Pct' in stats.columns and stats['Late_Rate_Pct'].notna().any():
-            service = 1.0 - _minmax(stats['Late_Rate_Pct'])
-        else:
-            service = pd.Series([0.5] * len(stats), index=stats.index)
-
-        score_global = (0.45 * score_ca + 0.20 * score_qty + 0.20 * score_pu + 0.15 * service) * 100.0
-        stats['Score_Global'] = pd.to_numeric(score_global, errors='coerce').round(2)
-        stats['Rank_Score'] = stats['Score_Global'].rank(ascending=False, method='dense').astype(int)
-        top20_score_df = stats.sort_values(['Score_Global', 'CA_Total'], ascending=False).head(20)
 
         # Corr Spearman
         corr_cols = [

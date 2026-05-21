@@ -181,22 +181,12 @@
 
 <div class="row mb-4">
     {% if geo_graphs.classification %}
-    <div class="col-md-6">
+    <div class="col-12">
         <div class="card">
             <div class="card-header bg-warning text-dark">
                 <h5 class="mb-0">Répartition par Classification</h5>
             </div>
             <div class="card-body">{{ geo_graphs.classification|safe }}</div>
-        </div>
-    </div>
-    {% endif %}
-    {% if geo_graphs.score_distribution %}
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0">Distribution des Scores Globaux</h5>
-            </div>
-            <div class="card-body">{{ geo_graphs.score_distribution|safe }}</div>
         </div>
     </div>
     {% endif %}

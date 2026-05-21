@@ -384,7 +384,7 @@ def create_ca_repartition_pie(df, time_col, value_col, granularity='month'):
 
 def create_top_periods_bar(df, time_col, value_col, granularity='month', n_top=5, direction='top'):
     """
-    Crée un graphique en barres des top/bottom N périodes par CA, triées chronologiquement
+    Crée un graphique en barres classé des top/bottom N périodes par CA.
     
     Args:
         df: DataFrame
@@ -424,21 +424,31 @@ def create_top_periods_bar(df, time_col, value_col, granularity='month', n_top=5
         # Sélectionner top ou bottom
         if direction == 'top':
             selected = agg_data.nlargest(n_top)
+            selected = selected.sort_values(ascending=False)
         else:
             selected = agg_data.nsmallest(n_top)
-        
-        # Trier par index (ordre chronologique) au lieu de par valeur
-        selected = selected.sort_index()
+            selected = selected.sort_values(ascending=True)
+
+        ranked_labels = [
+            f"#{rank} {period}"
+            for rank, period in enumerate(selected.index.astype(str), start=1)
+        ]
+        rank_colors = (
+            px.colors.sequential.Greens_r[:len(selected)]
+            if direction == 'top'
+            else px.colors.sequential.Reds[:len(selected)]
+        )
         
         fig = go.Figure(data=[go.Bar(
-            y=selected.index,
+            y=ranked_labels,
             x=selected.values,
             orientation='h',
-            marker_color=color,
+            marker_color=rank_colors or color,
             text=selected.values.round(0),
+            customdata=selected.index.astype(str),
             texttemplate='%{text:,.0f}€',
             textposition='outside',
-            hovertemplate='<b>%{y}</b><br>CA: %{x:,.0f}€<extra></extra>'
+            hovertemplate='<b>%{customdata}</b><br>Rang: %{y}<br>CA: %{x:,.0f}€<extra></extra>'
         )])
         
         fig.update_layout(
@@ -455,7 +465,8 @@ def create_top_periods_bar(df, time_col, value_col, granularity='month', n_top=5
                 gridcolor='rgba(200,200,200,0.3)'
             ),
             yaxis=dict(
-                tickfont=dict(size=10)
+                tickfont=dict(size=10),
+                autorange='reversed'
             )
         )
         

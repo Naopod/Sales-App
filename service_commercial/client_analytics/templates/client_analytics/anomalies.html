@@ -161,7 +161,7 @@
       |z| ∈ [1, 2] → légère déviation &nbsp;|&nbsp;
       |z| ∈ [2, 3] → signal notable &nbsp;|&nbsp;
       |z| &gt; 3 → forte anomalie<br>
-      <strong>Cas MAD = 0</strong> (client historiquement très régulier) : toute déviation reçoit z = ±999 — l'alerte est maximale car le comportement était parfaitement stable.
+      <strong>Cas MAD = 0</strong> (client historiquement très régulier) : la déviation est conservée comme anomalie forte, mais le z-score est plafonné à ±6. Les clients sans assez d'historique sont sortis du classement principal.
     </div>
     <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
       <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">3</span>
@@ -222,7 +222,8 @@
         bad_z = max(0, −z)    &nbsp;← pour CA/Qté/Commandes/Familles/Activité (baisses = danger)<br>
         bad_z = max(0,  z)    &nbsp;← pour HHI (hausse = danger)<br>
         bad_z = |z|           &nbsp;← pour PU (toute déviation = signal)<br>
-        contribution = poids × min(bad_z, 3) ÷ 3
+        contribution = poids × min(bad_z, 3) ÷ 3<br>
+        z utilisé = z plafonné dans [-6, +6]
       </div>
       <div class="mt-2"><strong>2. Score brut pondéré :</strong></div>
       <div class="ms-3 mt-1">
@@ -296,21 +297,21 @@
       </div>
       <div class="col-md-4">
         <div class="border rounded p-2 text-center" style="font-size:0.8rem;">
-          <div class="fw-700 fs-4" style="color:var(--accent);">3</div>
+          <div class="fw-700 fs-4" style="color:var(--accent);">4</div>
           <div>mois minimum requis</div>
           <div style="font-size:0.72rem;color:var(--text-muted);">pour qu'un client soit analysé</div>
         </div>
       </div>
       <div class="col-md-4">
         <div class="border rounded p-2 text-center" style="font-size:0.8rem;">
-          <div class="fw-700 fs-4" style="color:var(--accent);">2</div>
-          <div>mois min pour le deep-dive</div>
+          <div class="fw-700 fs-4" style="color:var(--accent);">6</div>
+          <div>mois pour une fiabilité forte</div>
           <div style="font-size:0.72rem;color:var(--text-muted);">sparklines et historique score</div>
         </div>
       </div>
     </div>
     <p style="font-size:0.8rem;">
-      La baseline est calculée sur les <strong>6 mois précédant</strong> le mois analysé (jamais le mois courant — pas de fuite). Si le client a moins de 6 mois d'historique, la fenêtre est réduite proportionnellement (<code>min_periods=3</code>).
+      La baseline est calculée sur les <strong>6 mois précédant</strong> le mois analysé (jamais le mois courant — pas de fuite). Un client doit avoir au moins 4 mois pour entrer dans le classement. Entre 4 et 5 mois, il est analysé avec une fiabilité faible.
     </p>
     <h6 class="fw-700 mb-2 mt-4" style="color:var(--accent);">
       <span class="badge rounded-pill me-2" style="background:var(--accent);color:#fff;font-size:0.75rem;">∑</span>
@@ -353,9 +354,9 @@
       <i class="bi bi-info-circle me-1"></i> Limites &amp; points d'attention
     </h6>
     <ul style="font-size:0.8rem;" class="mb-4">
-      <li><strong>Historique court (&lt; 6 mois) :</strong> la baseline est moins stable, les z-scores peuvent être bruiteux. Un client avec 2-3 mois de données sera dans le tableau mais avec une fiabilité réduite.</li>
+      <li><strong>Historique court (&lt; 6 mois) :</strong> la baseline est moins stable. Les clients avec 4-5 mois sont gardés avec une fiabilité faible ; ceux avec moins de 4 mois sont listés à part.</li>
       <li><strong>Saisonnalité :</strong> le moteur compare le mois courant à une baseline glissante. Si votre secteur a une forte saisonnalité annuelle (ex. pic décembre), les mois de pointe peuvent générer de faux positifs. Une version future intégrera la décomposition saisonnière STL.</li>
-      <li><strong>Nouveaux clients :</strong> les clients avec moins de 3 mois d'historique sont exclus de l'analyse (historique insuffisant pour calculer une baseline).</li>
+      <li><strong>Nouveaux clients :</strong> les clients avec moins de 4 mois d'historique sont exclus du classement d'anomalies, car la baseline n'est pas assez robuste.</li>
       <li><strong>Colonnes manquantes :</strong> si les colonnes Famille, Quantité ou N° Bon sont absentes du dataset, les signaux correspondants (HHI, Qté, PU, Commandes) sont ignorés et le score est calculé sur les signaux disponibles.</li>
       <li><strong>CUSUM :</strong> sensible uniquement au CA (signal le plus représentatif). Une baisse de diversité produit seule sans impact CA peut ne pas déclencher le CUSUM.</li>
     </ul>
@@ -385,12 +386,48 @@
     <div class="bm-kpi-num" style="color:var(--text-primary)">{{ portfolio.portfolio|length }}</div>
     <div class="bm-kpi-label">Clients analysés</div>
   </div>
+  <div class="bm-kpi-card">
+    <div class="bm-kpi-num" style="color:var(--text-secondary)">{{ portfolio.excluded_clients|length }}</div>
+    <div class="bm-kpi-label">Historique insuffisant</div>
+  </div>
   {% if portfolio.latest_period %}
   <div class="bm-kpi-card">
     <div class="bm-kpi-num" style="font-size:1.1rem;color:var(--text-secondary)">{{ portfolio.latest_period }}</div>
     <div class="bm-kpi-label">Dernière période</div>
   </div>
   {% endif %}
+</div>
+{% endif %}
+{% if portfolio.excluded_clients %}
+<div class="alert alert-light border d-flex align-items-start gap-2 mb-4">
+  <i class="bi bi-info-circle-fill text-primary mt-1"></i>
+  <div>
+    <strong>{{ portfolio.excluded_clients|length }} client{{ portfolio.excluded_clients|length|pluralize }} non classé{{ portfolio.excluded_clients|length|pluralize }} en anomalie.</strong>
+    Leur historique est trop court pour calculer une baseline robuste. Ils restent visibles ici, mais ne faussent plus le classement principal.
+    <details class="mt-2">
+      <summary style="cursor:pointer;">Voir les premiers clients concernés</summary>
+      <div class="table-responsive mt-2">
+        <table class="table table-sm mb-0">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th class="text-end">Mois disponibles</th>
+              <th>Raison</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in portfolio.excluded_clients|slice:":20" %}
+            <tr>
+              <td>{{ item.client_id }}</td>
+              <td class="text-end">{{ item.nb_months }}</td>
+              <td class="text-muted">{{ item.reason }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </div>
 </div>
 {% endif %}
 <div class="row g-4">
@@ -426,7 +463,18 @@
                 {% if row.top_signal %}
                 <div style="font-size:0.7rem;color:var(--text-secondary);">
                   Signal: <em>{{ row.top_signal }}</em>
-                  {% if row.top_signal_z %}<span class="ms-1">(z={{ row.top_signal_z }})</span>{% endif %}
+                  {% if row.top_signal_z_label %}<span class="ms-1">(z {{ row.top_signal_z_label }})</span>{% endif %}
+                </div>
+                {% endif %}
+                {% if row.reliability %}
+                <div class="mt-1" style="font-size:0.68rem;">
+                  {% if row.reliability.level == 'high' %}
+                    <span class="badge bg-success-subtle text-success border border-success-subtle">{{ row.reliability.label }}</span>
+                  {% elif row.reliability.level == 'medium' %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle">{{ row.reliability.label }}</span>
+                  {% else %}
+                    <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ row.reliability.label }}</span>
+                  {% endif %}
                 </div>
                 {% endif %}
               </td>
@@ -623,6 +671,15 @@ function renderDeepDive(data) {
     const cusumHtml = data.cusum_alert
         ? `<span class="bm-cusum-alert ms-2"><i class="bi bi-lightning-charge-fill me-1"></i>CUSUM déclenché — changement structurel</span>`
         : '';
+    const reliability = data.reliability || {};
+    const reliabilityColor = reliability.level === 'high'
+        ? '#16a34a'
+        : reliability.level === 'medium'
+            ? '#f97316'
+            : '#64748b';
+    const reliabilityHtml = reliability.label
+        ? `<span class="badge border ms-2" style="color:${reliabilityColor};border-color:${reliabilityColor}55;background:${reliabilityColor}14;">${reliability.label}</span>`
+        : '';
     // Alert score history mini-chart (Chart.js inline)
     const chartId = `bmScoreChart_${Date.now()}`;
     const alertHistory = data.alert_score_history || [];
@@ -643,7 +700,9 @@ function renderDeepDive(data) {
         <div class="mb-2" style="font-size:0.8rem;color:var(--text-secondary);">
           <i class="bi bi-calendar3 me-1"></i> Dernière période : <strong>${data.latest_month || '—'}</strong>
           &nbsp;|&nbsp; <i class="bi bi-database me-1"></i> ${data.nb_months} mois d'historique
+          ${reliabilityHtml}
         </div>
+        ${reliability.reason ? `<div class="mb-2 small text-muted"><i class="bi bi-shield-check me-1"></i>${reliability.reason}</div>` : ''}
         <div class="bm-attribution">${data.attribution || 'Aucune attribution disponible.'}</div>
       </div>
     </div>

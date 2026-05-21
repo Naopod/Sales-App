@@ -6,6 +6,7 @@
 
 {% block extra_css %}
 <link rel="stylesheet" href="{% static 'client_analytics/analysis_pages.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css">
 <style>
 /* Plotly (onglet Produits) : éviter l'espace blanc à droite */
 .products-plotly {
@@ -39,7 +40,7 @@
                     {{ dataset.name }}
                 </h1>
                 <p class="page-subtitle">
-                    <i class="bi bi-bar-chart-fill"></i> Analyses statistiques & temporelles
+                    <i class="bi bi-bar-chart-fill"></i> Analyses statistiques, clients et portefeuille
                 </p>
             </div>
         </div>
@@ -106,11 +107,6 @@
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link {% if active_tab == 'temporal' %}active{% endif %}" id="temporal-tab" data-bs-toggle="tab" data-bs-target="#temporal" type="button" role="tab">
-            <i class="bi bi-calendar3"></i> Analyse Série temporelle
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
         <button class="nav-link {% if active_tab == 'products' %}active{% endif %}" id="products-tab" data-bs-toggle="tab" data-bs-target="#products" type="button" role="tab">
             <i class="bi bi-box-seam"></i> Analyse produits
         </button>
@@ -155,6 +151,9 @@
     <div class="tab-pane fade {% if not active_tab or active_tab == 'statistics' %}show active{% endif %}" id="stats" role="tabpanel">
         
         <h2 class="mb-4 mt-4"><i class="bi bi-bar-chart-line"></i> Analyse par périodes</h2>
+        <p class="text-muted mb-4">
+            Cette section agrège le chiffre d'affaires et les principaux indicateurs par mois, trimestre ou année fiscale pour comparer les cycles de vente et repérer les périodes les plus contributrices.
+        </p>
         
         <!-- SOUS-ONGLETS POUR PÉRIODES (masqués car déplacés en haut) -->
         <ul class="nav nav-pills mb-4 d-none" id="periodTabs" role="tablist">
@@ -889,16 +888,7 @@
     
     <!-- AJAX lazy-loaded tabs -->
 
-    <div class="tab-pane fade" id="temporal" role="tabpanel" data-ajax-tab="temporal">
-        <div class="ajax-tab-placeholder text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Chargement...</span>
-            </div>
-            <p class="mt-3 text-muted">Chargement de l'analyse serie temporelle...</p>
-        </div>
-    </div>
-
-    <div class="tab-pane fade" id="products" role="tabpanel" data-ajax-tab="products">
+    <div class="tab-pane fade {% if active_tab == 'products' %}show active{% endif %}" id="products" role="tabpanel" data-ajax-tab="products">
         <div class="ajax-tab-placeholder text-center py-5">
             <div class="spinner-border text-success" role="status">
                 <span class="visually-hidden">Chargement...</span>
@@ -907,7 +897,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="clients" role="tabpanel" data-ajax-tab="clients">
+    <div class="tab-pane fade {% if active_tab == 'clients' %}show active{% endif %}" id="clients" role="tabpanel" data-ajax-tab="clients">
         <div class="ajax-tab-placeholder text-center py-5">
             <div class="spinner-border text-info" role="status">
                 <span class="visually-hidden">Chargement...</span>
@@ -916,7 +906,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="geography" role="tabpanel" data-ajax-tab="geographic">
+    <div class="tab-pane fade {% if active_tab == 'geographic' %}show active{% endif %}" id="geography" role="tabpanel" data-ajax-tab="geographic">
         <div class="ajax-tab-placeholder text-center py-5">
             <div class="spinner-border text-warning" role="status">
                 <span class="visually-hidden">Chargement...</span>
@@ -925,7 +915,7 @@
         </div>
     </div>
 
-    <div class="tab-pane fade" id="currency" role="tabpanel" data-ajax-tab="currency">
+    <div class="tab-pane fade {% if active_tab == 'currency' %}show active{% endif %}" id="currency" role="tabpanel" data-ajax-tab="currency">
         <div class="ajax-tab-placeholder text-center py-5">
             <div class="spinner-border text-secondary" role="status">
                 <span class="visually-hidden">Chargement...</span>
@@ -1054,6 +1044,7 @@ if (seriesCanvas) {
 </script>
 {% endif %}
 
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{% static 'client_analytics/analysis_pages.js' %}"></script>
 
 <!-- Script pour toggle des sections avancées -->

@@ -673,6 +673,14 @@ def create_client_lead_time_impact_chart(monthly_summary, gap_records=None, high
         else:
             return None
 
+        x_as_dt = pd.to_datetime(df[x_col], errors='coerce')
+        if x_as_dt.notna().all():
+            df['_x'] = x_as_dt
+            is_date_axis = True
+        else:
+            df['_x'] = df[x_col]
+            is_date_axis = False
+
         # Lag-1: activity next month
         df['orders_next'] = df['nb_orders'].shift(-1)
         df['ca_next'] = df['ca'].shift(-1)

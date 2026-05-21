@@ -6,7 +6,6 @@ Structure:
 - analysis_overview.py : Onglet Overview (profiling de base)
 - analysis_clustering.py : Onglet Clustering (K-Means, RFM)
 - analysis_by_period.py : Sous-onglet Analyse par périodes
-- analysis_time_series.py : Sous-onglet Analyse Série temporelle
 - analysis_products.py : Sous-onglet Analyse produits
 - analysis_clients.py : Sous-onglet Analyse clients
 - analysis_geographic.py : Sous-onglet Analyse géographique
@@ -23,7 +22,6 @@ from . import (
     analysis_overview,
     analysis_clustering,
     analysis_by_period,
-    analysis_time_series,
     analysis_products,
     analysis_clients,
     analysis_anomalies,
@@ -37,7 +35,6 @@ __all__ = [
     'analysis_overview',
     'analysis_clustering',
     'analysis_by_period',
-    'analysis_time_series',
     'analysis_products',
     'analysis_clients',
     'analysis_anomalies',

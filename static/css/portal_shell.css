@@ -90,6 +90,14 @@ body.portal-shell {
   backdrop-filter: blur(16px);
   background: rgba(248, 243, 237, 0.78);
   border-bottom: 1px solid var(--portal-border);
+  transform: translateY(0);
+  transition: transform 0.24s ease, box-shadow 0.18s ease;
+  will-change: transform;
+}
+
+.portal-header.is-hidden {
+  transform: translateY(-100%);
+  pointer-events: none;
 }
 
 .portal-topbar {

@@ -1,14 +1,11 @@
 <nav class="analysis-nav" id="analysisNav">
     <div class="container-fluid">
-        <button class="nav-toggle-btn" id="navToggleBtn" title="Réduire/Agrandir la navigation">
-            <i class="bi bi-chevron-up"></i>
-        </button>
         <div class="analysis-tabs" id="analysisTabs">
             <a class="analysis-tab" href="{% url 'client_analytics:dataset_overview' dataset.pk %}">
                 <div class="tab-icon"><i class="bi bi-info-circle-fill"></i></div>
                 <div class="tab-content">
-                    <span class="tab-title">Overview</span>
-                    <span class="tab-subtitle">Description des données</span>
+                    <span class="tab-title">Overview des données</span>
+                    <span class="tab-subtitle">Structure du dataset</span>
                 </div>
             </a>
             <a class="analysis-tab" href="{% url 'client_analytics:stats' dataset.pk %}">
@@ -49,16 +46,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // ── Nav collapse ──────────────────────────────────────────────
-    const navToggleBtn = document.getElementById('navToggleBtn');
     const analysisNav  = document.getElementById('analysisNav');
-    if (localStorage.getItem('navCollapsed') === 'true') {
-        analysisNav.classList.add('collapsed');
-    }
-    navToggleBtn?.addEventListener('click', function() {
-        analysisNav.classList.toggle('collapsed');
-        localStorage.setItem('navCollapsed', analysisNav.classList.contains('collapsed'));
-    });
+    analysisNav?.classList.remove('collapsed');
+    localStorage.removeItem('navCollapsed');
 
     // ── Active tab detection ──────────────────────────────────────
     // Compare chaque lien au pathname courant. On préfère la

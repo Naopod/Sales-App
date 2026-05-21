@@ -559,21 +559,6 @@
             });
         });
 
-        // 4b. Resize lors du changement de sous-onglets Série temporelle (pills)
-        // (Mois / Trimestre / Année fiscale) : ces panes sont masqués au load.
-        const temporalPillButtons = document.querySelectorAll('#temporal [data-bs-toggle="pill"]');
-        temporalPillButtons.forEach(button => {
-            button.addEventListener('shown.bs.tab', (event) => {
-                const targetId = event.target.getAttribute('data-bs-target');
-                if (targetId) {
-                    const targetPane = document.querySelector(targetId);
-                    if (targetPane) {
-                        resizePlotlyIn(targetPane);
-                    }
-                }
-            });
-        });
-        
         // 5. Observer pour les sections qui deviennent visibles (display: none -> block)
         // Utile pour les sections "Analyse avancée" qui sont toggles
         const observer = new MutationObserver((mutations) => {
@@ -625,7 +610,6 @@
         // Mapping entre les ID d'onglets et les noms de tabs
         const tabMapping = {
             'stats-tab': 'statistics',
-            'temporal-tab': 'temporal',
             'products-tab': 'products',
             'clients-tab': 'clients',
             'geography-tab': 'geographic',
@@ -698,12 +682,17 @@
         const scripts = temp.querySelectorAll('script');
         const scriptContents = [];
         scripts.forEach(script => {
+            const scriptType = (script.getAttribute('type') || '').trim().toLowerCase();
+            const isExecutable = !scriptType || ['text/javascript', 'application/javascript', 'text/ecmascript', 'application/ecmascript', 'module'].includes(scriptType);
+            if (!script.src && !isExecutable) {
+                return;
+            }
             if (script.src) {
                 // Script externe
-                scriptContents.push({type: 'external', src: script.src});
+                scriptContents.push({type: 'external', src: script.src, scriptType: scriptType});
             } else {
                 // Script inline
-                scriptContents.push({type: 'inline', content: script.textContent});
+                scriptContents.push({type: 'inline', content: script.textContent, scriptType: scriptType});
             }
             script.remove(); // Retirer le script du HTML
         });
@@ -714,6 +703,7 @@
         // Exécuter les scripts un par un
         scriptContents.forEach(script => {
             const scriptElement = document.createElement('script');
+            if (script.scriptType) scriptElement.type = script.scriptType;
             if (script.type === 'external') {
                 scriptElement.src = script.src;
             } else {
@@ -732,7 +722,10 @@
         if (!datasetPk) return;
         
         // ===== 1. PORTEFEUILLE CLIENT =====
-        const clientPortfolioForms = document.querySelectorAll('form:has(select[name="client"]):has(input[name="tab"][value="clients"])');
+        const clientPortfolioForms = Array.from(document.querySelectorAll('form')).filter(form =>
+            form.querySelector('select[name="client"]') &&
+            form.querySelector('input[name="tab"][value="clients"]')
+        );
         clientPortfolioForms.forEach(form => {
             if (form.hasAttribute('data-ajax-handled')) return;
             form.setAttribute('data-ajax-handled', 'true');
@@ -741,7 +734,10 @@
                 e.preventDefault();
                 
                 const clientId = this.querySelector('select[name="client"]').value;
-                const granularity = this.querySelector('input[name="granularity"]').value || 'month';
+                const activePeriod = document.querySelector('.period-btn.active');
+                const granularityInput = this.querySelector('input[name="granularity"]');
+                const granularity = (activePeriod?.dataset.period || granularityInput?.value || 'month');
+                if (granularityInput) granularityInput.value = granularity;
                 
                 if (!clientId) {
                     alert('Veuillez sélectionner un client');
@@ -767,13 +763,22 @@
                 resultsContainer.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Chargement...</span></div></div>';
                 
                 // Requête AJAX
-                const url = `/dataset/${datasetPk}/ajax/client-portfolio/?client=${encodeURIComponent(clientId)}&granularity=${granularity}`;
+                const action = this.getAttribute('action') || `/dataset/${datasetPk}/ajax/client-portfolio/`;
+                const url = `${action}?client=${encodeURIComponent(clientId)}&granularity=${encodeURIComponent(granularity)}`;
                 
                 fetch(url)
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
                             injectHTMLWithScripts(resultsContainer, data.html);
+                            if (window.initClient360Dashboards) {
+                                window.initClient360Dashboards(resultsContainer);
+                            }
+                            const currentUrl = new URL(window.location.href);
+                            currentUrl.searchParams.set('tab', 'clients');
+                            currentUrl.searchParams.set('client', clientId);
+                            currentUrl.searchParams.set('granularity', granularity);
+                            window.history.replaceState({tab: 'clients', client: clientId}, '', currentUrl.toString());
                             // Redimensionner les graphiques Plotly si présents
                             if (window.Plotly) {
                                 setTimeout(() => {
@@ -797,7 +802,11 @@
         });
         
         // ===== 2. CORRÉLATION CIBLÉE (PRODUIT/FAMILLE) =====
-        const correlationForms = document.querySelectorAll('form:has(select[name="product"]):has(select[name="family"]):has(input[name="tab"][value="products"])');
+        const correlationForms = Array.from(document.querySelectorAll('form')).filter(form =>
+            form.querySelector('select[name="product"]') &&
+            form.querySelector('select[name="family"]') &&
+            form.querySelector('input[name="tab"][value="products"]')
+        );
         correlationForms.forEach(form => {
             if (form.hasAttribute('data-ajax-handled')) return;
             form.setAttribute('data-ajax-handled', 'true');
@@ -1005,6 +1014,7 @@
         
         console.log('🔄 AJAX forms initialized');
     }
+    window.initClientAnalyticsAjaxForms = initAjaxForms;
     
     // Initialiser quand le DOM est prêt
     if (document.readyState === 'loading') {
@@ -1032,12 +1042,18 @@
         temp.innerHTML = htmlString;
         const scripts = [];
         temp.querySelectorAll('script').forEach(s => {
-            scripts.push(s.src ? {type: 'external', src: s.src} : {type: 'inline', content: s.textContent});
+            const scriptType = (s.getAttribute('type') || '').trim().toLowerCase();
+            const isExecutable = !scriptType || ['text/javascript', 'application/javascript', 'text/ecmascript', 'application/ecmascript', 'module'].includes(scriptType);
+            if (!s.src && !isExecutable) {
+                return;
+            }
+            scripts.push(s.src ? {type: 'external', src: s.src, scriptType: scriptType} : {type: 'inline', content: s.textContent, scriptType: scriptType});
             s.remove();
         });
         container.innerHTML = temp.innerHTML;
         scripts.forEach(s => {
             const el = document.createElement('script');
+            if (s.scriptType) el.type = s.scriptType;
             if (s.type === 'external') el.src = s.src;
             else el.textContent = s.content;
             container.appendChild(el);
@@ -1046,7 +1062,6 @@
 
     // Sub-tab pill IDs for each ajax tab name
     const SUB_TAB_PILLS = {
-        temporal:   { month: 'temporal-month-tab',  quarter: 'temporal-quarter-tab',  year: 'temporal-fiscal-tab'  },
         products:   { month: 'products-month-tab',  quarter: 'products-quarter-tab',  year: 'products-fiscal-tab'  },
         geographic: { month: 'geo-month-tab',        quarter: 'geo-quarter-tab',        year: 'geo-fiscal-tab'        },
         currency:   { month: 'currency-month-tab',   quarter: 'currency-quarter-tab',   year: 'currency-fiscal-tab'   },
@@ -1084,6 +1099,11 @@
         const tabName = pane.dataset.ajaxTab;
         const period  = getCurrentPeriod();
         const params  = new URLSearchParams({ tab: tabName, granularity: period });
+        if (tabName === 'clients') {
+            const urlParams = new URLSearchParams(window.location.search);
+            const selectedClient = urlParams.get('client');
+            if (selectedClient) params.set('client', selectedClient);
+        }
 
         // Keep spinner visible during load
         fetch(`/dataset/${datasetPk}/ajax/tab/?${params}`)
@@ -1092,6 +1112,12 @@
                 if (data.success) {
                     injectHTMLWithScripts(pane, data.html);
                     pane.dataset.ajaxLoaded = 'true';
+                    if (window.initClientAnalyticsAjaxForms) {
+                        window.initClientAnalyticsAjaxForms();
+                    }
+                    if (window.initClient360Dashboards) {
+                        window.initClient360Dashboards(pane);
+                    }
                     syncPeriodInPane(pane, period);
                     resizePlotsIn(pane);
                 } else {
@@ -1310,4 +1336,575 @@
     document.addEventListener('themeChanged', () => {
         setTimeout(updatePlotlyTheme, 100);
     });
+})();
+
+// ==========================================
+// CLIENT 360 INTERACTIVE DASHBOARD
+// ==========================================
+(function() {
+    'use strict';
+
+    const PLOT_CONFIG = { responsive: true, displaylogo: false };
+
+    function asNumber(value) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : 0;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function formatMoney(value) {
+        return `${Math.round(asNumber(value)).toLocaleString('fr-FR')} €`;
+    }
+
+    function formatNumber(value, digits = 0) {
+        return asNumber(value).toLocaleString('fr-FR', {
+            minimumFractionDigits: digits,
+            maximumFractionDigits: digits
+        });
+    }
+
+    function formatPct(value) {
+        if (value === null || value === undefined || Number.isNaN(Number(value))) return '-';
+        const sign = Number(value) > 0 ? '+' : '';
+        return `${sign}${formatNumber(value, 1)}%`;
+    }
+
+    function median(values) {
+        const arr = values.map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+        if (!arr.length) return null;
+        const mid = Math.floor(arr.length / 2);
+        return arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2;
+    }
+
+    function plotlyLayout(title, extra = {}) {
+        const style = getComputedStyle(document.documentElement);
+        const grid = style.getPropertyValue('--plotly-grid').trim() || 'rgba(148,163,184,0.25)';
+        const text = style.getPropertyValue('--plotly-text').trim() || style.getPropertyValue('--text-primary').trim();
+        return Object.assign({
+            title: { text: title, font: { size: 14 } },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: text || '#334155', size: 12 },
+            margin: { l: 52, r: 36, t: 52, b: 48 },
+            hovermode: 'x unified',
+            legend: { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'left', x: 0 },
+            xaxis: { gridcolor: grid, zerolinecolor: grid, automargin: true },
+            yaxis: { gridcolor: grid, zerolinecolor: grid, automargin: true }
+        }, extra);
+    }
+
+    function getData(root) {
+        const script = root.querySelector('script[type="application/json"]');
+        if (!script) return null;
+        try {
+            return JSON.parse(script.textContent || '{}');
+        } catch (e) {
+            console.error('Client360 JSON parse error', e);
+            return null;
+        }
+    }
+
+    function setOptions(select, items, allLabel, selectedValue) {
+        if (!select) return;
+        const current = selectedValue ?? select.value;
+        const html = [`<option value="all">${escapeHtml(allLabel)}</option>`].concat(
+            (items || []).map(item => {
+                const value = item.value ?? item.label ?? item;
+                const label = item.label ?? item.value ?? item;
+                return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
+            })
+        ).join('');
+        select.innerHTML = html;
+        const values = Array.from(select.options).map(option => option.value);
+        select.value = values.includes(current) ? current : 'all';
+    }
+
+    function setPeriodOptions(select, periods, selectedValue) {
+        if (!select) return;
+        select.innerHTML = (periods || []).map(item =>
+            `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label || item.value)}</option>`
+        ).join('');
+        if (selectedValue && Array.from(select.options).some(option => option.value === selectedValue)) {
+            select.value = selectedValue;
+        }
+    }
+
+    function periodIndexMap(data) {
+        const map = new Map();
+        (data.filters?.periods || []).forEach((period, idx) => {
+            map.set(String(period.value), Number.isFinite(Number(period.index)) ? Number(period.index) : idx);
+        });
+        return map;
+    }
+
+    function initFilters(root, data, state) {
+        const filters = data.filters || {};
+        setPeriodOptions(root.querySelector('[data-client360-filter="period-start"]'), filters.periods || [], state.periodStart);
+        setPeriodOptions(root.querySelector('[data-client360-filter="period-end"]'), filters.periods || [], state.periodEnd);
+        setOptions(root.querySelector('[data-client360-filter="family"]'), filters.families || [], 'Toutes', state.family);
+        setOptions(root.querySelector('[data-client360-filter="product"]'), filters.products || [], 'Tous', state.product);
+        setOptions(root.querySelector('[data-client360-filter="country"]'), filters.countries || [], 'Toutes', state.country);
+        const metricSelect = root.querySelector('[data-client360-filter="metric"]');
+        if (metricSelect) {
+            metricSelect.innerHTML = (data.metrics || []).map(item =>
+                `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`
+            ).join('');
+            metricSelect.value = Array.from(metricSelect.options).some(option => option.value === state.metric) ? state.metric : 'ca';
+        }
+
+        root.querySelectorAll('[data-client360-filter]').forEach(select => {
+            if (select.dataset.client360Bound === 'true') return;
+            select.dataset.client360Bound = 'true';
+            select.addEventListener('change', () => {
+                const key = select.dataset.client360Filter;
+                if (key === 'period-start') state.periodStart = select.value;
+                if (key === 'period-end') state.periodEnd = select.value;
+                if (key === 'family') state.family = select.value;
+                if (key === 'product') state.product = select.value;
+                if (key === 'country') state.country = select.value;
+                if (key === 'metric') state.metric = select.value;
+                render(root, data, state);
+            });
+        });
+
+        const reset = root.querySelector('[data-client360-reset]');
+        if (reset && reset.dataset.client360Bound !== 'true') {
+            reset.dataset.client360Bound = 'true';
+            reset.addEventListener('click', () => {
+                const periods = filters.periods || [];
+                state.periodStart = periods[0]?.value || '';
+                state.periodEnd = periods[periods.length - 1]?.value || '';
+                state.family = 'all';
+                state.product = 'all';
+                state.country = 'all';
+                state.metric = 'ca';
+                initFilters(root, data, state);
+                render(root, data, state);
+            });
+        }
+    }
+
+    function filteredRecords(data, state) {
+        const pMap = periodIndexMap(data);
+        let start = pMap.get(String(state.periodStart));
+        let end = pMap.get(String(state.periodEnd));
+        if (start === undefined) start = -Infinity;
+        if (end === undefined) end = Infinity;
+        if (start > end) [start, end] = [end, start];
+
+        return (data.records || []).filter(record => {
+            const idx = Number.isFinite(Number(record.period_index)) ? Number(record.period_index) : pMap.get(String(record.period));
+            if (idx < start || idx > end) return false;
+            if (state.family !== 'all' && record.family !== state.family) return false;
+            if (state.product !== 'all' && record.product !== state.product) return false;
+            if (state.country !== 'all' && record.country !== state.country) return false;
+            return true;
+        });
+    }
+
+    function groupRecords(records, key) {
+        const map = new Map();
+        records.forEach(record => {
+            const name = record[key] || 'Non renseigne';
+            if (!map.has(name)) {
+                map.set(name, {
+                    name,
+                    ca: 0,
+                    qty: 0,
+                    orders: 0,
+                    lines: 0,
+                    families: new Set(),
+                    products: new Set(),
+                    periods: new Set(),
+                    leadValues: [],
+                    lateValues: [],
+                    unitValues: []
+                });
+            }
+            const row = map.get(name);
+            row.ca += asNumber(record.ca);
+            row.qty += asNumber(record.qty);
+            row.orders += asNumber(record.orders);
+            row.lines += asNumber(record.lines);
+            row.families.add(record.family);
+            row.products.add(record.product);
+            row.periods.add(record.period);
+            if (record.lead_time_median !== null && record.lead_time_median !== undefined) row.leadValues.push(asNumber(record.lead_time_median));
+            if (record.late_rate_pct !== null && record.late_rate_pct !== undefined) row.lateValues.push(asNumber(record.late_rate_pct));
+            if (record.unit_price !== null && record.unit_price !== undefined) row.unitValues.push(asNumber(record.unit_price));
+        });
+        return Array.from(map.values()).map(row => {
+            row.unit_price = row.qty > 0 ? row.ca / row.qty : median(row.unitValues);
+            row.lead_time_median = median(row.leadValues);
+            row.late_rate_pct = median(row.lateValues);
+            return row;
+        });
+    }
+
+    function metricValue(row, metric) {
+        if (metric === 'qty') return asNumber(row.qty);
+        if (metric === 'orders') return asNumber(row.orders);
+        if (metric === 'unit_price') return asNumber(row.unit_price);
+        if (metric === 'lead_time_median') return asNumber(row.lead_time_median);
+        return asNumber(row.ca);
+    }
+
+    function metricLabel(data, metric) {
+        const found = (data.metrics || []).find(item => item.value === metric);
+        return found ? found.label : 'CA';
+    }
+
+    function summarize(records) {
+        const ca = records.reduce((sum, row) => sum + asNumber(row.ca), 0);
+        const qty = records.reduce((sum, row) => sum + asNumber(row.qty), 0);
+        const orders = records.reduce((sum, row) => sum + asNumber(row.orders), 0);
+        return {
+            ca,
+            qty,
+            orders,
+            unit_price: qty > 0 ? ca / qty : median(records.map(row => row.unit_price)),
+            lead_time: median(records.map(row => row.lead_time_median)),
+            late_rate: median(records.map(row => row.late_rate_pct)),
+            families: new Set(records.map(row => row.family)).size,
+            products: new Set(records.map(row => row.product)).size
+        };
+    }
+
+    function renderKpis(root, data, records, state) {
+        const s = summarize(records);
+        const pMap = periodIndexMap(data);
+        let start = pMap.get(String(state.periodStart));
+        let end = pMap.get(String(state.periodEnd));
+        if (start > end) [start, end] = [end, start];
+        const anomalyCount = (data.anomalies || []).filter(item => {
+            const idx = Number.isFinite(Number(item.period_index)) ? Number(item.period_index) : pMap.get(String(item.period));
+            return idx >= start && idx <= end;
+        }).length;
+        const values = {
+            ca: formatMoney(s.ca),
+            orders: formatNumber(s.orders, 0),
+            qty: formatNumber(s.qty, 0),
+            unit_price: s.unit_price === null ? '-' : formatMoney(s.unit_price),
+            lead_time: s.lead_time === null ? '-' : `${formatNumber(s.lead_time, 1)} j`,
+            anomalies: formatNumber(anomalyCount, 0)
+        };
+        Object.entries(values).forEach(([key, value]) => {
+            const el = root.querySelector(`[data-client360-kpi="${key}"]`);
+            if (el) el.textContent = value;
+        });
+        const subs = {
+            ca: `${s.families} familles / ${s.products} produits`,
+            orders: `${formatNumber(records.length, 0)} segments`,
+            qty: state.metric === 'qty' ? 'mesure active' : 'volume total',
+            unit_price: s.qty > 0 ? 'CA / quantite' : 'moyenne observee',
+            lead_time: s.late_rate === null ? 'retard non dispo' : `${formatNumber(s.late_rate, 1)}% retard`,
+            anomalies: `${(data.anomaly_summary?.critical_count || 0)} critiques`
+        };
+        Object.entries(subs).forEach(([key, value]) => {
+            const el = root.querySelector(`[data-client360-kpi-sub="${key}"]`);
+            if (el) el.textContent = value;
+        });
+    }
+
+    function renderProjectionCards(root, data) {
+        const target = root.querySelector('[data-client360-projection-cards]');
+        if (!target) return;
+        const cards = data.projection?.cards || [];
+        target.innerHTML = cards.length ? cards.map(card =>
+            `<span class="client360-projection-pill">${escapeHtml(card.label)} <strong>${formatMoney(card.value)}</strong> ${formatPct(card.delta_pct)}</span>`
+        ).join('') : '<span class="client360-projection-pill">Projection indisponible</span>';
+    }
+
+    function renderTrend(root, data, records, state) {
+        const div = root.querySelector('[data-client360-chart="trend"]');
+        if (!div || !window.Plotly) return;
+        const pMap = periodIndexMap(data);
+        const grouped = groupRecords(records, 'period').sort((a, b) => (pMap.get(a.name) || 0) - (pMap.get(b.name) || 0));
+        if (!grouped.length) {
+            Plotly.react(div, [], plotlyLayout('Aucune donnee'), PLOT_CONFIG);
+            return;
+        }
+        const metric = state.metric || 'ca';
+        const x = grouped.map(row => row.name);
+        const traces = [{
+            type: 'scatter',
+            mode: 'lines+markers',
+            x,
+            y: grouped.map(row => metricValue(row, metric)),
+            name: metricLabel(data, metric),
+            line: { color: '#2563eb', width: 3 },
+            marker: { size: 7 },
+            hovertemplate: '%{x}<br>%{y:,.2f}<extra></extra>'
+        }];
+        if (metric !== 'orders') {
+            traces.push({
+                type: 'bar',
+                x,
+                y: grouped.map(row => row.orders),
+                name: 'Commandes',
+                marker: { color: '#2d8a6c' },
+                opacity: 0.42,
+                yaxis: 'y2',
+                hovertemplate: '%{x}<br>Cmd: %{y:,.0f}<extra></extra>'
+            });
+        }
+        const canShowProjection = metric === 'ca' && state.family === 'all' && state.product === 'all' && state.country === 'all';
+        if (canShowProjection && data.projection?.forecast?.length) {
+            const lastPoint = grouped[grouped.length - 1];
+            traces.push({
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: [lastPoint.name].concat(data.projection.forecast.map(item => item.label)),
+                y: [lastPoint.ca].concat(data.projection.forecast.map(item => item.q50)),
+                name: 'Projection q50',
+                line: { color: '#cf8b2f', width: 3, dash: 'dash' },
+                marker: { size: 7 },
+                hovertemplate: '%{x}<br>CA projete: %{y:,.0f} €<extra></extra>'
+            });
+        }
+        Plotly.react(div, traces, plotlyLayout('Evolution portefeuille', {
+            yaxis: { title: metricLabel(data, metric), automargin: true },
+            yaxis2: { title: 'Commandes', overlaying: 'y', side: 'right', showgrid: false, automargin: true }
+        }), PLOT_CONFIG);
+    }
+
+    function renderMix(root, data, records, state) {
+        const div = root.querySelector('[data-client360-chart="mix"]');
+        if (!div || !window.Plotly) return;
+        const key = state.family === 'all' ? 'family' : 'product';
+        const grouped = groupRecords(records, key)
+            .sort((a, b) => metricValue(b, state.metric) - metricValue(a, state.metric))
+            .slice(0, 14)
+            .reverse();
+        const trace = {
+            type: 'bar',
+            orientation: 'h',
+            x: grouped.map(row => metricValue(row, state.metric)),
+            y: grouped.map(row => row.name),
+            marker: { color: key === 'family' ? '#950b39' : '#2d8a6c' },
+            customdata: grouped.map(row => row.name),
+            hovertemplate: '%{y}<br>%{x:,.2f}<extra></extra>'
+        };
+        Plotly.react(div, [trace], plotlyLayout(key === 'family' ? 'CA par famille' : 'CA par produit', {
+            margin: { l: 130, r: 20, t: 52, b: 36 },
+            xaxis: { title: metricLabel(data, state.metric), automargin: true },
+            yaxis: { automargin: true }
+        }), PLOT_CONFIG);
+        if (div.removeAllListeners) div.removeAllListeners('plotly_click');
+        div.on?.('plotly_click', event => {
+            const value = event.points?.[0]?.customdata;
+            if (!value) return;
+            if (key === 'family') state.family = value;
+            else state.product = value;
+            initFilters(root, data, state);
+            render(root, data, state);
+        });
+    }
+
+    function renderGeo(root, data, records, state) {
+        const div = root.querySelector('[data-client360-chart="geo"]');
+        if (!div || !window.Plotly) return;
+        const grouped = groupRecords(records, 'country').sort((a, b) => b.ca - a.ca).slice(0, 12);
+        const trace = {
+            type: 'bar',
+            x: grouped.map(row => row.name),
+            y: grouped.map(row => row.ca),
+            marker: { color: '#8b5cf6' },
+            customdata: grouped.map(row => row.name),
+            hovertemplate: '%{x}<br>CA: %{y:,.0f} €<extra></extra>'
+        };
+        Plotly.react(div, [trace], plotlyLayout('CA par geographie'), PLOT_CONFIG);
+        if (div.removeAllListeners) div.removeAllListeners('plotly_click');
+        div.on?.('plotly_click', event => {
+            const value = event.points?.[0]?.customdata;
+            if (!value) return;
+            state.country = value;
+            initFilters(root, data, state);
+            render(root, data, state);
+        });
+    }
+
+    function renderAnomalyChart(root, data, state) {
+        const div = root.querySelector('[data-client360-chart="anomalies"]');
+        if (!div || !window.Plotly) return;
+        const pMap = periodIndexMap(data);
+        let start = pMap.get(String(state.periodStart));
+        let end = pMap.get(String(state.periodEnd));
+        if (start > end) [start, end] = [end, start];
+        const anomalies = (data.anomalies || []).filter(item => {
+            const idx = Number.isFinite(Number(item.period_index)) ? Number(item.period_index) : pMap.get(String(item.period));
+            return idx >= start && idx <= end;
+        });
+        const traces = [];
+        if (data.behavior?.available && data.behavior.periods?.length) {
+            traces.push({
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: data.behavior.periods,
+                y: data.behavior.alert_score_history || [],
+                name: 'Score alerte',
+                line: { color: '#c14b56', width: 3 },
+                hovertemplate: '%{x}<br>Score: %{y:.1f}<extra></extra>'
+            });
+        }
+        if (anomalies.length) {
+            traces.push({
+                type: 'scatter',
+                mode: 'markers',
+                x: anomalies.map(item => item.period),
+                y: anomalies.map(item => Math.abs(asNumber(item.score)) * 12),
+                text: anomalies.map(item => item.message),
+                name: 'Anomalies',
+                marker: {
+                    size: anomalies.map(item => item.severity === 'red' ? 15 : 11),
+                    color: anomalies.map(item => item.severity === 'red' ? '#c14b56' : '#cf8b2f'),
+                    line: { color: '#ffffff', width: 1 }
+                },
+                hovertemplate: '%{x}<br>%{text}<br>Intensite: %{y:.1f}<extra></extra>'
+            });
+        }
+        const layout = plotlyLayout('Detection anomalies', {
+            yaxis: { title: 'Score', rangemode: 'tozero', automargin: true }
+        });
+        if (!traces.length) {
+            layout.annotations = [{
+                text: 'Aucun signal sur la selection',
+                x: 0.5,
+                y: 0.5,
+                xref: 'paper',
+                yref: 'paper',
+                showarrow: false
+            }];
+        }
+        Plotly.react(div, traces, layout, PLOT_CONFIG);
+    }
+
+    function renderCluster(root, data) {
+        const cluster = data.cluster || {};
+        const title = root.querySelector('[data-client360-cluster-title]');
+        const status = root.querySelector('[data-client360-cluster-status]');
+        const name = root.querySelector('[data-client360-cluster-name]');
+        const reading = root.querySelector('[data-client360-cluster-reading]');
+        if (title) title.textContent = cluster.current_label || 'Groupe non disponible';
+        if (status) status.textContent = cluster.changed ? 'Migration detectee' : 'Position stable';
+        if (name) name.textContent = cluster.current_name || cluster.current_label || 'Segment client';
+        if (reading) reading.textContent = cluster.reading || 'Profil calcule sur le portefeuille.';
+        const journey = root.querySelector('[data-client360-cluster-journey]');
+        if (!journey) return;
+        const steps = cluster.journey || [];
+        journey.innerHTML = steps.length ? steps.map((step, idx) =>
+            `<span class="client360-cluster-step ${idx === steps.length - 1 ? 'is-current' : ''}">${escapeHtml(step.period)} - ${escapeHtml(step.cluster_label || ('Groupe ' + step.cluster_num))}</span>`
+        ).join('') : '<span class="client360-cluster-step is-current">Historique cluster indisponible</span>';
+    }
+
+    function renderTables(root, data, records, state) {
+        const productBody = root.querySelector('[data-client360-products-body]');
+        if (productBody) {
+            const rows = groupRecords(records, 'product').sort((a, b) => b.ca - a.ca).slice(0, 45);
+            productBody.innerHTML = rows.length ? rows.map(row => {
+                const family = Array.from(row.families)[0] || '-';
+                return `<tr data-client360-product="${escapeHtml(row.name)}" class="${state.product === row.name ? 'is-selected' : ''}">
+                    <td><strong>${escapeHtml(row.name)}</strong></td>
+                    <td>${escapeHtml(family)}</td>
+                    <td class="text-end">${formatMoney(row.ca)}</td>
+                    <td class="text-end">${formatNumber(row.orders, 0)}</td>
+                    <td class="text-end">${row.unit_price === null ? '-' : formatMoney(row.unit_price)}</td>
+                    <td class="text-end">${row.lead_time_median === null ? '-' : formatNumber(row.lead_time_median, 1)}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="6" class="client360-empty">Aucun produit</td></tr>';
+            productBody.querySelectorAll('[data-client360-product]').forEach(row => {
+                row.addEventListener('click', () => {
+                    state.product = row.dataset.client360Product;
+                    initFilters(root, data, state);
+                    render(root, data, state);
+                });
+            });
+        }
+
+        const periodBody = root.querySelector('[data-client360-periods-body]');
+        if (periodBody) {
+            const pMap = periodIndexMap(data);
+            const rows = groupRecords(records, 'period').sort((a, b) => (pMap.get(a.name) || 0) - (pMap.get(b.name) || 0));
+            periodBody.innerHTML = rows.length ? rows.map(row =>
+                `<tr data-client360-period="${escapeHtml(row.name)}">
+                    <td><strong>${escapeHtml(row.name)}</strong></td>
+                    <td class="text-end">${formatMoney(row.ca)}</td>
+                    <td class="text-end">${formatNumber(row.orders, 0)}</td>
+                    <td class="text-end">${formatNumber(row.families.size, 0)}</td>
+                </tr>`
+            ).join('') : '<tr><td colspan="4" class="client360-empty">Aucune periode</td></tr>';
+            periodBody.querySelectorAll('[data-client360-period]').forEach(row => {
+                row.addEventListener('click', () => {
+                    state.periodStart = row.dataset.client360Period;
+                    state.periodEnd = row.dataset.client360Period;
+                    initFilters(root, data, state);
+                    render(root, data, state);
+                });
+            });
+        }
+
+        const anomalyBody = root.querySelector('[data-client360-anomalies-body]');
+        if (anomalyBody) {
+            const rows = (data.anomalies || []).slice(0, 12);
+            anomalyBody.innerHTML = rows.length ? rows.map(row =>
+                `<tr data-client360-period="${escapeHtml(row.period)}">
+                    <td>${escapeHtml(row.metric_label)}</td>
+                    <td>${escapeHtml(row.period)}</td>
+                    <td class="text-end">${formatNumber(row.score, 2)}</td>
+                </tr>`
+            ).join('') : '<tr><td colspan="3" class="client360-empty">Aucun signal</td></tr>';
+        }
+    }
+
+    function render(root, data, state) {
+        const records = filteredRecords(data, state);
+        renderKpis(root, data, records, state);
+        renderProjectionCards(root, data);
+        renderTrend(root, data, records, state);
+        renderMix(root, data, records, state);
+        renderGeo(root, data, records, state);
+        renderAnomalyChart(root, data, state);
+        renderCluster(root, data);
+        renderTables(root, data, records, state);
+    }
+
+    function initClient360Dashboard(root) {
+        if (!root || root.dataset.client360Ready === 'true') return;
+        const data = getData(root);
+        if (!data || !Array.isArray(data.records)) return;
+        const periods = data.filters?.periods || [];
+        const state = {
+            periodStart: periods[0]?.value || '',
+            periodEnd: periods[periods.length - 1]?.value || '',
+            family: 'all',
+            product: 'all',
+            country: 'all',
+            metric: 'ca'
+        };
+        root.dataset.client360Ready = 'true';
+        root._client360State = state;
+        initFilters(root, data, state);
+        render(root, data, state);
+    }
+
+    function initClient360Dashboards(scope) {
+        const container = scope || document;
+        container.querySelectorAll('[data-client360-dashboard]').forEach(initClient360Dashboard);
+    }
+
+    window.initClient360Dashboards = initClient360Dashboards;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => initClient360Dashboards(document));
+    } else {
+        initClient360Dashboards(document);
+    }
 })();

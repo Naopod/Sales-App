@@ -40,7 +40,6 @@ analysis_currency_dependency = LazyModule(
 )
 analysis_overview = LazyModule("service_commercial.client_analytics.services.analysis_overview")
 analysis_by_period = LazyModule("service_commercial.client_analytics.services.analysis_by_period")
-analysis_time_series = LazyModule("service_commercial.client_analytics.services.analysis_time_series")
 analysis_clustering = LazyModule("service_commercial.client_analytics.services.analysis_clustering")
 analysis_products = LazyModule("service_commercial.client_analytics.services.analysis_products")
 analysis_geographic = LazyModule("service_commercial.client_analytics.services.analysis_geographic")
@@ -116,27 +115,12 @@ def dataset_overview(request, pk):
     overview_analysis = analysis_overview.generate_overview_analysis(df)
     info = overview_analysis.get("info", {})
     missing_info = overview_analysis.get("missing_info", [])
-    numeric_summary = overview_analysis.get("numeric_summary")
     column_types = overview_analysis.get("column_types", {})
-
-    # Convert dataframe head to HTML
-    df_head_html = df.head(10).to_html(
-        classes="table table-striped table-sm", index=False
-    )
-
-    # Convert numeric summary to HTML
-    numeric_summary_html = None
-    if numeric_summary is not None:
-        numeric_summary_html = numeric_summary.to_html(
-            classes="table table-striped table-sm"
-        )
 
     context = {
         "dataset": dataset,
         "info": info,
         "missing_info": missing_info,
-        "df_head_html": df_head_html,
-        "numeric_summary_html": numeric_summary_html,
         "column_types": column_types,
     }
     return render(request, "client_analytics/dataset_overview.html", context)
@@ -173,26 +157,6 @@ def _safe_run(fn, *args, fallback=None, label="", **kwargs):
     except Exception:
         logger.exception("[%s] ERROR", label)
         return fallback if fallback is not None else {}
-
-
-def _build_temporal_context(df: "pd.DataFrame", granularity: str = "month") -> dict:
-    df_daily = _safe_run(
-        analysis_time_series.aggregate_daily, df, label="temporal:daily"
-    )
-    result = _safe_run(
-        analysis_time_series.generate_temporal_analysis,
-        df,
-        granularity=granularity,
-        df_daily_cache=df_daily,
-        anomaly_report_cache=None,
-        label=f"temporal:{granularity}",
-        fallback={"results": {}, "graphs": {}},
-    )
-    return {
-        "results": result.get("results", {}),
-        "graphs": result.get("graphs", {}),
-        "granularity": granularity,
-    }
 
 
 def _build_products_context(
@@ -254,10 +218,13 @@ def _build_clients_context(
                 fallback={"client_id": selected_client, "kpis": {}, "graphs": {}},
             )
 
-        portfolio_m = _port("month")
-        portfolio_q = _port("quarter")
-        portfolio_f = _port("year")
-        portfolio = portfolio_m
+        portfolio = _port(granularity)
+        if granularity == "quarter":
+            portfolio_q = portfolio
+        elif granularity == "year":
+            portfolio_f = portfolio
+        else:
+            portfolio_m = portfolio
 
     return {
         "client_analysis": client_analysis,
@@ -350,6 +317,8 @@ def stats(request, pk):
 
     granularity = _normalize_granularity(request.GET.get("granularity", "month"))
     active_tab = request.GET.get("tab", "statistics")
+    if active_tab not in {"statistics", "products", "clients", "geographic", "currency"}:
+        active_tab = "statistics"
     selected_client = request.GET.get("client", "")
 
     df_processed = dataset_io.load_dataset_df(dataset)
@@ -383,14 +352,6 @@ def stats(request, pk):
         label="available_periods",
         fallback={},
     )
-    temporal_metrics = _safe_run(
-        analysis_time_series.get_temporal_metrics,
-        df_processed,
-        granularity=granularity,
-        label="temporal_metrics",
-        fallback={},
-    )
-
     # Lead-time (optional, rendered outside the main tab panes)
     import json
 
@@ -419,7 +380,6 @@ def stats(request, pk):
         "granularity": granularity,
         "active_tab": active_tab,
         "kpis": all_kpis,
-        "temporal_metrics": temporal_metrics,
         "available_periods": available_periods,
         # Statistics per granularity (stats tab content)
         "results_month": stat_m.get("results", {}),
@@ -501,7 +461,7 @@ def ajax_tab(request, pk):
     Called by JavaScript when the user first clicks a non-default tab.
 
     Query params:
-      tab         – one of: temporal | products | clients | geographic | currency
+      tab         – one of: products | clients | geographic | currency
       granularity – month | quarter | year  (default: month)
       client      – (optional) client ID for the clients tab
       product     – (optional) product filter for the products tab
@@ -513,7 +473,7 @@ def ajax_tab(request, pk):
     tab = request.GET.get("tab", "")
     granularity = _normalize_granularity(request.GET.get("granularity", "month"))
 
-    if tab not in ("temporal", "products", "clients", "geographic", "currency"):
+    if tab not in ("products", "clients", "geographic", "currency"):
         return JsonResponse({"error": f"Unknown tab: {tab!r}"}, status=400)
 
     df = dataset_io.load_dataset_df(dataset)
@@ -521,11 +481,7 @@ def ajax_tab(request, pk):
         return JsonResponse({"error": "Dataset load failed"}, status=500)
 
     try:
-        if tab == "temporal":
-            ctx = _build_temporal_context(df, granularity=granularity)
-            template = "client_analytics/partials/tab_temporal.html"
-
-        elif tab == "products":
+        if tab == "products":
             ctx = _build_products_context(
                 df,
                 granularity=granularity,
@@ -550,6 +506,7 @@ def ajax_tab(request, pk):
             ctx = _build_currency_context(df, granularity=granularity)
             template = "client_analytics/partials/tab_currency.html"
 
+        ctx["dataset"] = dataset
         html = render_to_string(template, ctx, request=request)
         return JsonResponse({"success": True, "html": html})
 
@@ -617,6 +574,8 @@ def ajax_behavioral_client(request, pk):
 
 def clustering(request, pk):
     """Clustering page - Automatic K-Means clustering"""
+    import json
+
     dataset = get_object_or_404(Dataset, pk=pk)
 
     # Load dataframe (already processed during upload in forms.py)
@@ -626,30 +585,31 @@ def clustering(request, pk):
         messages.error(request, "Erreur lors du chargement du dataset")
         return redirect("client_analytics:home")
 
-    available_quarterly_years = (
-        analysis_clustering.get_quarterly_clustering_available_years(df)
+    mode = request.GET.get("mode", "static")
+    mode = "temporal" if mode == "temporal" else "static"
+    entity_type = request.GET.get("entity", "clients")
+    entity_type = "products" if entity_type == "products" else "clients"
+    granularity = _normalize_granularity(request.GET.get("granularity", "month"))
+    period = request.GET.get("period")
+    period_start = request.GET.get("period_start")
+    period_end = request.GET.get("period_end")
+    tracked_entities = request.GET.getlist("tracked")
+
+    clustering_result = analysis_clustering.generate_sales_clustering_analysis(
+        df,
+        mode=mode,
+        entity_type=entity_type,
+        granularity=granularity,
+        period=period,
+        period_start=period_start,
+        period_end=period_end,
+        tracked_entities=tracked_entities,
     )
 
-    mode = request.GET.get("mode", "global")
-    selected_year = request.GET.get("year")
-    if mode in {"quarterly_2024", "quarterly_notebook"}:
-        mode = "quarterly_notebook"
-        if request.GET.get("mode") == "quarterly_2024" and selected_year is None:
-            selected_year = "2024"
-        elif selected_year is None and available_quarterly_years:
-            selected_year = str(available_quarterly_years[-1])
-        clustering_result = analysis_clustering.generate_quarterly_clustering_analysis(
-            df,
-            year=selected_year,
-        )
-    else:
-        mode = "global"
-        selected_year = None
-        clustering_result = analysis_clustering.generate_clustering_analysis(df)
-
-    resolved_selected_year = clustering_result.get("kpis", {}).get("annee_analysee")
-    if resolved_selected_year is None and selected_year and str(selected_year).isdigit():
-        resolved_selected_year = int(selected_year)
+    period_options = clustering_result.get("period_options") or (
+        analysis_clustering.get_sales_clustering_period_options(df)
+    )
+    resolved = clustering_result.get("resolved", {})
 
     context = {
         "dataset": dataset,
@@ -658,8 +618,15 @@ def clustering(request, pk):
         "graphs": clustering_result.get("graphs", {}),
         "error": clustering_result.get("error"),
         "mode": mode,
-        "selected_year": resolved_selected_year,
-        "available_quarterly_years": available_quarterly_years,
+        "entity_type": entity_type,
+        "granularity": granularity,
+        "selected_period": resolved.get("period") or period,
+        "period_start": resolved.get("period_start") or period_start,
+        "period_end": resolved.get("period_end") or period_end,
+        "period_options": period_options,
+        "period_options_json": json.dumps(period_options, ensure_ascii=False),
+        "period_choices": period_options.get(granularity, []),
+        "tracked_entities": clustering_result.get("tracked_entities", tracked_entities),
     }
     return render(request, "client_analytics/clustering.html", context)
 

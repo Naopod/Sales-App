@@ -25,7 +25,6 @@ from .visualizations.viz_currency import (
     plot_non_eur_pct_over_time,
     plot_country_currency_heatmap,
     plot_pareto_non_eur_clients,
-    plot_non_eur_by_family
 )
 
 warnings.filterwarnings('ignore')
@@ -390,14 +389,6 @@ def analyze_currency_dependency(
         charts["pareto_non_eur_clients"] = fig
     if path:
         chart_paths["pareto_non_eur_clients"] = str(path)
-    
-    # Graph 6: % non-EUR par Famille
-    path = output_path_obj / "6_non_eur_by_family.png" if output_path_obj else None
-    fig = plot_non_eur_by_family(df_clean, path)
-    if fig:
-        charts["non_eur_by_family"] = fig
-    if path:
-        chart_paths["non_eur_by_family"] = str(path)
     
     # Convertir les figures en base64 si output_dir=None (pour usage web)
     if not output_dir and charts:

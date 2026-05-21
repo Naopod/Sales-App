@@ -4,6 +4,7 @@ Clustering K-Means automatique avec feature engineering avancé
 Adapté du notebook week_1_clean.ipynb
 """
 import base64
+import os
 from io import BytesIO
 
 import matplotlib
@@ -13,6 +14,9 @@ import pandas as pd
 import numpy as np
 import seaborn as sns
 from scipy.optimize import linear_sum_assignment
+
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
+
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import (
@@ -1107,3 +1111,958 @@ def generate_quarterly_clustering_analysis(df, year=None):
 def generate_clustering_tab_analysis(df):
     """Alias pour compatibilité."""
     return generate_clustering_analysis(df)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Sales clustering: business-first static and temporal clustering
+# ═══════════════════════════════════════════════════════════════════════
+
+_PERIOD_COLUMNS = {
+    "month": "Month",
+    "quarter": "Fiscal_Quarter",
+    "year": "Fiscal_Year_Label",
+}
+
+_GRANULARITY_LABELS = {
+    "month": "Mois",
+    "quarter": "Trimestre",
+    "year": "Année fiscale",
+}
+
+
+def _to_html(fig) -> str:
+    fig.update_layout(
+        autosize=True,
+        width=None,
+        margin=dict(l=24, r=20, t=58, b=32),
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(size=12),
+    )
+    return fig.to_html(full_html=False, include_plotlyjs=False, config={"responsive": True})
+
+
+def _period_col(granularity: str) -> str:
+    return _PERIOD_COLUMNS.get(granularity, "Month")
+
+
+def _product_entity_col(df: pd.DataFrame) -> tuple[str | None, str]:
+    candidates = [
+        "Code Recette",
+        "Code Produit",
+        "Produit",
+        "Article",
+        "Libelle 1",
+        "Libellé 1",
+        "Désignation",
+        "Designation",
+        "Famille",
+    ]
+    for col in candidates:
+        if col in df.columns:
+            label = "Famille produit" if col == "Famille" else "Produit"
+            return col, label
+    return None, "Produit"
+
+
+def _sorted_period_values(values, granularity: str) -> list[str]:
+    vals = [str(v) for v in values if pd.notna(v) and str(v)]
+    if granularity == "month":
+        return sorted(vals)
+    if granularity == "year":
+        return sorted(vals, key=lambda x: int(str(x).replace("FY", "")) if str(x).replace("FY", "").isdigit() else 0)
+    if granularity == "quarter":
+        def key(v: str):
+            s = str(v)
+            fy = 0
+            q = 0
+            if "FY" in s:
+                try:
+                    fy = int(s.split("FY")[-1].strip())
+                except Exception:
+                    fy = 0
+            if s.startswith("Q") and len(s) > 1 and s[1].isdigit():
+                q = int(s[1])
+            return (fy, q, s)
+        return sorted(vals, key=key)
+    return sorted(vals)
+
+
+def get_sales_clustering_period_options(df: pd.DataFrame) -> dict:
+    options = {}
+    if df is None or df.empty:
+        return {"month": [], "quarter": [], "year": []}
+    for granularity, col in _PERIOD_COLUMNS.items():
+        if col in df.columns:
+            options[granularity] = _sorted_period_values(df[col].dropna().unique(), granularity)
+        else:
+            options[granularity] = []
+    return options
+
+
+def _filter_period(df: pd.DataFrame, granularity: str, period: str | None) -> pd.DataFrame:
+    col = _period_col(granularity)
+    if not period or period == "all" or col not in df.columns:
+        return df.copy()
+    return df[df[col].astype(str) == str(period)].copy()
+
+
+def _filter_period_range(
+    df: pd.DataFrame,
+    granularity: str,
+    period_start: str | None,
+    period_end: str | None,
+) -> pd.DataFrame:
+    col = _period_col(granularity)
+    if col not in df.columns:
+        return df.copy()
+    periods = _sorted_period_values(df[col].dropna().unique(), granularity)
+    if not periods:
+        return df.copy()
+    start = period_start if period_start in periods else periods[0]
+    end = period_end if period_end in periods else periods[-1]
+    start_idx = periods.index(start)
+    end_idx = periods.index(end)
+    if start_idx > end_idx:
+        start_idx, end_idx = end_idx, start_idx
+    keep = set(periods[start_idx:end_idx + 1])
+    return df[df[col].astype(str).isin(keep)].copy()
+
+
+def _order_period_bounds(available: list[str], start: str | None, end: str | None) -> tuple[str | None, str | None]:
+    if start in available and end in available and available.index(start) > available.index(end):
+        return end, start
+    return start, end
+
+
+def _money(value) -> str:
+    try:
+        return f"{float(value):,.0f} €".replace(",", " ")
+    except Exception:
+        return "0 €"
+
+
+def _clean_numeric(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
+    out = df.copy()
+    for col in cols:
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    return out
+
+
+def _build_client_sales_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str], str]:
+    if "Cpt Client" not in df.columns:
+        return pd.DataFrame(), [], "Colonne client manquante"
+    if "Montant" not in df.columns:
+        return pd.DataFrame(), [], "Colonne montant manquante"
+
+    base = df.copy()
+    base["Montant"] = pd.to_numeric(base.get("Montant"), errors="coerce")
+    base["Quantité"] = pd.to_numeric(base.get("Quantité"), errors="coerce") if "Quantité" in base.columns else 0
+    if "PU Net" in base.columns:
+        base["PU Net"] = pd.to_numeric(base.get("PU Net"), errors="coerce")
+    if "Lead_Time_Days" in base.columns:
+        base["Lead_Time_Days"] = pd.to_numeric(base.get("Lead_Time_Days"), errors="coerce")
+    if "Lead_Time_Deviation_Days" in base.columns:
+        base["Lead_Time_Deviation_Days"] = pd.to_numeric(base.get("Lead_Time_Deviation_Days"), errors="coerce")
+
+    agg = {
+        "Montant": ["sum", "mean"],
+        "Quantité": "sum",
+    }
+    if "N° Bon" in base.columns:
+        agg["N° Bon"] = pd.Series.nunique
+    if "Famille" in base.columns:
+        agg["Famille"] = pd.Series.nunique
+    if "Country" in base.columns:
+        agg["Country"] = pd.Series.nunique
+    if "PU Net" in base.columns:
+        agg["PU Net"] = "mean"
+    if "Lead_Time_Days" in base.columns:
+        agg["Lead_Time_Days"] = "median"
+    if "Lead_Time_Deviation_Days" in base.columns:
+        agg["Lead_Time_Deviation_Days"] = "mean"
+
+    features = base.groupby("Cpt Client").agg(agg)
+    features.columns = ["_".join([str(x) for x in col if x]).strip("_") for col in features.columns]
+    features = features.reset_index().rename(columns={
+        "Cpt Client": "Entity",
+        "Montant_sum": "CA_Total",
+        "Montant_mean": "CA_Moyen",
+        "Quantité_sum": "Qty_Total",
+        "N° Bon_nunique": "Nb_Commandes",
+        "Famille_nunique": "Nb_Familles",
+        "Country_nunique": "Nb_Pays",
+        "PU Net_mean": "PU_Moyen",
+        "Lead_Time_Days_median": "Lead_Time_Median",
+        "Lead_Time_Deviation_Days_mean": "Retard_Moyen",
+    })
+    if "Nb_Commandes" not in features.columns:
+        features["Nb_Commandes"] = base.groupby("Cpt Client").size().values
+    for col in ["Nb_Familles", "Nb_Pays", "PU_Moyen", "Lead_Time_Median", "Retard_Moyen"]:
+        if col not in features.columns:
+            features[col] = 0
+
+    features["Panier_Moyen"] = _safe_div(features["CA_Total"].values, features["Nb_Commandes"].values)
+    features["Qty_Par_Commande"] = _safe_div(features["Qty_Total"].values, features["Nb_Commandes"].values)
+
+    if "Nom Devise" in base.columns:
+        total = base.groupby("Cpt Client")["Montant"].sum()
+        non_eur = base[base["Nom Devise"].astype(str).str.upper() != "EUR"].groupby("Cpt Client")["Montant"].sum()
+        features["Part_Non_EUR"] = features["Entity"].map(((non_eur / total) * 100).fillna(0)).fillna(0)
+    else:
+        features["Part_Non_EUR"] = 0
+
+    if "Country" in base.columns:
+        features["Segment_Detail"] = features["Entity"].map(base.groupby("Cpt Client")["Country"].agg(lambda x: x.mode().iloc[0] if not x.mode().empty else "N/A")).fillna("N/A")
+    else:
+        features["Segment_Detail"] = ""
+
+    feature_cols = [
+        "CA_Total", "CA_Moyen", "Qty_Total", "Nb_Commandes", "Nb_Familles",
+        "Nb_Pays", "Panier_Moyen", "Qty_Par_Commande", "PU_Moyen",
+        "Lead_Time_Median", "Retard_Moyen", "Part_Non_EUR",
+    ]
+    features = _clean_numeric(features, feature_cols)
+    return features, feature_cols, ""
+
+
+def _build_product_sales_features(df: pd.DataFrame) -> tuple[pd.DataFrame, list[str], str, str]:
+    entity_col, entity_label = _product_entity_col(df)
+    if not entity_col:
+        return pd.DataFrame(), [], "Aucune colonne produit exploitable", entity_label
+    if "Montant" not in df.columns:
+        return pd.DataFrame(), [], "Colonne montant manquante", entity_label
+
+    base = df.copy()
+    base[entity_col] = base[entity_col].astype(str)
+    base["Montant"] = pd.to_numeric(base.get("Montant"), errors="coerce")
+    base["Quantité"] = pd.to_numeric(base.get("Quantité"), errors="coerce") if "Quantité" in base.columns else 0
+    if "PU Net" in base.columns:
+        base["PU Net"] = pd.to_numeric(base.get("PU Net"), errors="coerce")
+    if "Lead_Time_Days" in base.columns:
+        base["Lead_Time_Days"] = pd.to_numeric(base.get("Lead_Time_Days"), errors="coerce")
+
+    agg = {
+        "Montant": "sum",
+        "Quantité": "sum",
+    }
+    if "N° Bon" in base.columns:
+        agg["N° Bon"] = pd.Series.nunique
+    if "Cpt Client" in base.columns:
+        agg["Cpt Client"] = pd.Series.nunique
+    if "Country" in base.columns:
+        agg["Country"] = pd.Series.nunique
+    if "PU Net" in base.columns:
+        agg["PU Net"] = "mean"
+    if "Lead_Time_Days" in base.columns:
+        agg["Lead_Time_Days"] = "median"
+
+    features = base.groupby(entity_col).agg(agg)
+    features = features.reset_index().rename(columns={
+        entity_col: "Entity",
+        "Montant": "CA_Total",
+        "Quantité": "Qty_Total",
+        "N° Bon": "Nb_Commandes",
+        "Cpt Client": "Nb_Clients",
+        "Country": "Nb_Pays",
+        "PU Net": "PU_Moyen",
+        "Lead_Time_Days": "Lead_Time_Median",
+    })
+    if "Nb_Commandes" not in features.columns:
+        features["Nb_Commandes"] = base.groupby(entity_col).size().values
+    for col in ["Nb_Clients", "Nb_Pays", "PU_Moyen", "Lead_Time_Median"]:
+        if col not in features.columns:
+            features[col] = 0
+    features["PU_Pondere"] = _safe_div(features["CA_Total"].values, features["Qty_Total"].values)
+    features["CA_Par_Client"] = _safe_div(features["CA_Total"].values, features["Nb_Clients"].values)
+
+    if "Cpt Client" in base.columns:
+        by_client = base.groupby([entity_col, "Cpt Client"])["Montant"].sum().reset_index()
+        total = by_client.groupby(entity_col)["Montant"].sum()
+        top = by_client.groupby(entity_col)["Montant"].max()
+        features["Concentration_Client"] = features["Entity"].map(((top / total) * 100).fillna(0)).fillna(0)
+    else:
+        features["Concentration_Client"] = 0
+
+    if "Nom Devise" in base.columns:
+        total = base.groupby(entity_col)["Montant"].sum()
+        non_eur = base[base["Nom Devise"].astype(str).str.upper() != "EUR"].groupby(entity_col)["Montant"].sum()
+        features["Part_Non_EUR"] = features["Entity"].map(((non_eur / total) * 100).fillna(0)).fillna(0)
+    else:
+        features["Part_Non_EUR"] = 0
+
+    if entity_col != "Famille" and "Famille" in base.columns:
+        features["Segment_Detail"] = features["Entity"].map(base.groupby(entity_col)["Famille"].agg(lambda x: x.mode().iloc[0] if not x.mode().empty else "N/A")).fillna("N/A")
+    else:
+        features["Segment_Detail"] = ""
+
+    feature_cols = [
+        "CA_Total", "Qty_Total", "Nb_Commandes", "Nb_Clients", "Nb_Pays",
+        "PU_Moyen", "PU_Pondere", "CA_Par_Client", "Lead_Time_Median",
+        "Concentration_Client", "Part_Non_EUR",
+    ]
+    features = _clean_numeric(features, feature_cols)
+    return features, feature_cols, "", entity_label
+
+
+def _prepare_clustering_matrix(features: pd.DataFrame, feature_cols: list[str]) -> pd.DataFrame:
+    matrix = features[feature_cols].copy()
+    for col in matrix.columns:
+        matrix[col] = pd.to_numeric(matrix[col], errors="coerce").replace([np.inf, -np.inf], np.nan).fillna(0)
+        if col in {"CA_Total", "CA_Moyen", "Qty_Total", "Nb_Commandes", "Panier_Moyen", "PU_Pondere", "CA_Par_Client"}:
+            matrix[col] = np.log1p(matrix[col].clip(lower=0))
+    return matrix
+
+
+def _choose_k(X_scaled: np.ndarray, max_k: int = 5) -> tuple[int, list[dict]]:
+    n = X_scaled.shape[0]
+    if n < 3:
+        return 0, []
+    upper = min(max_k, n - 1)
+    metrics = []
+    for k in range(2, upper + 1):
+        labels = KMeans(n_clusters=k, random_state=RANDOM_STATE, n_init=20).fit_predict(X_scaled)
+        if len(set(labels)) < 2:
+            continue
+        metrics.append({"k": k, "silhouette": float(silhouette_score(X_scaled, labels))})
+    if not metrics:
+        return min(2, n), []
+    best = max(metrics, key=lambda item: item["silhouette"])
+    return int(best["k"]), metrics
+
+
+def _business_label(entity_type: str, row: pd.Series, overall: pd.Series) -> tuple[str, str, str]:
+    ca_high = row.get("CA_Total", 0) >= overall.get("CA_Total", 0)
+    freq_high = row.get("Nb_Commandes", 0) >= overall.get("Nb_Commandes", 0)
+    qty_high = row.get("Qty_Total", 0) >= overall.get("Qty_Total", 0)
+
+    if entity_type == "clients":
+        if ca_high and freq_high:
+            return (
+                "Clients stratégiques récurrents",
+                "Ils combinent un CA élevé et une fréquence d'achat forte.",
+                "À protéger avec un suivi commercial rapproché et des offres de fidélisation.",
+            )
+        if ca_high and not freq_high:
+            return (
+                "Gros tickets ponctuels",
+                "Ils pèsent dans le CA mais commandent moins souvent.",
+                "À travailler en récurrence avec des relances et contrats cadres.",
+            )
+        if not ca_high and freq_high:
+            return (
+                "Clients réguliers à développer",
+                "Ils reviennent souvent mais avec des paniers plus modestes.",
+                "À faire monter en panier via bundles, recommandations et upsell ciblé.",
+            )
+        return (
+            "Clients occasionnels",
+            "Leur contribution et leur fréquence restent limitées sur la période.",
+            "À nourrir avec des campagnes simples et des offres de réactivation.",
+        )
+
+    if ca_high and qty_high:
+        return (
+            "Produits moteurs volume",
+            "Ils génèrent beaucoup de CA avec des volumes solides.",
+            "À sécuriser côté stock, disponibilité et visibilité commerciale.",
+        )
+    if ca_high and not qty_high:
+        return (
+            "Produits premium",
+            "Ils tirent le CA avec une valeur unitaire élevée.",
+            "À valoriser dans les offres et à surveiller côté marge.",
+        )
+    if not ca_high and qty_high:
+        return (
+            "Produits d'appel",
+            "Ils tournent en volume mais contribuent moins au CA.",
+            "À utiliser pour déclencher des ventes additionnelles.",
+        )
+    return (
+        "Long tail produits",
+        "Ils restent plus discrets sur la période.",
+        "À arbitrer entre maintien catalogue, regroupement ou animation ciblée.",
+    )
+
+
+def _cluster_scatter(features: pd.DataFrame, X_scaled: np.ndarray, entity_label: str) -> str | None:
+    try:
+        import plotly.express as px
+        from sklearn.decomposition import PCA
+
+        if X_scaled.shape[0] < 3:
+            return None
+        coords = PCA(n_components=2, random_state=RANDOM_STATE).fit_transform(X_scaled)
+        data = features.copy()
+        data["Axe 1"] = coords[:, 0]
+        data["Axe 2"] = coords[:, 1]
+        data["Groupe"] = data["Cluster_Label"]
+        data["CA"] = data["CA_Total"]
+        fig = px.scatter(
+            data,
+            x="Axe 1",
+            y="Axe 2",
+            color="Groupe",
+            size="CA",
+            hover_name="Entity",
+            hover_data={"CA_Total": ":,.0f", "Nb_Commandes": ":,.0f", "Axe 1": False, "Axe 2": False},
+            title=f"Carte des groupes - {entity_label.lower()}",
+            color_discrete_sequence=px.colors.qualitative.Set2,
+        )
+        fig.update_layout(height=520, legend_title_text="Groupes")
+        return _to_html(fig)
+    except Exception:
+        return None
+
+
+def _cluster_distribution_chart(profiles: list[dict], entity_label_plural: str) -> str | None:
+    try:
+        import plotly.graph_objects as go
+        labels = [p["name"] for p in profiles]
+        values = [p["count"] for p in profiles]
+        fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=0.45, textinfo="label+percent")])
+        fig.update_layout(title=f"Répartition des {entity_label_plural.lower()}", height=360)
+        return _to_html(fig)
+    except Exception:
+        return None
+
+
+def _profile_clusters(features: pd.DataFrame, entity_type: str, entity_label_plural: str) -> list[dict]:
+    profiles = []
+    overall = features[["CA_Total", "Qty_Total", "Nb_Commandes"]].median(numeric_only=True)
+    for cluster_id in sorted(features["Cluster"].unique()):
+        subset = features[features["Cluster"] == cluster_id].copy()
+        center = subset.median(numeric_only=True)
+        name, reading, action = _business_label(entity_type, center, overall)
+        top_members = (
+            subset.sort_values("CA_Total", ascending=False)
+            .head(8)[["Entity", "CA_Total", "Nb_Commandes"]]
+            .to_dict("records")
+        )
+        profiles.append({
+            "id": int(cluster_id),
+            "name": name,
+            "count": int(len(subset)),
+            "share": round(len(subset) / len(features) * 100, 1),
+            "ca_total": float(subset["CA_Total"].sum()),
+            "ca_median": float(subset["CA_Total"].median()),
+            "orders_median": float(subset["Nb_Commandes"].median()),
+            "qty_median": float(subset["Qty_Total"].median()),
+            "basket_median": float(subset.get("Panier_Moyen", subset.get("PU_Pondere", pd.Series([0]))).median()),
+            "reading": reading,
+            "action": action,
+            "top_members": top_members,
+            "entity_label_plural": entity_label_plural,
+        })
+    profiles.sort(key=lambda p: p["ca_total"], reverse=True)
+    for idx, profile in enumerate(profiles, start=1):
+        profile["display_id"] = idx
+        profile["cluster_label"] = f"Groupe {idx}"
+    return profiles
+
+
+def _run_static_cluster(
+    df: pd.DataFrame,
+    entity_type: str,
+    entity_label_plural: str,
+    entity_label_singular: str,
+) -> dict:
+    if entity_type == "products":
+        features, feature_cols, error, derived_label = _build_product_sales_features(df)
+        entity_label_singular = derived_label
+        entity_label_plural = "Produits" if derived_label == "Produit" else "Familles produits"
+    else:
+        features, feature_cols, error = _build_client_sales_features(df)
+
+    if error:
+        return {"error": error, "features": pd.DataFrame()}
+    if len(features) < 3:
+        return {"error": f"Pas assez de {entity_label_plural.lower()} sur la période sélectionnée.", "features": features}
+
+    matrix = _prepare_clustering_matrix(features, feature_cols)
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(matrix)
+    k, metrics = _choose_k(X_scaled)
+    if k < 2:
+        return {"error": "Pas assez de données pour former plusieurs groupes.", "features": features}
+
+    labels = KMeans(n_clusters=k, random_state=RANDOM_STATE, n_init=30, max_iter=500).fit_predict(X_scaled)
+    features = features.copy()
+    features["Cluster"] = labels
+
+    profiles = _profile_clusters(features, entity_type, entity_label_plural)
+    label_map = {profile["id"]: profile["cluster_label"] for profile in profiles}
+    name_map = {profile["id"]: profile["name"] for profile in profiles}
+    features["Cluster_Label"] = features["Cluster"].map(lambda c: f"{label_map.get(c, 'Groupe')} - {name_map.get(c, '')}")
+
+    graphs = {
+        "scatter": _cluster_scatter(features, X_scaled, entity_label_plural),
+        "distribution": _cluster_distribution_chart(profiles, entity_label_plural),
+    }
+
+    summary_table = (
+        features.sort_values("CA_Total", ascending=False)
+        .head(60)[["Entity", "Cluster_Label", "CA_Total", "Nb_Commandes", "Qty_Total"]]
+        .rename(columns={"Entity": entity_label_singular, "Cluster_Label": "Groupe", "CA_Total": "CA", "Nb_Commandes": "Commandes", "Qty_Total": "Quantite"})
+        .to_dict("records")
+    )
+
+    return {
+        "features": features,
+        "profiles": profiles,
+        "graphs": graphs,
+        "metrics": metrics,
+        "k": k,
+        "entity_label_singular": entity_label_singular,
+        "entity_label_plural": entity_label_plural,
+        "summary_table": summary_table,
+    }
+
+
+def _period_features(df: pd.DataFrame, granularity: str, entity_type: str) -> tuple[dict[str, pd.DataFrame], list[str], str, str]:
+    col = _period_col(granularity)
+    frames = {}
+    entity_label_plural = "Clients" if entity_type == "clients" else "Produits"
+    entity_label_singular = "Client" if entity_type == "clients" else "Produit"
+    if col not in df.columns:
+        return {}, [], entity_label_singular, entity_label_plural
+    for period in _sorted_period_values(df[col].dropna().unique(), granularity):
+        sub = df[df[col].astype(str) == str(period)].copy()
+        if entity_type == "products":
+            features, feature_cols, _, derived = _build_product_sales_features(sub)
+            entity_label_singular = derived
+            entity_label_plural = "Produits" if derived == "Produit" else "Familles produits"
+        else:
+            features, feature_cols, _ = _build_client_sales_features(sub)
+        if len(features) >= 3:
+            frames[period] = features
+    return frames, feature_cols if frames else [], entity_label_singular, entity_label_plural
+
+
+def _temporal_count_chart(distribution: list[dict]) -> str | None:
+    try:
+        import plotly.express as px
+        df = pd.DataFrame(distribution)
+        if df.empty:
+            return None
+        fig = px.bar(
+            df,
+            x="period",
+            y="count",
+            color="cluster_label",
+            title="Évolution de la taille des groupes",
+            labels={"period": "Période", "count": "Nombre", "cluster_label": "Groupe"},
+            color_discrete_sequence=px.colors.qualitative.Set2,
+        )
+        fig.update_layout(height=420, barmode="stack", legend_title_text="Groupes")
+        return _to_html(fig)
+    except Exception:
+        return None
+
+
+def _temporal_ca_chart(distribution: list[dict]) -> str | None:
+    try:
+        import plotly.express as px
+        df = pd.DataFrame(distribution)
+        if df.empty:
+            return None
+        fig = px.line(
+            df,
+            x="period",
+            y="ca_total",
+            color="cluster_label",
+            markers=True,
+            title="Évolution du CA par groupe",
+            labels={"period": "Période", "ca_total": "CA", "cluster_label": "Groupe"},
+            color_discrete_sequence=px.colors.qualitative.Set2,
+        )
+        fig.update_layout(height=420, legend_title_text="Groupes")
+        return _to_html(fig)
+    except Exception:
+        return None
+
+
+def _transition_heatmap(transitions: list[dict]) -> str | None:
+    try:
+        import plotly.graph_objects as go
+        if not transitions:
+            return None
+        first = transitions[0]
+        matrix = first["matrix"]
+        labels = list(matrix.index)
+        fig = go.Figure(data=go.Heatmap(z=matrix.values, x=labels, y=labels, colorscale="Blues", text=matrix.values, texttemplate="%{text}"))
+        fig.update_layout(title=f"Transitions {first['from']} → {first['to']}", xaxis_title="Groupe suivant", yaxis_title="Groupe précédent", height=420)
+        return _to_html(fig)
+    except Exception:
+        return None
+
+
+_TRACK_METRICS = [
+    ("CA_Total", "CA"),
+    ("Qty_Total", "Quantité"),
+    ("Nb_Commandes", "Commandes"),
+    ("Panier_Moyen", "Panier moyen"),
+    ("PU_Pondere", "PU pondéré"),
+    ("PU_Moyen", "PU moyen"),
+    ("Nb_Familles", "Familles"),
+    ("Nb_Clients", "Clients"),
+    ("Lead_Time_Median", "Lead time"),
+    ("Part_Non_EUR", "Part non-EUR"),
+    ("Concentration_Client", "Concentration client"),
+]
+
+
+def _journey_chart(track_records: list[dict], k: int) -> str | None:
+    try:
+        import plotly.graph_objects as go
+        if not track_records:
+            return None
+        df = pd.DataFrame(track_records)
+        fig = go.Figure()
+        for entity, data in df.groupby("entity", sort=False):
+            fig.add_trace(
+                go.Scatter(
+                    x=data["period"],
+                    y=data["cluster_num"],
+                    mode="lines+markers",
+                    name=str(entity),
+                    text=data["cluster_label"],
+                    customdata=data[["ca_total"]].values,
+                    hovertemplate=(
+                        "<b>%{fullData.name}</b><br>"
+                        "Période: %{x}<br>"
+                        "Groupe: %{text}<br>"
+                        "CA: %{customdata[0]:,.0f} €<extra></extra>"
+                    ),
+                )
+            )
+        fig.update_layout(
+            title="Parcours des éléments suivis entre les groupes",
+            height=420,
+            yaxis=dict(
+                title="Groupe",
+                tickmode="array",
+                tickvals=list(range(1, k + 1)),
+                ticktext=[f"Groupe {idx}" for idx in range(1, k + 1)],
+            ),
+            xaxis_title="Période",
+            legend_title_text="Sélection",
+        )
+        return _to_html(fig)
+    except Exception:
+        return None
+
+
+def _build_tracking_payload(
+    assignments: dict[str, pd.DataFrame],
+    periods: list[str],
+    feature_cols: list[str],
+    selected_entities: list[str] | None,
+    k: int,
+) -> dict:
+    if not assignments:
+        return {"options": [], "selected": [], "records": [], "changes": [], "chart": None}
+
+    combined = []
+    for period, frame in assignments.items():
+        tmp = frame.copy()
+        tmp["Period"] = period
+        combined.append(tmp)
+    all_rows = pd.concat(combined, ignore_index=True)
+
+    top_entities = (
+        all_rows.groupby("Entity")["CA_Total"]
+        .sum()
+        .sort_values(ascending=False)
+    )
+    options = [
+        {"value": str(entity), "label": str(entity)}
+        for entity in top_entities.head(300).index
+    ]
+    valid = set(str(entity) for entity in top_entities.index)
+    selected = [str(entity) for entity in (selected_entities or []) if str(entity) in valid]
+    if not selected:
+        selected = [str(entity) for entity in top_entities.head(5).index]
+    selected = selected[:12]
+
+    metric_cols = [col for col, _label in _TRACK_METRICS if col in all_rows.columns]
+    rows = all_rows[all_rows["Entity"].astype(str).isin(selected)].copy()
+    rows["Entity"] = rows["Entity"].astype(str)
+    rows["cluster_num"] = pd.to_numeric(rows["Cluster"], errors="coerce").fillna(0).astype(int) + 1
+
+    records = [
+        {
+            "entity": row["Entity"],
+            "period": row["Period"],
+            "cluster": int(row["Cluster"]),
+            "cluster_num": int(row["cluster_num"]),
+            "cluster_label": row.get("Cluster_Label", f"Groupe {int(row['cluster_num'])}"),
+            "ca_total": float(row.get("CA_Total", 0) or 0),
+        }
+        for _, row in rows.sort_values(["Entity", "Period"]).iterrows()
+    ]
+
+    changes = []
+    for entity in selected:
+        entity_rows = rows[rows["Entity"] == entity].copy()
+        order_map = {period: idx for idx, period in enumerate(periods)}
+        entity_rows["_order"] = entity_rows["Period"].map(order_map)
+        entity_rows = entity_rows.sort_values("_order")
+        previous = None
+        for _, current in entity_rows.iterrows():
+            if previous is not None and int(previous["Cluster"]) != int(current["Cluster"]):
+                metric_changes = []
+                for col, label in _TRACK_METRICS:
+                    if col not in metric_cols:
+                        continue
+                    before = float(previous.get(col, 0) or 0)
+                    after = float(current.get(col, 0) or 0)
+                    delta = after - before
+                    pct = (delta / abs(before) * 100) if abs(before) > 1e-9 else None
+                    weight = abs(pct) if pct is not None else abs(delta)
+                    metric_changes.append({
+                        "metric": label,
+                        "before": before,
+                        "after": after,
+                        "delta": delta,
+                        "pct": pct,
+                        "weight": weight,
+                    })
+                metric_changes = sorted(metric_changes, key=lambda item: item["weight"], reverse=True)[:4]
+                changes.append({
+                    "entity": entity,
+                    "from_period": previous["Period"],
+                    "to_period": current["Period"],
+                    "from_cluster": f"Groupe {int(previous['Cluster']) + 1}",
+                    "to_cluster": f"Groupe {int(current['Cluster']) + 1}",
+                    "metrics": metric_changes,
+                })
+            previous = current
+
+    return {
+        "options": options,
+        "selected": selected,
+        "records": records,
+        "changes": changes[:50],
+        "chart": _journey_chart(records, k),
+    }
+
+
+def _run_temporal_cluster(
+    df: pd.DataFrame,
+    granularity: str,
+    entity_type: str,
+    selected_entities: list[str] | None = None,
+) -> dict:
+    frames, feature_cols, entity_label_singular, entity_label_plural = _period_features(df, granularity, entity_type)
+    periods = list(frames.keys())
+    if len(periods) < 2:
+        return {"error": "Le clustering temporel nécessite au moins deux périodes avec assez de données."}
+
+    min_count = min(len(frame) for frame in frames.values())
+    if min_count < 3:
+        return {"error": "Pas assez d'éléments récurrents pour suivre les groupes dans le temps."}
+
+    all_features = pd.concat(frames.values(), ignore_index=True)
+    matrix_all = _prepare_clustering_matrix(all_features, feature_cols)
+    scaler = StandardScaler()
+    scaler.fit(matrix_all)
+    pooled_scaled = scaler.transform(matrix_all)
+    k, _ = _choose_k(pooled_scaled, max_k=min(5, min_count - 1))
+    k = max(2, min(k, min_count - 1))
+
+    assignments = {}
+    previous_centers = None
+    distribution = []
+    profiles_by_period = []
+
+    for period in periods:
+        features = frames[period].copy()
+        X = scaler.transform(_prepare_clustering_matrix(features, feature_cols))
+        km = KMeans(n_clusters=k, random_state=RANDOM_STATE, n_init=30, max_iter=500)
+        raw_labels = km.fit_predict(X)
+        centers = km.cluster_centers_
+
+        if previous_centers is not None:
+            cost = np.linalg.norm(centers[:, None, :] - previous_centers[None, :, :], axis=2)
+            row_ind, col_ind = linear_sum_assignment(cost)
+            mapping = {int(row): int(col) for row, col in zip(row_ind, col_ind)}
+            labels = np.array([mapping.get(int(label), int(label)) for label in raw_labels])
+            aligned_centers = np.zeros_like(centers)
+            for old, new in mapping.items():
+                aligned_centers[new] = centers[old]
+            previous_centers = aligned_centers
+        else:
+            labels = raw_labels
+            previous_centers = centers
+
+        features["Cluster"] = labels
+        period_profiles = _profile_clusters(features, entity_type, entity_label_plural)
+        for profile in period_profiles:
+            profile["cluster_label"] = f"Groupe {int(profile['id']) + 1}"
+        label_map = {profile["id"]: profile["cluster_label"] for profile in period_profiles}
+        features["Cluster_Label"] = features["Cluster"].map(lambda c: label_map.get(c, f"Groupe {int(c) + 1}"))
+        assignment_cols = ["Entity", "Cluster", "Cluster_Label", "CA_Total"] + [
+            col for col, _label in _TRACK_METRICS if col in features.columns
+        ]
+        assignments[period] = features[list(dict.fromkeys(assignment_cols))].copy()
+
+        for profile in period_profiles:
+            distribution.append({
+                "period": period,
+                "cluster": profile["id"],
+                "cluster_label": profile["cluster_label"],
+                "name": profile["name"],
+                "count": profile["count"],
+                "ca_total": profile["ca_total"],
+            })
+        profiles_by_period.append({"period": period, "profiles": period_profiles})
+
+    transitions = []
+    for prev, nxt in zip(periods, periods[1:]):
+        a = assignments[prev][["Entity", "Cluster"]].rename(columns={"Cluster": "from_cluster"})
+        b = assignments[nxt][["Entity", "Cluster"]].rename(columns={"Cluster": "to_cluster"})
+        merged = a.merge(b, on="Entity", how="inner")
+        if merged.empty:
+            continue
+        labels = [f"Groupe {idx + 1}" for idx in range(k)]
+        matrix = pd.crosstab(merged["from_cluster"], merged["to_cluster"]).reindex(index=range(k), columns=range(k), fill_value=0)
+        matrix.index = labels
+        matrix.columns = labels
+        stable = int((merged["from_cluster"] == merged["to_cluster"]).sum())
+        total = int(len(merged))
+        transitions.append({
+            "from": prev,
+            "to": nxt,
+            "matrix": matrix,
+            "matrix_records": matrix.reset_index().rename(columns={"index": "Groupe précédent"}).to_dict("records"),
+            "stable": stable,
+            "migrants": total - stable,
+            "stable_pct": round(stable / total * 100, 1) if total else 0,
+            "total": total,
+        })
+
+    graphs = {
+        "temporal_counts": _temporal_count_chart(distribution),
+        "temporal_ca": _temporal_ca_chart(distribution),
+        "transition_heatmap": _transition_heatmap(transitions),
+    }
+    tracking = _build_tracking_payload(assignments, periods, feature_cols, selected_entities, k)
+    graphs["journey"] = tracking.get("chart")
+
+    latest_profiles = profiles_by_period[-1]["profiles"] if profiles_by_period else []
+    return {
+        "k": k,
+        "periods": periods,
+        "profiles": latest_profiles,
+        "profiles_by_period": profiles_by_period,
+        "distribution": distribution,
+        "transitions": transitions,
+        "tracking": tracking,
+        "graphs": graphs,
+        "entity_label_singular": entity_label_singular,
+        "entity_label_plural": entity_label_plural,
+    }
+
+
+def generate_sales_clustering_analysis(
+    df: pd.DataFrame,
+    mode: str = "static",
+    entity_type: str = "clients",
+    granularity: str = "month",
+    period: str | None = None,
+    period_start: str | None = None,
+    period_end: str | None = None,
+    tracked_entities: list[str] | None = None,
+) -> dict:
+    """Business-first clustering for the Sales Analytics UI."""
+    try:
+        if df is None or df.empty:
+            return {"results": {}, "graphs": {}, "kpis": {}, "error": "Aucune donnée disponible."}
+
+        mode = "temporal" if mode == "temporal" else "static"
+        entity_type = "products" if entity_type == "products" else "clients"
+        granularity = granularity if granularity in _PERIOD_COLUMNS else "month"
+        period_options = get_sales_clustering_period_options(df)
+
+        available = period_options.get(granularity, [])
+        if mode == "static":
+            if period in available and not period_start and not period_end:
+                start = end = period
+            else:
+                start = period_start if period_start in available else (available[-1] if available else None)
+                end = period_end if period_end in available else start
+            start, end = _order_period_bounds(available, start, end)
+            scoped = _filter_period_range(df, granularity, start, end)
+            entity_label_plural = "Clients" if entity_type == "clients" else "Produits"
+            entity_label_singular = "Client" if entity_type == "clients" else "Produit"
+            result = _run_static_cluster(scoped, entity_type, entity_label_plural, entity_label_singular)
+            if result.get("error"):
+                return {"results": {}, "graphs": {}, "kpis": {}, "error": result["error"], "period_options": period_options}
+
+            kpis = {
+                "mode_label": "Clustering Statique",
+                "entity_label": result["entity_label_plural"],
+                "entity_count": int(len(result["features"])),
+                "clusters": int(result["k"]),
+                "period_label": start if start == end else f"{start} → {end}",
+                "granularity_label": _GRANULARITY_LABELS.get(granularity, "Période"),
+                "ca_total": _money(result["features"]["CA_Total"].sum()),
+            }
+            results = {
+                "profiles": result["profiles"],
+                "summary_table": result["summary_table"],
+                "metrics": result.get("metrics", []),
+                "entity_label_singular": result["entity_label_singular"],
+                "entity_label_plural": result["entity_label_plural"],
+            }
+            return {
+                "results": results,
+                "graphs": result["graphs"],
+                "kpis": kpis,
+                "error": None,
+                "period_options": period_options,
+                "resolved": {"period": start, "period_start": start, "period_end": end},
+            }
+
+        start = period_start if period_start in available else (available[0] if available else None)
+        end = period_end if period_end in available else (available[-1] if available else None)
+        start, end = _order_period_bounds(available, start, end)
+        scoped = _filter_period_range(df, granularity, start, end)
+        result = _run_temporal_cluster(scoped, granularity, entity_type, selected_entities=tracked_entities)
+        if result.get("error"):
+            return {"results": {}, "graphs": {}, "kpis": {}, "error": result["error"], "period_options": period_options}
+
+        kpis = {
+            "mode_label": "Clustering temporel",
+            "entity_label": result["entity_label_plural"],
+            "entity_count": int(max([sum(item["count"] for item in period["profiles"]) for period in result["profiles_by_period"]] or [0])),
+            "clusters": int(result["k"]),
+            "period_label": f"{start} → {end}",
+            "granularity_label": _GRANULARITY_LABELS.get(granularity, "Période"),
+            "period_count": len(result["periods"]),
+        }
+        results = {
+            "profiles": result["profiles"],
+            "profiles_by_period": result["profiles_by_period"],
+            "distribution": result["distribution"],
+            "transitions": result["transitions"],
+            "tracking": result["tracking"],
+            "periods": result["periods"],
+            "entity_label_singular": result["entity_label_singular"],
+            "entity_label_plural": result["entity_label_plural"],
+        }
+        return {
+            "results": results,
+            "graphs": result["graphs"],
+            "kpis": kpis,
+            "error": None,
+            "period_options": period_options,
+            "resolved": {"period_start": start, "period_end": end},
+            "tracked_entities": result.get("tracking", {}).get("selected", []),
+        }
+
+    except Exception as e:
+        return {"results": {}, "graphs": {}, "kpis": {}, "error": str(e)}

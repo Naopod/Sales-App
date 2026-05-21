@@ -440,6 +440,336 @@ body.analysis-page {
 
 @media (max-width: 992px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
+/* === Client 360 command center === */
+.client360-master-section,
+.client360-cockpit {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--card-shadow);
+}
+
+.client360-master-section {
+    padding: 1.25rem;
+}
+
+.client360-master-header,
+.client360-cockpit-header,
+.client360-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.client360-master-header {
+    margin-bottom: 1rem;
+}
+
+.client360-master-header h3,
+.client360-cockpit-header h3,
+.client360-panel-head h4 {
+    margin: 0;
+    color: var(--text-primary) !important;
+}
+
+.client360-master-header h3,
+.client360-cockpit-header h3 {
+    font-size: 1.35rem;
+    font-weight: 800;
+}
+
+.client360-panel-head h4 {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.client360-panel-head h4 i,
+.client360-eyebrow i {
+    color: var(--accent);
+}
+
+.client360-eyebrow,
+.client360-master-period {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.client360-master-period {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    text-transform: none;
+}
+
+.client360-client-form {
+    display: grid;
+    grid-template-columns: minmax(260px, 1fr) auto;
+    gap: 0.75rem;
+    align-items: end;
+}
+
+.client360-client-form label,
+.client360-filter-bar label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin: 0;
+}
+
+.client360-client-form label > span,
+.client360-filter-bar label > span {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.client360-cockpit {
+    padding: 1rem;
+}
+
+.client360-cockpit-header {
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border-default);
+}
+
+.client360-header-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-top: 0.45rem;
+}
+
+.client360-header-meta span {
+    padding: 0.25rem 0.5rem;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+}
+
+.client360-cluster-chip {
+    min-width: 240px;
+    padding: 0.75rem;
+    border: 1px solid var(--accent);
+    border-left: 4px solid var(--accent);
+    border-radius: var(--radius-md);
+    background: var(--accent-subtle);
+}
+
+.client360-cluster-chip span,
+.client360-cluster-chip small {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.client360-cluster-chip strong {
+    display: block;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    line-height: 1.25;
+    margin: 0.15rem 0;
+}
+
+.client360-filter-bar {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(130px, 1fr)) auto;
+    gap: 0.65rem;
+    align-items: end;
+    margin: 1rem 0;
+    padding: 0.85rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+}
+
+.client360-reset-btn {
+    min-width: 38px;
+    min-height: 38px;
+}
+
+.client360-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(120px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.client360-kpi {
+    min-height: 104px;
+    padding: 0.8rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.client360-kpi span {
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.client360-kpi strong {
+    color: var(--text-primary);
+    font-size: 1.2rem;
+    line-height: 1.1;
+}
+
+.client360-kpi small {
+    color: var(--text-muted);
+    font-size: 0.74rem;
+}
+
+.client360-dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.client360-panel {
+    min-width: 0;
+    padding: 0.85rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+}
+
+.client360-panel-wide {
+    grid-column: 1 / -1;
+}
+
+.client360-chart {
+    min-height: 320px;
+}
+
+.client360-chart-lg {
+    min-height: 420px;
+}
+
+.client360-projection-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    justify-content: flex-end;
+}
+
+.client360-projection-pill {
+    padding: 0.35rem 0.55rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.client360-projection-pill strong {
+    color: var(--text-primary);
+}
+
+.client360-cluster-body {
+    display: grid;
+    gap: 0.9rem;
+    margin-top: 0.75rem;
+}
+
+.client360-cluster-main {
+    display: grid;
+    gap: 0.3rem;
+    padding: 0.8rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-secondary);
+    border-left: 4px solid var(--success);
+}
+
+.client360-cluster-main strong {
+    color: var(--text-primary);
+}
+
+.client360-cluster-main span {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.client360-cluster-journey {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.client360-cluster-step {
+    padding: 0.35rem 0.5rem;
+    border-radius: var(--radius-md);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-default);
+    color: var(--text-secondary);
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.client360-cluster-step.is-current {
+    border-color: var(--success);
+    color: var(--success);
+}
+
+.client360-table-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+    gap: 1rem;
+}
+
+.client360-table {
+    margin-bottom: 0;
+}
+
+.client360-table tbody tr {
+    cursor: pointer;
+}
+
+.client360-table tbody tr.is-selected {
+    background: var(--accent-subtle) !important;
+}
+
+.client360-empty {
+    color: var(--text-muted);
+    padding: 1rem;
+    text-align: center;
+}
+
+@media (max-width: 1200px) {
+    .client360-filter-bar { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+    .client360-kpi-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); }
+}
+
+@media (max-width: 992px) {
+    .client360-dashboard-grid,
+    .client360-table-grid,
+    .client360-client-form { grid-template-columns: 1fr; }
+    .client360-cockpit-header,
+    .client360-master-header,
+    .client360-panel-head { align-items: flex-start; flex-direction: column; }
+    .client360-cluster-chip { width: 100%; min-width: 0; }
+}
+
+@media (max-width: 640px) {
+    .client360-filter-bar,
+    .client360-kpi-grid { grid-template-columns: 1fr; }
+    .client360-master-section,
+    .client360-cockpit { padding: 0.85rem; }
+}
+
 /* === Section Headers === */
 .section-title-bar {
     display: flex;

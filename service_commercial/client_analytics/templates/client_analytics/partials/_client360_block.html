@@ -11,6 +11,184 @@
 </div>
 {% endif %}
 
+{% if client_portfolio.dashboard.records %}
+<section class="client360-cockpit mt-3" data-client360-dashboard>
+    {{ client_portfolio.dashboard|json_script:"client360-dashboard-data" }}
+
+    <div class="client360-cockpit-header">
+        <div>
+            <span class="client360-eyebrow"><i class="bi bi-stars"></i> Client 360</span>
+            <h3>{{ client_portfolio.client_id }}</h3>
+            <div class="client360-header-meta">
+                <span>{{ client_portfolio.meta.period_label|default:"Mois" }}</span>
+                <span>{{ client_portfolio.kpis.nb_families|default:"0" }} familles</span>
+                <span>{{ client_portfolio.kpis.country|default:"Geographie mixte" }}</span>
+            </div>
+        </div>
+        <div class="client360-cluster-chip">
+            <span>Cluster</span>
+            <strong data-client360-cluster-title>{{ client_portfolio.cluster.current_label|default:"Groupe non disponible" }}</strong>
+            <small data-client360-cluster-status>
+                {% if client_portfolio.cluster.changed %}Migration detectee{% else %}Position stable{% endif %}
+            </small>
+        </div>
+    </div>
+
+    <div class="client360-filter-bar">
+        <label>
+            <span>Debut</span>
+            <select class="form-select form-select-sm" data-client360-filter="period-start"></select>
+        </label>
+        <label>
+            <span>Fin</span>
+            <select class="form-select form-select-sm" data-client360-filter="period-end"></select>
+        </label>
+        <label>
+            <span>Famille</span>
+            <select class="form-select form-select-sm" data-client360-filter="family"></select>
+        </label>
+        <label>
+            <span>Produit / recette</span>
+            <select class="form-select form-select-sm" data-client360-filter="product"></select>
+        </label>
+        <label>
+            <span>Geographie</span>
+            <select class="form-select form-select-sm" data-client360-filter="country"></select>
+        </label>
+        <label>
+            <span>Mesure</span>
+            <select class="form-select form-select-sm" data-client360-filter="metric"></select>
+        </label>
+        <button class="btn btn-sm btn-outline-secondary client360-reset-btn" type="button" data-client360-reset title="Reinitialiser">
+            <i class="bi bi-arrow-counterclockwise"></i>
+        </button>
+    </div>
+
+    <div class="client360-kpi-grid">
+        <div class="client360-kpi">
+            <span>CA filtre</span>
+            <strong data-client360-kpi="ca">-</strong>
+            <small data-client360-kpi-sub="ca">-</small>
+        </div>
+        <div class="client360-kpi">
+            <span>Commandes</span>
+            <strong data-client360-kpi="orders">-</strong>
+            <small data-client360-kpi-sub="orders">-</small>
+        </div>
+        <div class="client360-kpi">
+            <span>Quantite</span>
+            <strong data-client360-kpi="qty">-</strong>
+            <small data-client360-kpi-sub="qty">-</small>
+        </div>
+        <div class="client360-kpi">
+            <span>PU moyen</span>
+            <strong data-client360-kpi="unit_price">-</strong>
+            <small data-client360-kpi-sub="unit_price">-</small>
+        </div>
+        <div class="client360-kpi">
+            <span>Lead time</span>
+            <strong data-client360-kpi="lead_time">-</strong>
+            <small data-client360-kpi-sub="lead_time">-</small>
+        </div>
+        <div class="client360-kpi">
+            <span>Anomalies</span>
+            <strong data-client360-kpi="anomalies">-</strong>
+            <small data-client360-kpi-sub="anomalies">-</small>
+        </div>
+    </div>
+
+    <div class="client360-dashboard-grid">
+        <div class="client360-panel client360-panel-wide">
+            <div class="client360-panel-head">
+                <h4><i class="bi bi-activity"></i> Evolution et projection</h4>
+                <div class="client360-projection-strip" data-client360-projection-cards></div>
+            </div>
+            <div class="client360-chart client360-chart-lg" data-client360-chart="trend"></div>
+        </div>
+
+        <div class="client360-panel">
+            <div class="client360-panel-head">
+                <h4><i class="bi bi-diagram-3"></i> Mix portefeuille</h4>
+            </div>
+            <div class="client360-chart" data-client360-chart="mix"></div>
+        </div>
+
+        <div class="client360-panel">
+            <div class="client360-panel-head">
+                <h4><i class="bi bi-globe2"></i> Geographies</h4>
+            </div>
+            <div class="client360-chart" data-client360-chart="geo"></div>
+        </div>
+
+        <div class="client360-panel">
+            <div class="client360-panel-head">
+                <h4><i class="bi bi-bounding-box-circles"></i> Cluster</h4>
+            </div>
+            <div class="client360-cluster-body">
+                <div class="client360-cluster-main">
+                    <strong data-client360-cluster-name>{{ client_portfolio.cluster.current_name|default:"Segment client" }}</strong>
+                    <span data-client360-cluster-reading>{{ client_portfolio.cluster.reading|default:"Profil calcule sur le portefeuille." }}</span>
+                </div>
+                <div class="client360-cluster-journey" data-client360-cluster-journey></div>
+            </div>
+        </div>
+
+        <div class="client360-panel">
+            <div class="client360-panel-head">
+                <h4><i class="bi bi-exclamation-triangle"></i> Anomalies</h4>
+            </div>
+            <div class="client360-chart" data-client360-chart="anomalies"></div>
+        </div>
+
+        <div class="client360-panel client360-panel-wide">
+            <div class="client360-panel-head">
+                <h4><i class="bi bi-table"></i> Produits, periodes et signaux</h4>
+            </div>
+            <div class="client360-table-grid">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover client360-table">
+                        <thead>
+                            <tr>
+                                <th>Produit / recette</th>
+                                <th>Famille</th>
+                                <th class="text-end">CA</th>
+                                <th class="text-end">Cmd</th>
+                                <th class="text-end">PU</th>
+                                <th class="text-end">LT</th>
+                            </tr>
+                        </thead>
+                        <tbody data-client360-products-body></tbody>
+                    </table>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover client360-table">
+                        <thead>
+                            <tr>
+                                <th>Periode</th>
+                                <th class="text-end">CA</th>
+                                <th class="text-end">Cmd</th>
+                                <th class="text-end">Fam.</th>
+                            </tr>
+                        </thead>
+                        <tbody data-client360-periods-body></tbody>
+                    </table>
+                    <table class="table table-sm client360-table mt-3">
+                        <thead>
+                            <tr>
+                                <th>Signal</th>
+                                <th>Periode</th>
+                                <th class="text-end">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody data-client360-anomalies-body></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
 {% if client_portfolio.kpis %}
 <div class="row mt-3">
     <div class="col-md-3 mb-3">

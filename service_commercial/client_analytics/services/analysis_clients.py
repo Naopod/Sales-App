@@ -16,6 +16,527 @@ def _pick_col(df: pd.DataFrame, candidates) -> str | None:
     return None
 
 
+def _json_float(value, digits: int | None = 4):
+    try:
+        if value is None or pd.isna(value):
+            return None
+        value = float(value)
+        if not np.isfinite(value):
+            return None
+        return round(value, digits) if digits is not None else value
+    except Exception:
+        return None
+
+
+def _json_int(value):
+    try:
+        if value is None or pd.isna(value):
+            return None
+        return int(value)
+    except Exception:
+        return None
+
+
+def _periodize_client360_frame(df: pd.DataFrame, date_col: str | None, granularity: str) -> pd.DataFrame:
+    work = df.copy()
+    if not date_col or date_col not in work.columns:
+        work["_period_label"] = "Total"
+        work["_period_index"] = 0
+        return work
+
+    dates = pd.to_datetime(work[date_col], errors="coerce", dayfirst=True)
+    work["_d"] = dates
+    if dates.notna().sum() == 0:
+        work["_period_label"] = "Total"
+        work["_period_index"] = 0
+        return work
+
+    valid = work["_d"].notna()
+    if granularity == "quarter":
+        fy = work.loc[valid, "_d"].dt.year + (work.loc[valid, "_d"].dt.month >= 4).astype(int)
+        qn = ((work.loc[valid, "_d"].dt.month - 4) % 12) // 3 + 1
+        work.loc[valid, "_period_index"] = (fy * 10 + qn).astype(int)
+        if "Fiscal_Quarter" in work.columns and work.loc[valid, "Fiscal_Quarter"].notna().any():
+            work.loc[valid, "_period_label"] = work.loc[valid, "Fiscal_Quarter"].astype(str)
+        else:
+            work.loc[valid, "_period_label"] = "Q" + qn.astype(int).astype(str) + " FY" + fy.astype(int).astype(str)
+    elif granularity == "year":
+        fy = work.loc[valid, "_d"].dt.year + (work.loc[valid, "_d"].dt.month >= 4).astype(int)
+        work.loc[valid, "_period_index"] = fy.astype(int)
+        if "Fiscal_Year_Label" in work.columns and work.loc[valid, "Fiscal_Year_Label"].notna().any():
+            work.loc[valid, "_period_label"] = work.loc[valid, "Fiscal_Year_Label"].astype(str)
+        else:
+            work.loc[valid, "_period_label"] = "FY" + fy.astype(int).astype(str)
+    else:
+        work.loc[valid, "_period_index"] = (
+            work.loc[valid, "_d"].dt.year * 100 + work.loc[valid, "_d"].dt.month
+        ).astype(int)
+        work.loc[valid, "_period_label"] = work.loc[valid, "_d"].dt.to_period("M").astype(str)
+
+    work["_period_label"] = work["_period_label"].fillna("Sans date").astype(str)
+    work["_period_index"] = pd.to_numeric(work["_period_index"], errors="coerce").fillna(-1).astype(int)
+    return work
+
+
+def _client360_metric_anomalies(monthly_summary: list[dict]) -> list[dict]:
+    if not monthly_summary or len(monthly_summary) < 4:
+        return []
+
+    df = pd.DataFrame(monthly_summary).copy()
+    if df.empty:
+        return []
+    if "period_index" in df.columns:
+        df["period_index"] = pd.to_numeric(df["period_index"], errors="coerce")
+        df = df.sort_values(["period_index", "period"])
+    else:
+        df = df.sort_values("period")
+
+    metric_defs = [
+        ("ca", "CA", "EUR"),
+        ("nb_orders", "Commandes", ""),
+        ("pu_net_weighted", "PU Net", ""),
+        ("lead_time_median", "Lead time", "j"),
+    ]
+    rows = []
+    for col, label, unit in metric_defs:
+        if col not in df.columns:
+            continue
+        s = pd.to_numeric(df[col], errors="coerce")
+        valid = s.dropna()
+        if valid.shape[0] < 4 or valid.nunique() < 2:
+            continue
+        median = float(valid.median())
+        mad = float((valid - median).abs().median())
+        std = float(valid.std(ddof=0) or 0.0)
+        for idx, value in s.items():
+            if pd.isna(value):
+                continue
+            if mad > 0:
+                z = 0.6745 * (float(value) - median) / mad
+            elif std > 0:
+                z = (float(value) - float(valid.mean())) / std
+            else:
+                continue
+            abs_z = abs(z)
+            if abs_z < 2.25:
+                continue
+            row = df.loc[idx]
+            direction = "haut" if z > 0 else "bas"
+            severity = "red" if abs_z >= 3.5 else "orange"
+            rows.append({
+                "period": str(row.get("period") or row.get("month") or ""),
+                "period_index": _json_int(row.get("period_index")),
+                "metric": col,
+                "metric_label": label,
+                "value": _json_float(value, 2),
+                "score": _json_float(z, 2),
+                "severity": severity,
+                "direction": direction,
+                "unit": unit,
+                "message": f"{label} anormalement {direction}",
+            })
+
+    rows.sort(key=lambda item: (abs(item.get("score") or 0), item.get("period_index") or 0), reverse=True)
+    return rows[:30]
+
+
+def _client360_projection(df: pd.DataFrame, client_id: str, monthly_summary: list[dict]) -> dict:
+    projection = {
+        "available": False,
+        "method": "Tendance lineaire",
+        "history": [],
+        "forecast": [],
+        "cards": [],
+        "error": None,
+    }
+
+    try:
+        from . import analysis_projection
+
+        result = analysis_projection.analyze_client_projection(df, str(client_id))
+        if result and not result.get("error"):
+            ca_metric = (result.get("metrics") or {}).get("ca") or {}
+            periods = ca_metric.get("periods") or []
+            values = ca_metric.get("values") or []
+            projection["history"] = [
+                {"period": str(p), "ca": _json_float(v, 0)}
+                for p, v in zip(periods, values)
+            ]
+            forecast = []
+            for horizon, item in sorted((result.get("proj") or {}).items(), key=lambda kv: int(kv[0])):
+                label = f"+{int(horizon)}M"
+                q50 = _json_float(item.get("q50"), 0)
+                forecast.append({
+                    "horizon": int(horizon),
+                    "label": label,
+                    "q10": _json_float(item.get("q10"), 0),
+                    "q50": q50,
+                    "q90": _json_float(item.get("q90"), 0),
+                    "delta_pct": _json_float(item.get("delta_pct"), 1),
+                })
+                projection["cards"].append({
+                    "label": label,
+                    "value": q50,
+                    "delta_pct": _json_float(item.get("delta_pct"), 1),
+                })
+            projection["forecast"] = forecast
+            projection["available"] = bool(forecast)
+            projection["method"] = "STL + projection client"
+            projection["current_ca"] = _json_float(result.get("current_ca"), 0)
+            projection["latest_period"] = result.get("latest_period")
+            projection["slope_6m"] = _json_float(result.get("slope_6m"), 1)
+            return projection
+        if result and result.get("error"):
+            projection["error"] = result.get("error")
+    except Exception as exc:
+        projection["error"] = str(exc)
+
+    try:
+        hist = pd.DataFrame(monthly_summary or []).copy()
+        if hist.empty or "ca" not in hist.columns:
+            return projection
+        if "period_index" in hist.columns and pd.to_numeric(hist["period_index"], errors="coerce").notna().any():
+            hist["period_index"] = pd.to_numeric(hist["period_index"], errors="coerce")
+            hist = hist.sort_values(["period_index", "period"])
+        else:
+            hist = hist.sort_values("period")
+        hist["ca"] = pd.to_numeric(hist["ca"], errors="coerce").fillna(0.0)
+        projection["history"] = [
+            {"period": str(row.get("period") or row.get("month")), "ca": _json_float(row.get("ca"), 0)}
+            for _, row in hist.tail(18).iterrows()
+        ]
+        values = hist["ca"].tail(6).to_numpy(dtype=float)
+        if values.size == 0:
+            return projection
+        latest = float(values[-1])
+        if values.size >= 2:
+            x = np.arange(values.size, dtype=float)
+            slope = float(np.polyfit(x, values, 1)[0])
+        else:
+            slope = 0.0
+        for horizon in [3, 6, 12]:
+            q50 = max(0.0, latest + slope * horizon)
+            q10 = q50 * 0.80
+            q90 = q50 * 1.20
+            delta = ((q50 - latest) / latest * 100.0) if latest > 0 else None
+            card = {
+                "label": f"+{horizon}M",
+                "value": _json_float(q50, 0),
+                "delta_pct": _json_float(delta, 1),
+            }
+            projection["cards"].append(card)
+            projection["forecast"].append({
+                "horizon": horizon,
+                "label": f"+{horizon}M",
+                "q10": _json_float(q10, 0),
+                "q50": _json_float(q50, 0),
+                "q90": _json_float(q90, 0),
+                "delta_pct": _json_float(delta, 1),
+            })
+        projection["available"] = True
+        projection["current_ca"] = _json_float(latest, 0)
+        projection["slope_6m"] = _json_float(slope, 1)
+    except Exception as exc:
+        projection["error"] = str(exc)
+
+    return projection
+
+
+def _client360_behavior(df: pd.DataFrame, client_id: str) -> dict:
+    try:
+        from . import analysis_behavioral_monitoring
+
+        result = analysis_behavioral_monitoring.analyze_client(df, str(client_id))
+        if not result or result.get("error"):
+            return {"available": False, "error": (result or {}).get("error")}
+        return {
+            "available": True,
+            "alert_score": _json_float(result.get("alert_score"), 1),
+            "classification": result.get("classification"),
+            "attribution": result.get("attribution"),
+            "cusum_alert": bool(result.get("cusum_alert")),
+            "latest_month": result.get("latest_month"),
+            "nb_months": _json_int(result.get("nb_months")),
+            "periods": [str(p) for p in result.get("periods", [])],
+            "alert_score_history": [_json_float(v, 1) for v in result.get("alert_score_history", [])],
+            "reliability": result.get("reliability"),
+        }
+    except Exception as exc:
+        return {"available": False, "error": str(exc)}
+
+
+def _client360_cluster(df: pd.DataFrame, client_id: str, granularity: str) -> dict:
+    cluster = {
+        "available": False,
+        "current_label": "Groupe non disponible",
+        "current_name": None,
+        "current_group": None,
+        "share_pct": None,
+        "ca_median": None,
+        "orders_median": None,
+        "reading": None,
+        "action": None,
+        "journey": [],
+        "changes": [],
+        "changed": False,
+        "previous_label": None,
+    }
+
+    try:
+        from . import analysis_clustering
+
+        static_result = analysis_clustering._run_static_cluster(df, "clients", "Clients", "Client")
+        features = static_result.get("features")
+        if isinstance(features, pd.DataFrame) and not features.empty:
+            row = features[features["Entity"].astype(str) == str(client_id)]
+            if not row.empty:
+                current = row.iloc[0]
+                raw_cluster = _json_int(current.get("Cluster"))
+                profile = None
+                for item in static_result.get("profiles", []):
+                    if _json_int(item.get("id")) == raw_cluster:
+                        profile = item
+                        break
+                cluster.update({
+                    "available": True,
+                    "current_label": str(current.get("Cluster_Label") or f"Groupe {(raw_cluster or 0) + 1}"),
+                    "current_name": profile.get("name") if profile else None,
+                    "current_group": (raw_cluster + 1) if raw_cluster is not None else None,
+                    "share_pct": _json_float(profile.get("share") if profile else None, 1),
+                    "ca_median": _json_float(profile.get("ca_median") if profile else None, 0),
+                    "orders_median": _json_float(profile.get("orders_median") if profile else None, 1),
+                    "reading": profile.get("reading") if profile else None,
+                    "action": profile.get("action") if profile else None,
+                })
+
+        temporal_result = analysis_clustering._run_temporal_cluster(
+            df,
+            granularity if granularity in ("month", "quarter", "year") else "month",
+            "clients",
+            selected_entities=[str(client_id)],
+        )
+        tracking = temporal_result.get("tracking", {}) if isinstance(temporal_result, dict) else {}
+        records = [
+            item for item in tracking.get("records", [])
+            if str(item.get("entity")) == str(client_id)
+        ]
+        period_order = {str(p): i for i, p in enumerate((temporal_result or {}).get("periods", []))}
+        records = sorted(records, key=lambda item: period_order.get(str(item.get("period")), 9999))
+        journey = []
+        for item in records:
+            journey.append({
+                "period": str(item.get("period")),
+                "cluster": _json_int(item.get("cluster")),
+                "cluster_num": _json_int(item.get("cluster_num")),
+                "cluster_label": str(item.get("cluster_label") or ""),
+                "ca_total": _json_float(item.get("ca_total"), 0),
+            })
+        if journey:
+            cluster["available"] = True
+            cluster["journey"] = journey
+            cluster["current_label"] = journey[-1].get("cluster_label") or cluster["current_label"]
+            cluster["current_group"] = journey[-1].get("cluster_num") or cluster["current_group"]
+            if len(journey) >= 2:
+                cluster["previous_label"] = journey[-2].get("cluster_label")
+                cluster["changed"] = journey[-2].get("cluster") != journey[-1].get("cluster")
+        changes = [
+            item for item in tracking.get("changes", [])
+            if str(item.get("entity")) == str(client_id)
+        ]
+        cluster["changes"] = changes[:8]
+    except Exception:
+        pass
+
+    if not cluster["available"]:
+        try:
+            client_col = _pick_col(df, ["Cpt Client", "Compte Client", "Client", "Code Client"])
+            amount_col = _pick_col(df, ["Montant", "CA", "CA Net", "Chiffre d'Affaires"])
+            order_col = "NÂ° Bon" if "NÂ° Bon" in df.columns else _pick_col(df, ["No Bon", "N Bon", "Bon", "NÂ° Commande", "Commande"])
+            if client_col and amount_col:
+                work = df[[client_col, amount_col] + ([order_col] if order_col else [])].copy()
+                work[amount_col] = pd.to_numeric(work[amount_col], errors="coerce")
+                agg = work.groupby(client_col).agg(
+                    ca=(amount_col, "sum"),
+                    orders=(order_col, pd.Series.nunique) if order_col else (amount_col, "count"),
+                )
+                if str(client_id) in agg.index.astype(str).tolist():
+                    row = agg[agg.index.astype(str) == str(client_id)].iloc[0]
+                    ca_q75 = agg["ca"].quantile(0.75)
+                    ca_q25 = agg["ca"].quantile(0.25)
+                    orders_q75 = agg["orders"].quantile(0.75)
+                    if row["ca"] >= ca_q75 and row["orders"] >= orders_q75:
+                        label = "Groupe strategique"
+                    elif row["ca"] <= ca_q25:
+                        label = "Groupe occasionnel"
+                    else:
+                        label = "Groupe stable"
+                    cluster.update({
+                        "available": True,
+                        "current_label": label,
+                        "current_name": label,
+                    })
+        except Exception:
+            pass
+
+    return cluster
+
+
+def _build_client360_dashboard(
+    df: pd.DataFrame,
+    df_client: pd.DataFrame,
+    client_id: str,
+    time_granularity: str,
+    portfolio: dict,
+) -> dict:
+    meta = portfolio.get("meta", {})
+    date_col = meta.get("date_col")
+    amount_col = meta.get("amount_col")
+    order_col = meta.get("order_col")
+    qty_col = meta.get("qty_col")
+    pu_col = meta.get("pu_col")
+    family_col = meta.get("family_col")
+    product_col = meta.get("product_col")
+    country_col = meta.get("country_col")
+    currency_col = meta.get("currency_col")
+    lead_time_col = meta.get("lead_time_col")
+    lead_time_deviation_col = meta.get("lead_time_deviation_col")
+    late_flag_col = meta.get("late_flag_col")
+
+    dashboard = {
+        "client_id": str(client_id),
+        "period_label": meta.get("period_label") or "Mois",
+        "period_unit": meta.get("period_unit") or "mois",
+        "granularity": time_granularity,
+        "records": [],
+        "filters": {"periods": [], "families": [], "products": [], "countries": [], "currencies": []},
+        "metrics": [
+            {"value": "ca", "label": "CA"},
+            {"value": "qty", "label": "Quantite"},
+            {"value": "orders", "label": "Commandes"},
+            {"value": "unit_price", "label": "PU Net"},
+            {"value": "lead_time_median", "label": "Lead time"},
+        ],
+        "projection": {},
+        "cluster": {},
+        "behavior": {},
+        "anomalies": [],
+    }
+
+    if df_client is None or df_client.empty:
+        return dashboard
+
+    work = _periodize_client360_frame(df_client, date_col, time_granularity)
+    work["_family"] = work[family_col].fillna("Non renseigne").astype(str) if family_col and family_col in work.columns else "Non renseigne"
+    work["_product"] = work[product_col].fillna("Non renseigne").astype(str) if product_col and product_col in work.columns else "Non renseigne"
+    work["_country"] = work[country_col].fillna("Non renseigne").astype(str) if country_col and country_col in work.columns else "Non renseigne"
+    work["_currency"] = work[currency_col].fillna("Non renseigne").astype(str) if currency_col and currency_col in work.columns else "Non renseigne"
+    work["_ca"] = pd.to_numeric(work[amount_col], errors="coerce").fillna(0.0) if amount_col and amount_col in work.columns else 0.0
+    work["_qty"] = pd.to_numeric(work[qty_col], errors="coerce").fillna(0.0) if qty_col and qty_col in work.columns else 0.0
+    if pu_col and pu_col in work.columns:
+        work["_pu"] = pd.to_numeric(work[pu_col], errors="coerce")
+    else:
+        qty = pd.to_numeric(work["_qty"], errors="coerce").replace({0: np.nan})
+        work["_pu"] = pd.to_numeric(work["_ca"], errors="coerce") / qty
+    if lead_time_col and lead_time_col in work.columns:
+        work["_lead_time"] = pd.to_numeric(work[lead_time_col], errors="coerce")
+    elif "_lead_time_calc" in work.columns:
+        work["_lead_time"] = pd.to_numeric(work["_lead_time_calc"], errors="coerce")
+    else:
+        work["_lead_time"] = np.nan
+
+    if late_flag_col and late_flag_col in work.columns:
+        raw_late = work[late_flag_col]
+        late_num = pd.to_numeric(raw_late, errors="coerce")
+        if late_num.isna().all():
+            late_num = raw_late.astype(str).str.lower().isin(["true", "vrai", "1", "yes", "oui", "late", "retard"]).astype(int)
+        work["_late"] = late_num
+    elif lead_time_deviation_col and lead_time_deviation_col in work.columns:
+        work["_late"] = (pd.to_numeric(work[lead_time_deviation_col], errors="coerce") > 0).astype(float)
+    else:
+        work["_late"] = np.nan
+
+    if "_order_key" not in work.columns:
+        if order_col and order_col in work.columns:
+            work["_order_key"] = work[order_col].astype(str)
+        else:
+            work["_order_key"] = work.index.astype(str)
+
+    group_cols = ["_period_label", "_period_index", "_family", "_product", "_country", "_currency"]
+    grouped = (
+        work.groupby(group_cols, dropna=False)
+        .agg(
+            ca=("_ca", "sum"),
+            qty=("_qty", "sum"),
+            orders=("_order_key", pd.Series.nunique),
+            lines=("_order_key", "size"),
+            pu_mean=("_pu", "mean"),
+            lead_time_median=("_lead_time", "median"),
+            late_rate=("_late", "mean"),
+        )
+        .reset_index()
+        .sort_values(["_period_index", "ca"], ascending=[True, False])
+    )
+    grouped["unit_price"] = grouped["ca"] / grouped["qty"].replace({0: np.nan})
+    grouped["unit_price"] = grouped["unit_price"].fillna(grouped["pu_mean"])
+
+    records = []
+    for _, row in grouped.iterrows():
+        records.append({
+            "period": str(row["_period_label"]),
+            "period_index": _json_int(row["_period_index"]),
+            "family": str(row["_family"]),
+            "product": str(row["_product"]),
+            "country": str(row["_country"]),
+            "currency": str(row["_currency"]),
+            "ca": _json_float(row["ca"], 2),
+            "qty": _json_float(row["qty"], 2),
+            "orders": _json_int(row["orders"]) or 0,
+            "lines": _json_int(row["lines"]) or 0,
+            "unit_price": _json_float(row["unit_price"], 4),
+            "lead_time_median": _json_float(row["lead_time_median"], 2),
+            "late_rate_pct": _json_float((row["late_rate"] or 0) * 100, 2) if pd.notna(row["late_rate"]) else None,
+        })
+    dashboard["records"] = records
+
+    def _filter_options(key: str, label_key: str = "label"):
+        if not records:
+            return []
+        tmp = pd.DataFrame(records)
+        if key not in tmp.columns:
+            return []
+        opt = tmp.groupby(key, dropna=False)["ca"].sum().sort_values(ascending=False)
+        return [
+            {"value": str(name), label_key: str(name), "ca": _json_float(ca, 0)}
+            for name, ca in opt.items()
+            if str(name)
+        ]
+
+    periods = (
+        grouped[["_period_label", "_period_index"]]
+        .drop_duplicates()
+        .sort_values(["_period_index", "_period_label"])
+    )
+    dashboard["filters"]["periods"] = [
+        {"value": str(row["_period_label"]), "label": str(row["_period_label"]), "index": _json_int(row["_period_index"])}
+        for _, row in periods.iterrows()
+    ]
+    dashboard["filters"]["families"] = _filter_options("family")
+    dashboard["filters"]["products"] = _filter_options("product")[:500]
+    dashboard["filters"]["countries"] = _filter_options("country")
+    dashboard["filters"]["currencies"] = _filter_options("currency")
+
+    monthly_summary = portfolio.get("tables", {}).get("monthly_summary", [])
+    dashboard["anomalies"] = _client360_metric_anomalies(monthly_summary)
+    dashboard["anomaly_summary"] = {
+        "count": len(dashboard["anomalies"]),
+        "critical_count": len([item for item in dashboard["anomalies"] if item.get("severity") == "red"]),
+    }
+    dashboard["projection"] = _client360_projection(df, str(client_id), monthly_summary)
+    dashboard["behavior"] = _client360_behavior(df, str(client_id))
+    dashboard["cluster"] = _client360_cluster(df, str(client_id), time_granularity)
+    return dashboard
+
+
 def get_client_options(df: pd.DataFrame, max_clients: int = 500) -> list[dict]:
     """Construit la liste des clients pour un <select> (triée par CA desc).
 
@@ -894,6 +1415,20 @@ def analyze_client_portfolio_full(
         'top1_family_share_pct': _safe_float(top1_family_share),
         'hhi': _safe_float(hhi),
     }
+
+    # ===== Dashboard interactif Client 360 =====
+    try:
+        dashboard = _build_client360_dashboard(df, df_client, str(client_id), tg, portfolio)
+        portfolio['dashboard'] = dashboard
+        portfolio['cluster'] = dashboard.get('cluster', {})
+        portfolio['projection'] = dashboard.get('projection', {})
+        portfolio['anomaly_summary'] = {
+            'count': len(dashboard.get('anomalies', [])),
+            'critical_count': len([a for a in dashboard.get('anomalies', []) if a.get('severity') == 'red']),
+        }
+    except Exception as e:
+        print(f"[client360] interactive dashboard error: {e}")
+        portfolio['dashboard'] = {}
 
     # ===== Graphes (Plotly HTML) =====
     try:

@@ -7,7 +7,6 @@ Chaque fichier viz_*.py correspond à un onglet et contient les fonctions de vis
 Fichiers:
 - viz_overview.py : Graphiques pour l'onglet Overview
 - viz_by_period.py : Graphiques pour le sous-onglet Analyse par périodes
-- viz_time_series.py : Graphiques pour le sous-onglet Série temporelle
 - viz_products.py : Graphiques pour le sous-onglet Produits
 - viz_clients.py : Graphiques pour le sous-onglet Clients
 - viz_geographic.py : Graphiques pour le sous-onglet Géographique
@@ -18,7 +17,6 @@ Fichiers:
 # Imports pour faciliter l'utilisation
 from .viz_overview import *
 from .viz_by_period import *
-from .viz_time_series import *
 from .viz_products import *
 from .viz_clients import *
 from .viz_geographic import *
@@ -29,9 +27,6 @@ __all__ = [
     # viz_overview
     
     # viz_by_period
-    
-    # viz_time_series
-    'create_stl_decomposition_plot',
     
     # viz_products
     
@@ -48,5 +43,4 @@ __all__ = [
     'plot_non_eur_pct_over_time',
     'plot_country_currency_heatmap',
     'plot_pareto_non_eur_clients',
-    'plot_non_eur_by_family',
 ]

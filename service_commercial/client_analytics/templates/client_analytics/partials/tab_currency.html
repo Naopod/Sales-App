@@ -1,14 +1,15 @@
 {% load custom_filters %}
 
     <h2 class="mb-4 mt-4"><i class="bi bi-currency-exchange"></i> Dépendance aux devises</h2>
+    <p class="text-muted mb-4">
+        Cette section présente l'exposition du chiffre d'affaires aux devises non-EUR, leur poids dans le portefeuille et les clients ou marchés qui concentrent cette dépendance.
+    </p>
 
 {% if currency_kpi %}
 <div class="row mb-4">
     <div class="col-12">
         <h2 class="mb-3"><i class="bi bi-currency-exchange"></i> Analyse de la Dépendance aux Devises</h2>
-        <p class="text-muted">
-            Analyse de l'exposition aux devises étrangères - Mix de devises, concentration et volatilité
-        </p>
+        <p class="text-muted">Mix de devises, concentration et évolution de la part non-EUR.</p>
     </div>
 </div>
 
@@ -110,23 +111,13 @@
 </div>
 
 <div class="row mb-4">
-    <div class="col-md-6">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h5 class="mb-0"><i class="bi bi-people"></i> Top Clients Non-EUR (Pareto)</h5>
             </div>
             <div class="card-body">
                 <img src="{{ currency_charts.pareto_non_eur_clients }}" class="img-fluid" alt="Top Clients Non-EUR">
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-box"></i> Part Non-EUR par Famille Produits</h5>
-            </div>
-            <div class="card-body">
-                <img src="{{ currency_charts.non_eur_by_family }}" class="img-fluid" alt="Part Non-EUR par Famille">
             </div>
         </div>
     </div>
